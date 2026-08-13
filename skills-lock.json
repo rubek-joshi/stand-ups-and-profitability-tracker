@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "configure-nestjs-rfc9457": {
+      "source": "camcima/nestjs-rfc9457",
+      "sourceType": "github",
+      "skillPath": "skills/configure-nestjs-rfc9457/SKILL.md",
+      "computedHash": "ba08217f1c01fb615cb9a70db7f2008fcc26d5527a78c98183536f92499a4c86"
+    },
+    "shadcn": {
+      "source": "shadcn/ui",
+      "sourceType": "github",
+      "skillPath": "skills/shadcn/SKILL.md",
+      "computedHash": "f99ef49d9909d380ca683ceb8dc8c25775c20ee38140112c394e037d8c11ee18"
+    }
+  }
+}
