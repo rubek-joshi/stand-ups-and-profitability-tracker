@@ -136,7 +136,7 @@ Exact role-permission mapping should be confirmed with stakeholders before build
 ### 6.1 Client Management
 - CRUD for clients.
 - View all projects under a client with an aggregated profit/loss summary.
-- Cannot delete a client with active projects (soft-deactivate instead).
+- **Cannot delete a client with any projects** — active, extended, closed, or under AMC — since deleting the client would orphan that project's historical financial/audit data. **Soft-deactivate instead.** See §6.17 for the disabled-state and confirmation-modal behavior around this.
 
 ### 6.2 Project Management
 - CRUD for projects; each project has a **Category**, **Client**, and **fixed Budget (excl. VAT)** and a **fixed Timeline** (`start_date` → `end_date`).
@@ -157,6 +157,7 @@ Exact role-permission mapping should be confirmed with stakeholders before build
   - No longer appears in new stand-ups.
   - Retains all historical stand-up/allocation data for reporting.
   - Is excluded from active headcount/utilization dashboards but remains queryable in historical reports.
+- **Deletion is blocked, not just discouraged:** an employee **cannot be deleted** if they're tied to any other resource — existing `ProjectAssignment`s, any historical `StandupEntry`/`AttendanceRecord`, or any `EmployeeSalaryEntry`. In practice this means almost any employee who has ever done real work in the system can't be deleted. Marking them `status = left` (above) is the correct action instead — it preserves all historical cost/P&L data while removing them from active use. See §6.17 for how this is surfaced in the UI (disabled delete button + tooltip + confirmation modal for the cases where deletion genuinely is allowed, e.g., a record created by mistake with zero history).
 - **Project assignment:** admins/managers assign an employee to one or more projects (`ProjectAssignment`); this pool determines which projects that employee can be allocated to in a stand-up (see §6.5.3).
 - **Attendance & leave history:** each employee's profile (Employee Detail Page) shows:
   - **Totals** of **First Half Leave**, **Second Half Leave**, **Late**, and **Absent** occurrences — shown as overall totals and as a **month-wise breakdown** (date, count per month, running total) for each of the four, so patterns are visible at a glance.
@@ -171,6 +172,7 @@ Core members are a **separate category of paid personnel**, distinct from employ
 - **Added to projects directly**, via `CoreMemberAssignment` — an admin/manager assigns a core member to one or more projects.
 - **Cost model — monthly salary divided across active projects, prorated by day:** a core member's effective monthly salary is divided across all projects they're concurrently assigned to **on a day-by-day basis** — e.g., a core member on 3 concurrent projects for the full month has their salary split ⅓ / ⅓ / ⅓ across those 3 projects. If they're unassigned from one project partway through the month, the split recalculates for the remaining days (e.g., 3-way split for the first half of the month, then 2-way split for the second half, once one assignment ends) rather than applying one flat divisor to the whole month. If assigned to only 1 project for the full month, that project bears the full salary.
 - **Core member leaving:** mark `status = left` with a `date_left`; behaves the same as an employee leaving (removed from future cost accrual, historical data retained) — see §6.3's handling for the equivalent employee case.
+- **Deletion is blocked** under the same rule as employees (§6.3): a core member **cannot be deleted** if tied to any `CoreMemberAssignment` or `CoreMemberSalaryEntry`. Use `status = left` instead. See §6.17.
 - Core member cost is included in project, client, and category profit/loss totals (see §6.7) and in the budget-vs-timeline forecast (see §6.8), but core members are **excluded** from the Employee Utilization metric (§6.7), since utilization is a stand-up-derived concept that doesn't apply to them.
 
 ### 6.5 Stand-ups
@@ -312,6 +314,16 @@ Displays:
 - **Category breakdown** (profit/loss per category, within selected range or overall)
 - **Project Health Indicators** (see §6.13) — visual flags (e.g., green/yellow/red) per project based on configurable thresholds
 
+**Mobile Responsiveness**
+- The dashboard must be **fully usable on mobile viewports** (phone and tablet widths), not just a scaled-down desktop layout:
+  - **Layout reflow:** the stat cards (Total Profit, Total Loss, Overall Profit/Loss %, Active/Closed counts, Accumulated VAT, etc.) stack into a **single column** below a tablet breakpoint, instead of the multi-column grid used on desktop.
+  - **Ranked lists** (Top 5 Profitable/Loss-Making Projects) and the **Category breakdown** remain fully readable at narrow widths — condensed rows or horizontal scroll for any wide numeric columns, rather than tables getting clipped or requiring pinch-zoom.
+  - **Date Range Selector** collapses to a mobile-friendly picker (e.g., a bottom-sheet/modal date picker) rather than the desktop inline dual-calendar widget.
+  - **Sidebar navigation** collapses into a **hamburger/off-canvas menu** on mobile, consistent with how it's accessed via the Command Palette (§6.15) as an alternative.
+  - **Health indicator badges** (§6.13) and **AMC Overdue warning badges** (§6.10) remain visible and legible at mobile widths — they should not be truncated or hidden.
+  - Touch targets (buttons, filter chips, list rows) meet a minimum comfortable tap size; no functionality on the dashboard should be **mouse-hover-only** (e.g., a tooltip-only detail must also be reachable by tap).
+- This mobile-responsive treatment applies to the dashboard specifically for v1; other screens (stand-up entry, admin CRUD forms, audit logs) are desktop-first for now and can be revisited in a later version.
+
 ### 6.13 Configurable Project Health Indicators (Settings)
 - Admins (and super admins) can configure thresholds that classify a project's health. Sensible defaults (editable):
   - **Healthy** (green): profit margin **≥ 20%**
@@ -324,7 +336,7 @@ Displays:
 - Every create/update/delete action of consequence is logged: client, project, employee, core member (including salary changes and leave status), stand-up completion/edit, extensions, VAT clearance, AMC changes, settings changes.
 - **Visible only to Super Admin.**
 - Filterable by:
-  - **Action type** (e.g., "Salary Updated", "Project Closed", "VAT Cleared", "Core Member Assigned")
+  - **Action type** (e.g., "Salary Updated", "Project Closed", "VAT Cleared", "Core Member Assigned", "DB Snapshot Downloaded")
   - **User (actor)**
   - Combinable filters (action **and/or** user)
 - Each entry shows: timestamp, actor, action, target entity, and a readable diff/summary of what changed.
@@ -347,6 +359,21 @@ Displays:
 - **Default:** on first visit (no stored preference yet), the app follows the **OS/browser's system preference** (`prefers-color-scheme`).
 - **Persistence:** once the user explicitly picks a theme, that choice is saved to **`localStorage`** and takes precedence over system preference on all future visits **in that browser** (this is a per-browser/device preference, not synced to the user's account across devices, consistent with how recents are stored in §6.15).
 - If the user has never explicitly chosen a theme, the app should continue to **follow live system-preference changes** (e.g., OS switches to dark mode at sunset) rather than freezing at whatever was detected on first load.
+
+### 6.17 Confirmation Modals & Disabled-State Tooltips
+- **Confirmation modal required before:**
+  - **Logging out.**
+  - **Any delete action**, across all entities (clients, projects, employees, core members, categories, salary entries, etc.) — including cases where deletion is actually allowed (see the blocking rules in §6.1/§6.3/§6.4 for cases where it's blocked entirely rather than just confirmed).
+  - **Any action that triggers a full recalculation** — most notably editing or deleting a past `EmployeeSalaryEntry`/`CoreMemberSalaryEntry` (§6.3, §6.4), since this silently re-derives historical cost/P&L across every affected project. The modal should say plainly what will be recalculated (e.g., "This will recalculate cost and profit/loss for N projects between [date] and today. Continue?").
+  - Other clearly destructive/hard-to-reverse actions already called out elsewhere in this doc follow the same pattern even if not restated here (e.g., cancelling an AMC, clearing accumulated VAT, downloading a new DB snapshot per §6.18).
+  - Every confirmation modal must have a clear **Cancel** action as the safe default (not pre-focused on the destructive confirm button), and the destructive action should be logged to the Audit Log (§6.14) once confirmed.
+- **Disabled-button tooltips:** wherever a button is disabled because an action isn't currently allowed (e.g., "Delete" on a client with existing projects, "Delete" on an employee with stand-up history, an AMC action that's not yet applicable), **hovering the disabled button shows a tooltip explaining why** (e.g., "Cannot delete: employee has 42 stand-up entries. Mark as left instead."). On touch devices where hover isn't available, tapping the disabled control reveals the same tooltip (consistent with the no-hover-only rule already set for the mobile dashboard in §6.12).
+
+### 6.18 Database Snapshot Export (Super Admin)
+- In **Settings**, a **Super Admin**-only action lets the admin **download a full snapshot of the current database** at any point in time (e.g., an export/dump file), for backup/audit purposes outside the system.
+- **Single-snapshot retention:** the system keeps **at most one** generated snapshot at a time. Generating/downloading a new snapshot **deletes the previous one** as part of the same action — there's no snapshot history or archive to browse. This is confirmed via the standard confirmation modal (§6.17), since it's a destructive action for the prior snapshot: *"Downloading a new snapshot will replace and permanently delete the existing one. Continue?"*
+- The snapshot action (both generation and the resulting deletion of the prior file) is recorded in the **Audit Log** (§6.14), including the actor and timestamp.
+- This is a manual, on-demand export — not a scheduled/automatic backup job in v1.
 
 ---
 
@@ -379,7 +406,11 @@ Displays:
 | VAT rate changed in Settings | Only applies to new projects going forward; existing projects retain the VAT rate snapshot from their creation (`vat_rate_applied`) to avoid retroactively altering historical figures. |
 | Paid leave allowance changed in Settings | Applies going forward; historical paid/unpaid leave classification for past periods is not retroactively recalculated. |
 | Two admins editing the same stand-up concurrently | Live cursors and real-time sync prevent silent overwrites; last-write-wins is avoided via collaborative editing (CRDT/OT). |
-| Client deletion with active projects | Blocked; client must be deactivated instead, or all projects closed first. |
+| Client deletion attempted while they have any projects (active or closed) | Blocked entirely (delete button disabled with an explanatory tooltip, §6.17); client must be soft-deactivated instead. |
+| Employee/Core Member deletion attempted while tied to assignments, salary entries, or (for employees) stand-up/attendance history | Blocked entirely, same pattern as client deletion above; mark `status = left` instead (§6.3, §6.4). |
+| Employee/Core Member deletion attempted with **zero** history (e.g., created by mistake, never assigned or paid) | Allowed, but still requires the standard delete confirmation modal (§6.17) before proceeding. |
+| Admin edits/deletes a past salary entry | Confirmation modal (§6.17) shown first, stating what will be recalculated and the affected date range/projects, before the recalculation in §6.3/§6.4/§7 proceeds. |
+| Super Admin downloads a new DB snapshot while a previous one exists | Confirmation modal warns the previous snapshot will be deleted; on confirm, the new snapshot is generated and the old one removed, both logged to the Audit Log (§6.18). |
 | Dashboard date range left empty | Shows overall (all-time) stats. |
 | Dashboard date range set to a valid range | All applicable stats (profit/loss, VAT accrued, top projects, category breakdown) recalculate for that range only. |
 
@@ -394,6 +425,7 @@ Displays:
 - **Currency:** all monetary values stored and displayed in NPR.
 - **Performance:** dashboard aggregate stats and forecasts should load quickly even as stand-up/allocation history grows (consider pre-aggregation or caching for historical rollups).
 - **Client-side preferences:** command palette recents (§6.15) and the dark-mode setting (§6.16) are stored in browser `localStorage` — per-browser/device, not synced across devices or persisted server-side.
+- **Responsiveness:** the dashboard (§6.12) must render correctly across standard phone, tablet, and desktop breakpoints; dark mode (§6.16) must apply consistently across all of them.
 
 ---
 

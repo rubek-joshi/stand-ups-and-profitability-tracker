@@ -1,0 +1,33 @@
+import { Controller, Get, Query, UseGuards } from "@nestjs/common";
+import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { AuditAction } from "@workspace/database";
+import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
+import { PoliciesGuard } from "../casbin/guards/policies.guard";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { AuditService } from "./audit.service";
+
+@ApiTags("audit")
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard, PoliciesGuard)
+@Controller("audit")
+export class AuditController {
+  constructor(private readonly auditService: AuditService) {}
+
+  @Get()
+  @RequirePermission("audit", "read")
+  @ApiOperation({ summary: "List audit logs (super admin)" })
+  @ApiOkResponse()
+  async findAll(
+    @Query("action") action?: AuditAction,
+    @Query("actorId") actorId?: string,
+    @Query("skip") skip?: string,
+    @Query("take") take?: string,
+  ) {
+    return this.auditService.findAll({
+      action,
+      actorId,
+      skip: skip ? Number(skip) : 0,
+      take: take ? Number(take) : 50,
+    });
+  }
+}

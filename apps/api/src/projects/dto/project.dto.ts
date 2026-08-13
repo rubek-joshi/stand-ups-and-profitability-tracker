@@ -1,0 +1,108 @@
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsBoolean,
+  IsDateString,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from "class-validator";
+
+export class CreateProjectDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  clientId!: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  categoryId!: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  name!: string;
+
+  @ApiProperty({ description: "Budget in NPR (converted to paisa)" })
+  @IsNumber()
+  @Min(0)
+  budgetNpr!: number;
+
+  @ApiProperty({ example: "2026-01-01" })
+  @IsDateString()
+  startDate!: string;
+
+  @ApiProperty({ example: "2026-06-30" })
+  @IsDateString()
+  endDate!: string;
+
+  @ApiPropertyOptional({ default: true })
+  @IsOptional()
+  @IsBoolean()
+  isVatApplicable?: boolean;
+}
+
+export class UpdateProjectDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  categoryId?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  budgetNpr?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isVatApplicable?: boolean;
+}
+
+export class AssignEmployeeDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  employeeId!: string;
+}
+
+export class AssignCoreMemberDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  coreMemberId!: string;
+}
+
+export class CreateExtensionDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  reason!: string;
+
+  @ApiPropertyOptional({ description: "Extension amount in NPR; defaults to 0" })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  amountNpr?: number;
+}

@@ -1,3 +1,37 @@
 export { prisma } from "./client";
 export { PrismaClient } from "./generated/prisma/client";
-export type { User, CasbinRule, Prisma } from "./generated/prisma/client";
+export type {
+  User,
+  CasbinRule,
+  OrgSettings,
+  Client,
+  Category,
+  Project,
+  ProjectAssignment,
+  CoreMemberAssignment,
+  ProjectExtension,
+  Employee,
+  EmployeeSalaryEntry,
+  CoreMember,
+  CoreMemberSalaryEntry,
+  Standup,
+  StandupEntry,
+  ProjectAllocation,
+  StandupProjectOverride,
+  AttendanceRecord,
+  AmcRecord,
+  VatClearance,
+  AuditLog,
+  DbSnapshot,
+  Prisma,
+} from "./generated/prisma/client";
+export {
+  ClientStatus,
+  ProjectStatus,
+  PersonStatus,
+  AttendanceType,
+  StandupStatus,
+  AttendanceStatus,
+  AmcStatus,
+  AuditAction,
+} from "./generated/prisma/client";

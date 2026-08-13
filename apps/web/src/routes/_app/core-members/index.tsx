@@ -1,0 +1,175 @@
+import * as React from "react"
+import { Link, createFileRoute } from "@tanstack/react-router"
+import { Button } from "@workspace/ui/components/button"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
+import { Input } from "@workspace/ui/components/input"
+import { Label } from "@workspace/ui/components/label"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@workspace/ui/components/table"
+import { PageHeader } from "@/components/page-header"
+import { StatusBadge } from "@/components/health-badge"
+import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
+import { api, ApiError, type Envelope } from "@/lib/api"
+import { parseNprInput } from "@/lib/money"
+import type { CoreMember } from "@/lib/types"
+
+export const Route = createFileRoute("/_app/core-members/")({
+  component: CoreMembersPage,
+})
+
+function CoreMembersPage() {
+  const [items, setItems] = React.useState<CoreMember[]>([])
+  const [loading, setLoading] = React.useState(true)
+  const [error, setError] = React.useState<string | null>(null)
+  const [open, setOpen] = React.useState(false)
+  const [form, setForm] = React.useState({
+    name: "",
+    email: "",
+    dateJoined: new Date().toISOString().slice(0, 10),
+    initialSalaryNpr: "",
+  })
+
+  const load = React.useCallback(async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const res = await api<Envelope<CoreMember[]>>("/core-members")
+      setItems(res.data)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Failed to load")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  React.useEffect(() => {
+    void load()
+  }, [load])
+
+  return (
+    <div>
+      <PageHeader
+        title="Core Members"
+        description="Always-on cost contributors (not in stand-ups)"
+        actions={<Button onClick={() => setOpen(true)}>New core member</Button>}
+      />
+      {loading ? <LoadingState /> : null}
+      {error ? <ErrorState message={error} onRetry={load} /> : null}
+      {!loading && items.length === 0 ? <EmptyState message="No core members" /> : null}
+      {items.length > 0 ? (
+        <div className="overflow-x-auto rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Joined</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((m) => (
+                <TableRow key={m.id}>
+                  <TableCell>
+                    <Link
+                      to="/core-members/$id"
+                      params={{ id: m.id }}
+                      className="font-medium hover:underline"
+                    >
+                      {m.name}
+                    </Link>
+                  </TableCell>
+                  <TableCell>{m.email}</TableCell>
+                  <TableCell>
+                    <StatusBadge status={m.status} />
+                  </TableCell>
+                  <TableCell>{String(m.dateJoined).slice(0, 10)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      ) : null}
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create core member</DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              try {
+                await api("/core-members", {
+                  method: "POST",
+                  body: {
+                    name: form.name.trim(),
+                    email: form.email.trim(),
+                    dateJoined: form.dateJoined,
+                    initialSalaryNpr: form.initialSalaryNpr
+                      ? parseNprInput(form.initialSalaryNpr)
+                      : undefined,
+                  },
+                })
+                setOpen(false)
+                await load()
+              } catch (err) {
+                alert(err instanceof ApiError ? err.message : "Failed")
+              }
+            }}
+          >
+            <div className="space-y-2">
+              <Label>Name</Label>
+              <Input
+                required
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                required
+                value={form.email}
+                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Date joined</Label>
+              <Input
+                type="date"
+                required
+                value={form.dateJoined}
+                onChange={(e) => setForm((f) => ({ ...f, dateJoined: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Initial salary (NPR)</Label>
+              <Input
+                value={form.initialSalaryNpr}
+                onChange={(e) => setForm((f) => ({ ...f, initialSalaryNpr: e.target.value }))}
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit">Create</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

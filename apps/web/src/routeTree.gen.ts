@@ -9,50 +9,393 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as LoginRouteImport } from './routes/login'
+import { Route as AppRouteImport } from './routes/_app'
+import { Route as AppIndexRouteImport } from './routes/_app/index'
+import { Route as AppVatRouteImport } from './routes/_app/vat'
+import { Route as AppSettingsRouteImport } from './routes/_app/settings'
+import { Route as AppCategoriesRouteImport } from './routes/_app/categories'
+import { Route as AppAuditRouteImport } from './routes/_app/audit'
+import { Route as AppStandupsIndexRouteImport } from './routes/_app/standups/index'
+import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/index'
+import { Route as AppEmployeesIndexRouteImport } from './routes/_app/employees/index'
+import { Route as AppCoreMembersIndexRouteImport } from './routes/_app/core-members/index'
+import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
+import { Route as AppStandupsIdRouteImport } from './routes/_app/standups/$id'
+import { Route as AppProjectsIdRouteImport } from './routes/_app/projects/$id'
+import { Route as AppEmployeesIdRouteImport } from './routes/_app/employees/$id'
+import { Route as AppCoreMembersIdRouteImport } from './routes/_app/core-members/$id'
+import { Route as AppClientsIdRouteImport } from './routes/_app/clients/$id'
 
-const IndexRoute = IndexRouteImport.update({
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AppRoute,
+} as any)
+const AppVatRoute = AppVatRouteImport.update({
+  id: '/vat',
+  path: '/vat',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSettingsRoute = AppSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCategoriesRoute = AppCategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppAuditRoute = AppAuditRouteImport.update({
+  id: '/audit',
+  path: '/audit',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStandupsIndexRoute = AppStandupsIndexRouteImport.update({
+  id: '/standups/',
+  path: '/standups/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProjectsIndexRoute = AppProjectsIndexRouteImport.update({
+  id: '/projects/',
+  path: '/projects/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmployeesIndexRoute = AppEmployeesIndexRouteImport.update({
+  id: '/employees/',
+  path: '/employees/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCoreMembersIndexRoute = AppCoreMembersIndexRouteImport.update({
+  id: '/core-members/',
+  path: '/core-members/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
+  id: '/clients/',
+  path: '/clients/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppStandupsIdRoute = AppStandupsIdRouteImport.update({
+  id: '/standups/$id',
+  path: '/standups/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppProjectsIdRoute = AppProjectsIdRouteImport.update({
+  id: '/projects/$id',
+  path: '/projects/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmployeesIdRoute = AppEmployeesIdRouteImport.update({
+  id: '/employees/$id',
+  path: '/employees/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCoreMembersIdRoute = AppCoreMembersIdRouteImport.update({
+  id: '/core-members/$id',
+  path: '/core-members/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsIdRoute = AppClientsIdRouteImport.update({
+  id: '/clients/$id',
+  path: '/clients/$id',
+  getParentRoute: () => AppRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AppIndexRoute
+  '/login': typeof LoginRoute
+  '/audit': typeof AppAuditRoute
+  '/categories': typeof AppCategoriesRoute
+  '/settings': typeof AppSettingsRoute
+  '/vat': typeof AppVatRoute
+  '/clients/$id': typeof AppClientsIdRoute
+  '/core-members/$id': typeof AppCoreMembersIdRoute
+  '/employees/$id': typeof AppEmployeesIdRoute
+  '/projects/$id': typeof AppProjectsIdRoute
+  '/standups/$id': typeof AppStandupsIdRoute
+  '/clients/': typeof AppClientsIndexRoute
+  '/core-members/': typeof AppCoreMembersIndexRoute
+  '/employees/': typeof AppEmployeesIndexRoute
+  '/projects/': typeof AppProjectsIndexRoute
+  '/standups/': typeof AppStandupsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/login': typeof LoginRoute
+  '/audit': typeof AppAuditRoute
+  '/categories': typeof AppCategoriesRoute
+  '/settings': typeof AppSettingsRoute
+  '/vat': typeof AppVatRoute
+  '/': typeof AppIndexRoute
+  '/clients/$id': typeof AppClientsIdRoute
+  '/core-members/$id': typeof AppCoreMembersIdRoute
+  '/employees/$id': typeof AppEmployeesIdRoute
+  '/projects/$id': typeof AppProjectsIdRoute
+  '/standups/$id': typeof AppStandupsIdRoute
+  '/clients': typeof AppClientsIndexRoute
+  '/core-members': typeof AppCoreMembersIndexRoute
+  '/employees': typeof AppEmployeesIndexRoute
+  '/projects': typeof AppProjectsIndexRoute
+  '/standups': typeof AppStandupsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_app/audit': typeof AppAuditRoute
+  '/_app/categories': typeof AppCategoriesRoute
+  '/_app/settings': typeof AppSettingsRoute
+  '/_app/vat': typeof AppVatRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/clients/$id': typeof AppClientsIdRoute
+  '/_app/core-members/$id': typeof AppCoreMembersIdRoute
+  '/_app/employees/$id': typeof AppEmployeesIdRoute
+  '/_app/projects/$id': typeof AppProjectsIdRoute
+  '/_app/standups/$id': typeof AppStandupsIdRoute
+  '/_app/clients/': typeof AppClientsIndexRoute
+  '/_app/core-members/': typeof AppCoreMembersIndexRoute
+  '/_app/employees/': typeof AppEmployeesIndexRoute
+  '/_app/projects/': typeof AppProjectsIndexRoute
+  '/_app/standups/': typeof AppStandupsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/audit'
+    | '/categories'
+    | '/settings'
+    | '/vat'
+    | '/clients/$id'
+    | '/core-members/$id'
+    | '/employees/$id'
+    | '/projects/$id'
+    | '/standups/$id'
+    | '/clients/'
+    | '/core-members/'
+    | '/employees/'
+    | '/projects/'
+    | '/standups/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/login'
+    | '/audit'
+    | '/categories'
+    | '/settings'
+    | '/vat'
+    | '/'
+    | '/clients/$id'
+    | '/core-members/$id'
+    | '/employees/$id'
+    | '/projects/$id'
+    | '/standups/$id'
+    | '/clients'
+    | '/core-members'
+    | '/employees'
+    | '/projects'
+    | '/standups'
+  id:
+    | '__root__'
+    | '/_app'
+    | '/login'
+    | '/_app/audit'
+    | '/_app/categories'
+    | '/_app/settings'
+    | '/_app/vat'
+    | '/_app/'
+    | '/_app/clients/$id'
+    | '/_app/core-members/$id'
+    | '/_app/employees/$id'
+    | '/_app/projects/$id'
+    | '/_app/standups/$id'
+    | '/_app/clients/'
+    | '/_app/core-members/'
+    | '/_app/employees/'
+    | '/_app/projects/'
+    | '/_app/standups/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app/': {
+      id: '/_app/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/vat': {
+      id: '/_app/vat'
+      path: '/vat'
+      fullPath: '/vat'
+      preLoaderRoute: typeof AppVatRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/settings': {
+      id: '/_app/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AppSettingsRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/categories': {
+      id: '/_app/categories'
+      path: '/categories'
+      fullPath: '/categories'
+      preLoaderRoute: typeof AppCategoriesRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/audit': {
+      id: '/_app/audit'
+      path: '/audit'
+      fullPath: '/audit'
+      preLoaderRoute: typeof AppAuditRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/standups/': {
+      id: '/_app/standups/'
+      path: '/standups'
+      fullPath: '/standups/'
+      preLoaderRoute: typeof AppStandupsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/projects/': {
+      id: '/_app/projects/'
+      path: '/projects'
+      fullPath: '/projects/'
+      preLoaderRoute: typeof AppProjectsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/employees/': {
+      id: '/_app/employees/'
+      path: '/employees'
+      fullPath: '/employees/'
+      preLoaderRoute: typeof AppEmployeesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/core-members/': {
+      id: '/_app/core-members/'
+      path: '/core-members'
+      fullPath: '/core-members/'
+      preLoaderRoute: typeof AppCoreMembersIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clients/': {
+      id: '/_app/clients/'
+      path: '/clients'
+      fullPath: '/clients/'
+      preLoaderRoute: typeof AppClientsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/standups/$id': {
+      id: '/_app/standups/$id'
+      path: '/standups/$id'
+      fullPath: '/standups/$id'
+      preLoaderRoute: typeof AppStandupsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/projects/$id': {
+      id: '/_app/projects/$id'
+      path: '/projects/$id'
+      fullPath: '/projects/$id'
+      preLoaderRoute: typeof AppProjectsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/employees/$id': {
+      id: '/_app/employees/$id'
+      path: '/employees/$id'
+      fullPath: '/employees/$id'
+      preLoaderRoute: typeof AppEmployeesIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/core-members/$id': {
+      id: '/_app/core-members/$id'
+      path: '/core-members/$id'
+      fullPath: '/core-members/$id'
+      preLoaderRoute: typeof AppCoreMembersIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clients/$id': {
+      id: '/_app/clients/$id'
+      path: '/clients/$id'
+      fullPath: '/clients/$id'
+      preLoaderRoute: typeof AppClientsIdRouteImport
+      parentRoute: typeof AppRoute
     }
   }
 }
 
+interface AppRouteChildren {
+  AppAuditRoute: typeof AppAuditRoute
+  AppCategoriesRoute: typeof AppCategoriesRoute
+  AppSettingsRoute: typeof AppSettingsRoute
+  AppVatRoute: typeof AppVatRoute
+  AppIndexRoute: typeof AppIndexRoute
+  AppClientsIdRoute: typeof AppClientsIdRoute
+  AppCoreMembersIdRoute: typeof AppCoreMembersIdRoute
+  AppEmployeesIdRoute: typeof AppEmployeesIdRoute
+  AppProjectsIdRoute: typeof AppProjectsIdRoute
+  AppStandupsIdRoute: typeof AppStandupsIdRoute
+  AppClientsIndexRoute: typeof AppClientsIndexRoute
+  AppCoreMembersIndexRoute: typeof AppCoreMembersIndexRoute
+  AppEmployeesIndexRoute: typeof AppEmployeesIndexRoute
+  AppProjectsIndexRoute: typeof AppProjectsIndexRoute
+  AppStandupsIndexRoute: typeof AppStandupsIndexRoute
+}
+
+const AppRouteChildren: AppRouteChildren = {
+  AppAuditRoute: AppAuditRoute,
+  AppCategoriesRoute: AppCategoriesRoute,
+  AppSettingsRoute: AppSettingsRoute,
+  AppVatRoute: AppVatRoute,
+  AppIndexRoute: AppIndexRoute,
+  AppClientsIdRoute: AppClientsIdRoute,
+  AppCoreMembersIdRoute: AppCoreMembersIdRoute,
+  AppEmployeesIdRoute: AppEmployeesIdRoute,
+  AppProjectsIdRoute: AppProjectsIdRoute,
+  AppStandupsIdRoute: AppStandupsIdRoute,
+  AppClientsIndexRoute: AppClientsIndexRoute,
+  AppCoreMembersIndexRoute: AppCoreMembersIndexRoute,
+  AppEmployeesIndexRoute: AppEmployeesIndexRoute,
+  AppProjectsIndexRoute: AppProjectsIndexRoute,
+  AppStandupsIndexRoute: AppStandupsIndexRoute,
+}
+
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

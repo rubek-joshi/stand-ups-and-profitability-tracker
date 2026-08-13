@@ -7,6 +7,98 @@ datasource db {
   provider = "postgresql"
 }
 
+enum ClientStatus {
+  active
+  inactive
+}
+
+enum ProjectStatus {
+  active
+  extended
+  closed
+  under_amc
+}
+
+enum PersonStatus {
+  active
+  left
+}
+
+enum AttendanceType {
+  first_half_leave
+  second_half_leave
+  late
+  paid_absence
+  unpaid_absence
+}
+
+enum StandupStatus {
+  draft
+  in_progress
+  completed
+}
+
+enum AttendanceStatus {
+  present
+  first_half_leave
+  second_half_leave
+  late
+  absent
+}
+
+enum AmcStatus {
+  free_period
+  reminder_due
+  paid_pending
+  overdue
+  cancelled
+}
+
+enum AuditAction {
+  CLIENT_CREATED
+  CLIENT_UPDATED
+  CLIENT_DEACTIVATED
+  CLIENT_DELETED
+  CATEGORY_CREATED
+  CATEGORY_UPDATED
+  CATEGORY_DEACTIVATED
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_CLOSED
+  PROJECT_EXTENDED
+  PROJECT_AUTO_EXTENDED
+  PROJECT_ASSIGNMENT_CREATED
+  PROJECT_ASSIGNMENT_ENDED
+  CORE_MEMBER_ASSIGNED
+  CORE_MEMBER_UNASSIGNED
+  EMPLOYEE_CREATED
+  EMPLOYEE_UPDATED
+  EMPLOYEE_MARKED_LEFT
+  EMPLOYEE_DELETED
+  EMPLOYEE_SALARY_CREATED
+  EMPLOYEE_SALARY_UPDATED
+  EMPLOYEE_SALARY_DELETED
+  CORE_MEMBER_CREATED
+  CORE_MEMBER_UPDATED
+  CORE_MEMBER_MARKED_LEFT
+  CORE_MEMBER_DELETED
+  CORE_MEMBER_SALARY_CREATED
+  CORE_MEMBER_SALARY_UPDATED
+  CORE_MEMBER_SALARY_DELETED
+  STANDUP_CREATED
+  STANDUP_UPDATED
+  STANDUP_COMPLETED
+  STANDUP_REOPENED
+  STANDUP_OVERRIDE_GRANTED
+  AMC_SET
+  AMC_UPDATED
+  AMC_CANCELLED
+  VAT_CLEARED
+  SETTINGS_UPDATED
+  DB_SNAPSHOT_DOWNLOADED
+  USER_LOGIN
+}
+
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
@@ -15,6 +107,15 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
+
+  auditLogs          AuditLog[]          @relation("AuditActor")
+  createdStandups    Standup[]           @relation("StandupCreator")
+  createdExtensions  ProjectExtension[]  @relation("ExtensionCreator")
+  employeeSalaryChanges EmployeeSalaryEntry[] @relation("EmployeeSalaryChangedBy")
+  coreMemberSalaryChanges CoreMemberSalaryEntry[] @relation("CoreMemberSalaryChangedBy")
+  vatClearances      VatClearance[]
+  dbSnapshots        DbSnapshot[]
+  standupOverrides   StandupProjectOverride[]
 
   @@map("users")
 }
@@ -30,4 +131,330 @@ model CasbinRule {
   v5    String?
 
   @@map("casbin_rule")
+}
+
+model OrgSettings {
+  id                      String   @id @default(cuid())
+  vatRatePercent          Int      @default(13)
+  paidLeaveDaysPerMonth   Int      @default(4)
+  amcReminderLeadDays     Int      @default(7)
+  healthHealthyMinPercent Int      @default(20)
+  healthAtRiskMinPercent  Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@map("org_settings")
+}
+
+model Client {
+  id          String       @id @default(cuid())
+  name        String
+  contactInfo String?
+  status      ClientStatus @default(active)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  projects    Project[]
+
+  @@map("clients")
+}
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  isSeeded  Boolean   @default(false)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  projects  Project[]
+
+  @@map("categories")
+}
+
+model Project {
+  id              String        @id @default(cuid())
+  clientId        String
+  categoryId      String
+  name            String
+  budgetPaisa     BigInt
+  startDate       DateTime      @db.Date
+  endDate         DateTime      @db.Date
+  status          ProjectStatus @default(active)
+  isVatApplicable Boolean       @default(true)
+  vatRateApplied  Int           @default(13)
+  autoExtended    Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  client              Client                   @relation(fields: [clientId], references: [id])
+  category            Category                 @relation(fields: [categoryId], references: [id])
+  employeeAssignments ProjectAssignment[]
+  coreMemberAssignments CoreMemberAssignment[]
+  extensions          ProjectExtension[]
+  allocations         ProjectAllocation[]
+  amcRecord           AmcRecord?
+  standupOverrides    StandupProjectOverride[]
+
+  @@index([clientId])
+  @@index([categoryId])
+  @@index([status])
+  @@map("projects")
+}
+
+model ProjectAssignment {
+  id           String    @id @default(cuid())
+  projectId    String
+  employeeId   String
+  assignedAt   DateTime  @default(now())
+  unassignedAt DateTime?
+
+  project  Project  @relation(fields: [projectId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([projectId])
+  @@index([employeeId])
+  @@map("project_assignments")
+}
+
+model CoreMemberAssignment {
+  id           String    @id @default(cuid())
+  projectId    String
+  coreMemberId String
+  assignedAt   DateTime  @default(now())
+  unassignedAt DateTime?
+
+  project    Project    @relation(fields: [projectId], references: [id])
+  coreMember CoreMember @relation(fields: [coreMemberId], references: [id])
+
+  @@index([projectId])
+  @@index([coreMemberId])
+  @@map("core_member_assignments")
+}
+
+model ProjectExtension {
+  id          String   @id @default(cuid())
+  projectId   String
+  reason      String
+  amountPaisa BigInt   @default(0)
+  isProfit    Boolean  @default(false)
+  isAuto      Boolean  @default(false)
+  createdById String
+  createdAt   DateTime @default(now())
+
+  project   Project @relation(fields: [projectId], references: [id])
+  createdBy User    @relation("ExtensionCreator", fields: [createdById], references: [id])
+
+  @@index([projectId])
+  @@map("project_extensions")
+}
+
+model Employee {
+  id         String       @id @default(cuid())
+  name       String
+  email      String       @unique
+  status     PersonStatus @default(active)
+  dateJoined DateTime     @db.Date
+  dateLeft   DateTime?    @db.Date
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  salaryEntries   EmployeeSalaryEntry[]
+  assignments     ProjectAssignment[]
+  attendanceRecords AttendanceRecord[]
+  standupEntries  StandupEntry[]
+
+  @@map("employees")
+}
+
+model EmployeeSalaryEntry {
+  id            String   @id @default(cuid())
+  employeeId    String
+  salaryPaisa   BigInt
+  effectiveDate DateTime @db.Date
+  changedById   String
+  reason        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  employee  Employee @relation(fields: [employeeId], references: [id])
+  changedBy User     @relation("EmployeeSalaryChangedBy", fields: [changedById], references: [id])
+
+  @@index([employeeId, effectiveDate])
+  @@map("employee_salary_entries")
+}
+
+model CoreMember {
+  id         String       @id @default(cuid())
+  name       String
+  email      String       @unique
+  status     PersonStatus @default(active)
+  dateJoined DateTime     @db.Date
+  dateLeft   DateTime?    @db.Date
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+
+  salaryEntries CoreMemberSalaryEntry[]
+  assignments   CoreMemberAssignment[]
+
+  @@map("core_members")
+}
+
+model CoreMemberSalaryEntry {
+  id            String   @id @default(cuid())
+  coreMemberId  String
+  salaryPaisa   BigInt
+  effectiveDate DateTime @db.Date
+  changedById   String
+  reason        String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  coreMember CoreMember @relation(fields: [coreMemberId], references: [id])
+  changedBy  User       @relation("CoreMemberSalaryChangedBy", fields: [changedById], references: [id])
+
+  @@index([coreMemberId, effectiveDate])
+  @@map("core_member_salary_entries")
+}
+
+model Standup {
+  id          String        @id @default(cuid())
+  date        DateTime      @db.Date
+  status      StandupStatus @default(draft)
+  createdById String
+  yjsState    Bytes?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  createdBy  User                     @relation("StandupCreator", fields: [createdById], references: [id])
+  entries    StandupEntry[]
+  overrides  StandupProjectOverride[]
+  attendance AttendanceRecord[]
+
+  @@index([date])
+  @@map("standups")
+}
+
+model StandupEntry {
+  id               String           @id @default(cuid())
+  standupId        String
+  employeeId       String
+  attendanceStatus AttendanceStatus @default(present)
+  notesMarkdown    String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  standup     Standup             @relation(fields: [standupId], references: [id], onDelete: Cascade)
+  employee    Employee            @relation(fields: [employeeId], references: [id])
+  allocations ProjectAllocation[]
+
+  @@unique([standupId, employeeId])
+  @@map("standup_entries")
+}
+
+model ProjectAllocation {
+  id             String @id @default(cuid())
+  standupEntryId String
+  projectId      String
+  percentage     Int
+  isNonBillable  Boolean @default(false)
+
+  standupEntry StandupEntry @relation(fields: [standupEntryId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id])
+
+  @@unique([standupEntryId, projectId])
+  @@map("project_allocations")
+}
+
+model StandupProjectOverride {
+  id         String   @id @default(cuid())
+  standupId  String
+  projectId  String
+  reason     String
+  approvedById String
+  createdAt  DateTime @default(now())
+
+  standup    Standup @relation(fields: [standupId], references: [id], onDelete: Cascade)
+  project    Project @relation(fields: [projectId], references: [id])
+  approvedBy User    @relation(fields: [approvedById], references: [id])
+
+  @@unique([standupId, projectId])
+  @@map("standup_project_overrides")
+}
+
+model AttendanceRecord {
+  id         String         @id @default(cuid())
+  employeeId String
+  standupId  String
+  date       DateTime       @db.Date
+  month      String
+  type       AttendanceType
+  createdAt  DateTime       @default(now())
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+  standup  Standup  @relation(fields: [standupId], references: [id])
+
+  @@index([employeeId, month])
+  @@index([standupId])
+  @@map("attendance_records")
+}
+
+model AmcRecord {
+  id              String    @id @default(cuid())
+  projectId       String    @unique
+  setDate         DateTime  @db.Date
+  freeUntilDate   DateTime  @db.Date
+  reminderSentAt  DateTime?
+  status          AmcStatus @default(free_period)
+  cancelledAt     DateTime?
+  cancelledRemark String?
+  amcAmountPaisa  BigInt?
+  isVatApplicable Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@map("amc_records")
+}
+
+model VatClearance {
+  id              String   @id @default(cuid())
+  amountPaisa     BigInt
+  clearedAt       DateTime @default(now())
+  clearedById     String
+  note            String?
+  createdAt       DateTime @default(now())
+
+  clearedBy User @relation(fields: [clearedById], references: [id])
+
+  @@map("vat_clearances")
+}
+
+model AuditLog {
+  id         String      @id @default(cuid())
+  actorId    String?
+  action     AuditAction
+  targetType String
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime    @default(now())
+
+  actor User? @relation("AuditActor", fields: [actorId], references: [id])
+
+  @@index([action])
+  @@index([actorId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model DbSnapshot {
+  id           String   @id @default(cuid())
+  fileName     String
+  filePath     String
+  sizeBytes    BigInt
+  createdById  String
+  createdAt    DateTime @default(now())
+
+  createdBy User @relation(fields: [createdById], references: [id])
+
+  @@map("db_snapshots")
 }
