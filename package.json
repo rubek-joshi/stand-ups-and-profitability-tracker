@@ -7,7 +7,14 @@
     "dev": "turbo dev",
     "lint": "turbo lint",
     "format": "turbo format",
-    "typecheck": "turbo typecheck"
+    "typecheck": "turbo typecheck",
+    "db:generate": "pnpm --filter @workspace/database db:generate",
+    "db:migrate": "pnpm --filter @workspace/database db:migrate",
+    "db:deploy": "pnpm --filter @workspace/database db:deploy",
+    "db:seed": "pnpm --filter @workspace/database db:seed",
+    "db:studio": "pnpm --filter @workspace/database db:studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down"
   },
   "devDependencies": {
     "prettier": "^3.8.3",
@@ -22,7 +29,8 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild",
-      "lightningcss"
+      "lightningcss",
+      "bcrypt"
     ]
   }
 }

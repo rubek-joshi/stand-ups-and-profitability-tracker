@@ -190,7 +190,7 @@ For each employee listed in the stand-up:
   - **Only "Absent" triggers the disabling behavior:** marking an employee absent immediately **disables/greys out their markdown notes field** and **skips their project-allocation section** for that stand-up (no project gets time credited for that day). Absence does **not** automatically exclude the employee from that day's **cost** calculation — see the paid/unpaid leave logic in §6.5.4.
   - **First Half Leave, Second Half Leave, and Late are all treated as Present** for every purpose other than the attendance count itself: notes field stays enabled, the project-allocation section is shown and required exactly as for a normal present day, the full day's cost is attributed normally (no paid/unpaid leave logic applies), and utilization is unaffected. The only difference from a plain "Present" day is that the occurrence is recorded and counted separately for reporting (see the Employee Detail Page totals in §6.3).
 - **Notes field:** free-form **Markdown** editor, per employee, for stand-up notes (only disabled when `attendance_status = absent`).
-- **Project selection:** multi-select, restricted to **only the projects the employee is explicitly assigned to** (via `ProjectAssignment`, §6.2) — an employee cannot be allocated to a project they aren't associated with.
+- **Project selection:** multi-select, restricted to **only the projects the employee is explicitly assigned to** (via `ProjectAssignment`, §6.2) — an employee cannot be allocated to a project they aren't associated with. Within that assigned set, projects are further filtered/flagged by their **closed-project and AMC eligibility rules** (§6.10) — a project whose AMC was rejected by the client (or that was closed with no AMC arranged) is **not selectable** without an admin override; a project with an **overdue** AMC remains selectable but shows a warning badge in the picker.
   - On selection, the system **automatically splits time 100% evenly** across the selected projects (e.g., 2 projects → 50/50, 3 projects → 33.33/33.33/33.34).
   - The percentage split is **manually adjustable** per project (e.g., drag slider or numeric input), with validation that the total always equals 100%.
 
@@ -272,6 +272,21 @@ Every project has a **fixed budget** and a **fixed timeline** (`start_date` → 
 - **Cancelling an AMC:** an admin/manager can take a **"Cancel AMC"** action (e.g., when the client rejects it), with an **optional remark** explaining why. This sets status to `Cancelled`, stops further reminders for that project, and is logged with `cancelled_at` and `cancelled_remark`.
 - Reminders surface on the Dashboard and via **email** (email is the only reminder channel for now; in-app notifications may be considered in a future version).
 
+**Stand-up eligibility for closed projects**
+A project's `status` and its `AMCRecord.status` together determine whether it can still be selected in a stand-up:
+
+| Project status | AMC status | Selectable in stand-up? |
+|---|---|---|
+| `active` / `extended` | — (no AMC yet) | Yes — normal. |
+| `closed` | `Free Period`, `Reminder Due`, or paid/`Under AMC` | Yes — normal, ordinary AMC work. |
+| `closed` / `under_amc` | `Overdue` | Yes, but **flagged**. The project shows an **"AMC Overdue" warning badge** in the stand-up project picker, on the project page, and in the dashboard's project list. The AMC being overdue doesn't stop support work from continuing (blocking it could hurt the client relationship while payment is being chased) — but cost accruing during this window must stay visible so it prompts collection follow-up, not a silent leak. |
+| `closed` | `Cancelled` (client rejected the AMC) or no AMC set | **No** — not selectable in the normal project picker. There's no active paid relationship to attribute time to. |
+
+- **Admin override for a cancelled/no-AMC closed project:** if an employee genuinely needs to log one-off work against such a project (e.g., a goodwill fix), an **admin/manager must explicitly re-enable it for that stand-up** via an override action (logged with who approved it and why). Time logged this way is tagged **non-billable / write-off**:
+  - It **does not** get folded back into that project's already-closed budget/P/L (which stays frozen as of closure).
+  - It **is** counted toward the employee's cost/utilization and toward an org-wide **non-billable cost** total, so the org can see how much unattributed work is happening.
+- This eligibility check runs at the point of **project selection** in the stand-up (§6.5.3), not after the fact — so cost against a rejected AMC can't accumulate by accident.
+
 ### 6.11 Project Categories
 - Seeded categories: `Design`, `Development`.
 - Admin can add/edit/deactivate categories.
@@ -332,6 +347,8 @@ Displays:
 | Employee marked absent, within paid leave allowance | Notes field disabled, no project allocation for the day, but the employee's prorated daily cost **is still counted** (as overhead) toward that day's cost calculation. Recorded as a paid leave day. |
 | Employee marked absent, paid leave allowance already exhausted | Recorded as **unpaid leave**; employee is **excluded** from cost calculation for that day. Reflected in their month-wise unpaid leave history. |
 | Employee marked First Half Leave, Second Half Leave, or Late | Treated identically to Present: notes field enabled, project allocation shown/required, full day's cost attributed normally, no paid-leave balance impact. Only difference is the occurrence is logged as an `AttendanceRecord` and counted in that status's total on the Employee Detail Page. |
+| Employee tries to log time against a closed project whose AMC was rejected (or has no AMC) | Project is **not selectable** in the normal picker. An admin/manager can grant a one-off **override**, which tags the logged time as **non-billable/write-off** — counted in org-wide cost and the employee's utilization, but excluded from that project's (already-frozen) P/L. |
+| Employee logs time against a closed project whose AMC is Overdue | Selectable and logged normally, but the project shows an **"AMC Overdue" warning badge** in the picker, project page, and dashboard, so the accruing cost stays visible and prompts payment follow-up rather than going unnoticed. |
 | Allocation percentages don't sum to 100% | System blocks stand-up completion until corrected (validation error). |
 | Employee selects a project they aren't assigned to | Not selectable — the project list offered during a stand-up is restricted to the employee's assigned projects only. |
 | Core member assigned to multiple concurrent projects | Their monthly salary is **divided equally** among all currently active project assignments — e.g., 3 concurrent projects each bear ⅓ of the salary as cost, not the full amount each. |
