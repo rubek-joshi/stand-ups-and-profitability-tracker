@@ -7,6 +7,7 @@ export type {
   Client,
   Category,
   Project,
+  ProjectCategory,
   ProjectAssignment,
   CoreMemberAssignment,
   ProjectExtension,

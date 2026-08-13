@@ -5,6 +5,7 @@ import {
 } from "@nestjs/common";
 import { AuditAction, ClientStatus } from "@workspace/database";
 import { AuditService } from "../audit/audit.service";
+import { serializeMoneyFields } from "../_shared/utils/serialize-money.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
@@ -45,7 +46,9 @@ export class ClientsService {
       where: { id },
       include: {
         projects: {
-          include: { category: true },
+          include: {
+            projectCategories: { include: { category: true } },
+          },
           orderBy: { createdAt: "desc" },
         },
       },
@@ -53,7 +56,16 @@ export class ClientsService {
     if (!client) {
       throw new NotFoundException(`Client ${id} not found`);
     }
-    return client;
+    return {
+      ...client,
+      projects: client.projects.map((project) => ({
+        ...serializeMoneyFields(project, ["budgetPaisa"] as const),
+        categories:
+          project.projectCategories?.map((row) => row.category) ?? [],
+        categoryIds:
+          project.projectCategories?.map((row) => row.categoryId) ?? [],
+      })),
+    };
   }
 
   async update(id: string, dto: UpdateClientDto, actorId: string) {

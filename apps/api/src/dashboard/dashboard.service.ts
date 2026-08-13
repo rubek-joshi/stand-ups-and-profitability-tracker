@@ -17,7 +17,10 @@ export class DashboardService {
     const fromDate = from ? parseIsoDate(from) : undefined;
     const toDate = to ? parseIsoDate(to) : undefined;
     const projects = await this.prismaService.project.findMany({
-      include: { category: true, client: true },
+      include: {
+        client: true,
+        projectCategories: { include: { category: true } },
+      },
     });
     const results = await this.profitabilityService.calculateMany(
       projects.map((project) => project.id),
@@ -37,11 +40,15 @@ export class DashboardService {
       }
       revenueSum += pl.revenuePaisa;
       profitLossSum += pl.profitLossPaisa;
+      const categoryNames = project.projectCategories.map(
+        (row) => row.category.name,
+      );
       return {
         id: project.id,
         name: project.name,
         clientName: project.client.name,
-        categoryName: project.category.name,
+        categoryName: categoryNames.join(", "),
+        categoryNames,
         status: project.status,
         profitLossPaisa: String(pl.profitLossPaisa),
         marginPercent: pl.marginPercent,
@@ -62,13 +69,16 @@ export class DashboardService {
     >();
     for (const project of projects) {
       const pl = byId.get(project.id)!;
-      const existing = categoryMap.get(project.categoryId) ?? {
-        categoryId: project.categoryId,
-        name: project.category.name,
-        profitLossPaisa: 0n,
-      };
-      existing.profitLossPaisa += pl.profitLossPaisa;
-      categoryMap.set(project.categoryId, existing);
+      for (const row of project.projectCategories) {
+        const existing = categoryMap.get(row.categoryId) ?? {
+          categoryId: row.categoryId,
+          name: row.category.name,
+          profitLossPaisa: 0n,
+        };
+        // Full project P/L is attributed to each linked category (tagging model).
+        existing.profitLossPaisa += pl.profitLossPaisa;
+        categoryMap.set(row.categoryId, existing);
+      }
     }
     const vat = await this.vatService.getAccumulatedUnpaid();
     const amcReminders = await this.prismaService.amcRecord.findMany({
@@ -114,7 +124,7 @@ export class DashboardService {
       })),
       categoryBreakdown: [...categoryMap.values()].map((item) => ({
         categoryId: item.categoryId,
-        name: item.name,
+        categoryName: item.name,
         profitLossPaisa: String(item.profitLossPaisa),
       })),
     };

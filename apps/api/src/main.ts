@@ -6,6 +6,9 @@ import { createRfc9457ValidationPipeExceptionFactory } from "@camcima/nestjs-rfc
 import { applyProblemDetailResponses } from "@camcima/nestjs-rfc9457/swagger";
 import { AppModule } from "./app.module";
 import { TransformResInterceptor } from "./_shared/interceptors/transform-res.interceptor";
+import { enableBigIntJson } from "./_shared/utils/bigint-json";
+
+enableBigIntJson();
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);

@@ -40,20 +40,24 @@ export class ProjectsService {
     if (!settings) {
       throw new BadRequestException("Org settings not found");
     }
-    await this.ensureClientAndCategory(dto.clientId, dto.categoryId);
+    await this.ensureClientAndCategories(dto.clientId, dto.categoryIds);
     const isVatApplicable = dto.isVatApplicable ?? true;
     const project = await this.prismaService.project.create({
       data: {
         clientId: dto.clientId,
-        categoryId: dto.categoryId,
         name: dto.name,
         budgetPaisa: nprToPaisa(dto.budgetNpr),
         startDate: parseIsoDate(dto.startDate),
         endDate: parseIsoDate(dto.endDate),
         isVatApplicable,
         vatRateApplied: isVatApplicable ? settings.vatRatePercent : 0,
+        projectCategories: {
+          create: [...new Set(dto.categoryIds)].map((categoryId) => ({
+            categoryId,
+          })),
+        },
       },
-      include: { client: true, category: true },
+      include: this.projectInclude,
     });
     await this.auditService.write({
       actorId,
@@ -71,10 +75,10 @@ export class ProjectsService {
         ...(filters.clientId ? { clientId: filters.clientId } : {}),
         ...(filters.status ? { status: filters.status } : {}),
       },
-      include: { client: true, category: true },
+      include: this.projectInclude,
       orderBy: { createdAt: "desc" },
     });
-    return serializeMoneyList(projects, PROJECT_MONEY_FIELDS);
+    return projects.map((project) => this.serializeProject(project));
   }
 
   async findOne(id: string) {
@@ -103,26 +107,31 @@ export class ProjectsService {
 
   async update(id: string, dto: UpdateProjectDto, actorId: string) {
     const before = await this.getProjectOrThrow(id);
-    if (dto.categoryId) {
-      const category = await this.prismaService.category.findUnique({
-        where: { id: dto.categoryId },
-      });
-      if (!category) {
-        throw new NotFoundException(`Category ${dto.categoryId} not found`);
-      }
+    if (dto.categoryIds) {
+      await this.ensureCategoriesExist(dto.categoryIds);
     }
-    const project = await this.prismaService.project.update({
-      where: { id },
-      data: {
-        name: dto.name,
-        categoryId: dto.categoryId,
-        budgetPaisa:
-          dto.budgetNpr === undefined ? undefined : nprToPaisa(dto.budgetNpr),
-        startDate: dto.startDate ? parseIsoDate(dto.startDate) : undefined,
-        endDate: dto.endDate ? parseIsoDate(dto.endDate) : undefined,
-        isVatApplicable: dto.isVatApplicable,
-      },
-      include: { client: true, category: true, extensions: true },
+    const project = await this.prismaService.$transaction(async (tx) => {
+      if (dto.categoryIds) {
+        await tx.projectCategory.deleteMany({ where: { projectId: id } });
+        await tx.projectCategory.createMany({
+          data: [...new Set(dto.categoryIds)].map((categoryId) => ({
+            projectId: id,
+            categoryId,
+          })),
+        });
+      }
+      return tx.project.update({
+        where: { id },
+        data: {
+          name: dto.name,
+          budgetPaisa:
+            dto.budgetNpr === undefined ? undefined : nprToPaisa(dto.budgetNpr),
+          startDate: dto.startDate ? parseIsoDate(dto.startDate) : undefined,
+          endDate: dto.endDate ? parseIsoDate(dto.endDate) : undefined,
+          isVatApplicable: dto.isVatApplicable,
+        },
+        include: this.projectInclude,
+      });
     });
     this.profitabilityService.clearCache(id);
     await this.auditService.write({
@@ -146,7 +155,7 @@ export class ProjectsService {
     const project = await this.prismaService.project.update({
       where: { id },
       data: { status: ProjectStatus.closed },
-      include: { client: true, category: true, extensions: true },
+      include: this.projectInclude,
     });
     await this.auditService.write({
       actorId,
@@ -341,17 +350,19 @@ export class ProjectsService {
     return { employees, coreMembers };
   }
 
+  private readonly projectInclude = {
+    client: true,
+    projectCategories: { include: { category: true } },
+    extensions: true,
+    employeeAssignments: { include: { employee: true } },
+    coreMemberAssignments: { include: { coreMember: true } },
+    amcRecord: true,
+  } as const;
+
   private async getProjectOrThrow(id: string) {
     const project = await this.prismaService.project.findUnique({
       where: { id },
-      include: {
-        client: true,
-        category: true,
-        extensions: true,
-        employeeAssignments: { include: { employee: true } },
-        coreMemberAssignments: { include: { coreMember: true } },
-        amcRecord: true,
-      },
+      include: this.projectInclude,
     });
     if (!project) {
       throw new NotFoundException(`Project ${id} not found`);
@@ -359,20 +370,58 @@ export class ProjectsService {
     return project;
   }
 
-  private async ensureClientAndCategory(clientId: string, categoryId: string) {
-    const [client, category] = await Promise.all([
-      this.prismaService.client.findUnique({ where: { id: clientId } }),
-      this.prismaService.category.findUnique({ where: { id: categoryId } }),
-    ]);
+  private async ensureClientAndCategories(
+    clientId: string,
+    categoryIds: string[],
+  ) {
+    const client = await this.prismaService.client.findUnique({
+      where: { id: clientId },
+    });
     if (!client) {
       throw new NotFoundException(`Client ${clientId} not found`);
     }
-    if (!category) {
-      throw new NotFoundException(`Category ${categoryId} not found`);
+    await this.ensureCategoriesExist(categoryIds);
+  }
+
+  private async ensureCategoriesExist(categoryIds: string[]) {
+    const uniqueIds = [...new Set(categoryIds)];
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException("At least one category is required");
+    }
+    const categories = await this.prismaService.category.findMany({
+      where: { id: { in: uniqueIds } },
+    });
+    if (categories.length !== uniqueIds.length) {
+      throw new NotFoundException("One or more categories were not found");
     }
   }
 
-  private serializeProject<T extends { budgetPaisa: bigint }>(project: T) {
-    return serializeMoneyFields(project, PROJECT_MONEY_FIELDS);
+  private serializeProject<
+    T extends {
+      budgetPaisa: bigint;
+      projectCategories?: Array<{ category: { id: string; name: string } }>;
+      extensions?: Array<{ amountPaisa: bigint }>;
+      amcRecord?: { amcAmountPaisa: bigint | null } | null;
+    },
+  >(project: T) {
+    const serialized = serializeMoneyFields(project, PROJECT_MONEY_FIELDS) as T & {
+      categories?: Array<{ id: string; name: string }>;
+      categoryIds?: string[];
+      extensions?: ReturnType<typeof serializeMoneyList>;
+      amcRecord?: ReturnType<typeof serializeMoneyFields> | null;
+    };
+    const categories =
+      project.projectCategories?.map((row) => row.category) ?? [];
+    return {
+      ...serialized,
+      categories,
+      categoryIds: categories.map((category) => category.id),
+      extensions: project.extensions
+        ? serializeMoneyList(project.extensions, EXTENSION_MONEY_FIELDS)
+        : project.extensions,
+      amcRecord: project.amcRecord
+        ? serializeMoneyFields(project.amcRecord, ["amcAmountPaisa"] as const)
+        : project.amcRecord,
+    };
   }
 }

@@ -11,6 +11,7 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Switch } from "@workspace/ui/components/switch"
+import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   Select,
   SelectContent,
@@ -48,7 +49,7 @@ function ProjectsPage() {
   const [form, setForm] = React.useState({
     name: "",
     clientId: "",
-    categoryId: "",
+    categoryIds: [] as string[],
     budgetNpr: "",
     startDate: new Date().toISOString().slice(0, 10),
     endDate: "",
@@ -166,7 +167,7 @@ function ProjectsPage() {
                   body: {
                     name: form.name.trim(),
                     clientId: form.clientId,
-                    categoryId: form.categoryId,
+                    categoryIds: form.categoryIds,
                     budgetNpr: parseNprInput(form.budgetNpr),
                     startDate: form.startDate,
                     endDate: form.endDate,
@@ -209,22 +210,31 @@ function ProjectsPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Category</Label>
-              <Select
-                value={form.categoryId || undefined}
-                onValueChange={(v) => setForm((f) => ({ ...f, categoryId: v ?? "" }))}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {categories.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
+              <Label>Categories</Label>
+              <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-3">
+                {categories.map((c) => {
+                  const checked = form.categoryIds.includes(c.id)
+                  return (
+                    <label key={c.id} className="flex items-center gap-2 text-sm">
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(value) => {
+                          setForm((f) => ({
+                            ...f,
+                            categoryIds: value
+                              ? [...f.categoryIds, c.id]
+                              : f.categoryIds.filter((id) => id !== c.id),
+                          }))
+                        }}
+                      />
                       {c.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    </label>
+                  )
+                })}
+              </div>
+              {form.categoryIds.length === 0 ? (
+                <p className="text-xs text-destructive">Select at least one category</p>
+              ) : null}
             </div>
             <div className="space-y-2">
               <Label>Budget (NPR)</Label>

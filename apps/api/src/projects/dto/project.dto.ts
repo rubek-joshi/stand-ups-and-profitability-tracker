@@ -1,5 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsNotEmpty,
@@ -16,10 +18,11 @@ export class CreateProjectDto {
   @IsNotEmpty()
   clientId!: string;
 
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  categoryId!: string;
+  @ApiProperty({ type: [String], description: "One or more category IDs" })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  categoryIds!: string[];
 
   @ApiProperty()
   @IsString()
@@ -53,10 +56,12 @@ export class UpdateProjectDto {
   @MaxLength(200)
   name?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ type: [String] })
   @IsOptional()
-  @IsString()
-  categoryId?: string;
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  categoryIds?: string[];
 
   @ApiPropertyOptional()
   @IsOptional()

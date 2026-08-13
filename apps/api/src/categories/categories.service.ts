@@ -32,7 +32,7 @@ export class CategoriesService {
   async findAll() {
     return this.prismaService.category.findMany({
       orderBy: { name: "asc" },
-      include: { _count: { select: { projects: true } } },
+      include: { _count: { select: { projectCategories: true } } },
     });
   }
 

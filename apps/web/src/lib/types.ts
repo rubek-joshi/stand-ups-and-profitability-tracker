@@ -22,7 +22,7 @@ export type Project = {
   id: string
   name: string
   clientId: string
-  categoryId: string
+  categoryIds?: string[]
   budgetPaisa: string
   startDate: string
   endDate: string
@@ -31,7 +31,7 @@ export type Project = {
   vatRateApplied?: number
   autoExtended?: boolean
   client?: { id: string; name: string }
-  category?: { id: string; name: string }
+  categories?: Array<{ id: string; name: string }>
   profitability?: ProjectProfitability
   extensions?: ProjectExtension[]
   amcRecord?: AmcRecord | null

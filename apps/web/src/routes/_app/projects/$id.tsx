@@ -5,6 +5,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { Switch } from "@workspace/ui/components/switch"
+import { Checkbox } from "@workspace/ui/components/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import {
@@ -58,7 +59,7 @@ function ProjectDetailPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [edit, setEdit] = React.useState({
     name: "",
-    categoryId: "",
+    categoryIds: [] as string[],
     budgetNpr: "",
     startDate: "",
     endDate: "",
@@ -95,7 +96,10 @@ function ProjectDetailPage() {
       setCategories(cats.data.filter((c) => c.isActive))
       setEdit({
         name: p.data.name,
-        categoryId: p.data.categoryId,
+        categoryIds:
+          p.data.categoryIds ??
+          p.data.categories?.map((c) => c.id) ??
+          [],
         budgetNpr: String(paisaToNpr(p.data.budgetPaisa)),
         startDate: String(p.data.startDate).slice(0, 10),
         endDate: String(p.data.endDate).slice(0, 10),
@@ -128,7 +132,7 @@ function ProjectDetailPage() {
     <div>
       <PageHeader
         title={project.name}
-        description={`${project.client?.name ?? "Client"} · ${project.category?.name ?? "Category"}`}
+        description={`${project.client?.name ?? "Client"} · ${(project.categories ?? []).map((c) => c.name).join(", ") || "No categories"}`}
         actions={
           <>
             <StatusBadge status={project.status} />
@@ -189,7 +193,7 @@ function ProjectDetailPage() {
                     method: "PATCH",
                     body: {
                       name: edit.name.trim(),
-                      categoryId: edit.categoryId,
+                      categoryIds: edit.categoryIds,
                       budgetNpr: parseNprInput(edit.budgetNpr),
                       startDate: edit.startDate,
                       endDate: edit.endDate,
@@ -207,22 +211,28 @@ function ProjectDetailPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select
-                    value={edit.categoryId}
-                    onValueChange={(v) => setEdit((f) => ({ ...f, categoryId: v ?? "" }))}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
+                  <Label>Categories</Label>
+                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-3">
+                    {categories.map((c) => {
+                      const checked = edit.categoryIds.includes(c.id)
+                      return (
+                        <label key={c.id} className="flex items-center gap-2 text-sm">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(value) => {
+                              setEdit((f) => ({
+                                ...f,
+                                categoryIds: value
+                                  ? [...f.categoryIds, c.id]
+                                  : f.categoryIds.filter((id) => id !== c.id),
+                              }))
+                            }}
+                          />
                           {c.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                        </label>
+                      )
+                    })}
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Budget (NPR)</Label>
