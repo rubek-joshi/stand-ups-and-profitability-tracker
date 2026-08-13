@@ -330,6 +330,24 @@ Displays:
 - Each entry shows: timestamp, actor, action, target entity, and a readable diff/summary of what changed.
 - **Retention:** logs are kept **indefinitely** for now (no automatic archival or deletion policy in v1).
 
+### 6.15 Command Palette (Global Navigation)
+- **Trigger:** `Ctrl+K` on Windows/Linux, `Cmd+K` on Mac. Opens an overlay search box from anywhere in the app.
+- **Scope:** searches across **Projects**, **Employees**, **Clients**, **Core Members**, and the app's own **sidebar navigation destinations** (Dashboard, Stand-ups, Settings, Audit Logs, etc.) in a single unified, fuzzy-matched result list. Selecting a result navigates directly to that project/employee/client's detail page or that nav destination.
+- **Recents:**
+  - The palette stores the **5 most recently accessed commands** (any mix of entities and nav destinations), shown in a distinct "Recent" group at the top when the palette is opened with an empty query.
+  - **No repeats:** if the user re-selects an item already in the recents list, it **moves to the top** rather than being added as a duplicate entry — the list is always up to 5 *unique* items, most-recent-first.
+  - Recents are stored **client-side** (browser `localStorage`, not the database), since this is a personal navigation convenience rather than shared/auditable data.
+- **Keyboard navigation:**
+  - Arrow **Up/Down** move the highlighted selection; **Enter** activates the highlighted item; **Esc** closes the palette.
+  - The **Recents group and the main results list are navigated as one continuous, linear list** — there is no jump, skip, or re-highlight glitch when the selection crosses from the last "Recent" item to the first regular result (or vice versa going up). Internally this means the palette maintains a single flat index across both groups rather than tracking "recent index" and "results index" separately.
+- **Empty/no-match state:** if the query matches nothing, show a plain "No results" state (no recents shown once there's an active query — recents are an empty-query convenience only).
+
+### 6.16 Dark Mode
+- A **light/dark theme toggle**, accessible from the sidebar/settings area.
+- **Default:** on first visit (no stored preference yet), the app follows the **OS/browser's system preference** (`prefers-color-scheme`).
+- **Persistence:** once the user explicitly picks a theme, that choice is saved to **`localStorage`** and takes precedence over system preference on all future visits **in that browser** (this is a per-browser/device preference, not synced to the user's account across devices, consistent with how recents are stored in §6.15).
+- If the user has never explicitly chosen a theme, the app should continue to **follow live system-preference changes** (e.g., OS switches to dark mode at sunset) rather than freezing at whatever was detected on first load.
+
 ---
 
 ## 7. Edge Cases & Business Rules
@@ -375,12 +393,13 @@ Displays:
 - **Access control:** role-based permissions enforced at the API layer, not just UI.
 - **Currency:** all monetary values stored and displayed in NPR.
 - **Performance:** dashboard aggregate stats and forecasts should load quickly even as stand-up/allocation history grows (consider pre-aggregation or caching for historical rollups).
+- **Client-side preferences:** command palette recents (§6.15) and the dark-mode setting (§6.16) are stored in browser `localStorage` — per-browser/device, not synced across devices or persisted server-side.
 
 ---
 
 ## 9. Open Questions for Stakeholders
 
-1. The default health-indicator thresholds (20% / 0–20% / <0%) are a reasonable starting point but should be validated against actual historical margins once real project data is available — are these in the right range for this business?
+1. ~~The default health-indicator thresholds (20% / 0–20% / <0%) are a reasonable starting point but should be validated against actual historical margins once real project data is available — are these in the right range for this business?~~ **Resolved for v1:** keep the current thresholds as the starting point; revisit and tune once real historical margin data is available.
 
 ---
 
