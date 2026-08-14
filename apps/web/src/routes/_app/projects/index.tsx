@@ -88,8 +88,14 @@ function ProjectsPage() {
         actions={
           <>
             <Select
-              value={statusFilter || undefined}
+              value={statusFilter || null}
               onValueChange={(v) => setStatusFilter(v ?? "")}
+              items={{
+                active: "Active",
+                extended: "Extended",
+                closed: "Closed",
+                under_amc: "Under AMC",
+              }}
             >
               <SelectTrigger className="w-40">
                 <SelectValue placeholder="All statuses" />
@@ -137,7 +143,19 @@ function ProjectsPage() {
                       {p.name}
                     </Link>
                   </TableCell>
-                  <TableCell>{p.client?.name ?? "—"}</TableCell>
+                  <TableCell>
+                    {p.client?.id ? (
+                      <Link
+                        to="/clients/$id"
+                        params={{ id: p.client.id }}
+                        className="hover:underline"
+                      >
+                        {p.client.name}
+                      </Link>
+                    ) : (
+                      (p.client?.name ?? "—")
+                    )}
+                  </TableCell>
                   <TableCell>
                     <StatusBadge status={p.status} />
                   </TableCell>
@@ -192,8 +210,11 @@ function ProjectsPage() {
             <div className="space-y-2">
               <Label>Client</Label>
               <Select
-                value={form.clientId || undefined}
+                value={form.clientId || null}
                 onValueChange={(v) => setForm((f) => ({ ...f, clientId: v ?? "" }))}
+                items={Object.fromEntries(
+                  clients.filter((c) => c.status === "active").map((c) => [c.id, c.name]),
+                )}
               >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="Select client" />

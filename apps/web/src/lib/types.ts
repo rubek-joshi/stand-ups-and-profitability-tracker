@@ -179,10 +179,14 @@ export type VatClearance = {
 export type AuditLog = {
   id: string
   action: string
-  entityType: string
-  entityId: string
-  summary: string | null
-  diff: unknown
+  targetType: string
+  targetId: string
+  /** @deprecated API uses targetType */
+  entityType?: string
+  /** @deprecated API uses targetId */
+  entityId?: string
+  summary?: string | null
+  metadata?: unknown
   createdAt: string
   actor?: { id: string; name: string; email: string } | null
 }

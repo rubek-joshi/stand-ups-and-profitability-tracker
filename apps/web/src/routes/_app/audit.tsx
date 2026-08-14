@@ -20,6 +20,7 @@ import {
 } from "@workspace/ui/components/table"
 import { PageHeader } from "@/components/page-header"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
+import { EntityLink } from "@/components/resource-link"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import type { AuditLog } from "@/lib/types"
 
@@ -94,8 +95,9 @@ function AuditPage() {
             <div className="space-y-1">
               <Label className="text-xs">Action</Label>
               <Select
-                value={action || undefined}
+                value={action || null}
                 onValueChange={(v) => setAction(v ?? "")}
+                items={Object.fromEntries(ACTIONS.map((a) => [a, a]))}
               >
                 <SelectTrigger className="w-56">
                   <SelectValue placeholder="All actions" />
@@ -164,7 +166,18 @@ function AuditPage() {
                     <TableCell className="font-mono text-xs">{log.action}</TableCell>
                     <TableCell>{log.actor?.name ?? log.actor?.email ?? "—"}</TableCell>
                     <TableCell className="text-sm">
-                      {log.entityType} · {log.entityId.slice(0, 8)}…
+                      {(() => {
+                        const type = log.targetType ?? log.entityType ?? ""
+                        const id = log.targetId ?? log.entityId ?? ""
+                        const label = `${type} · ${id.slice(0, 8)}…`
+                        return id ? (
+                          <EntityLink type={type} id={id}>
+                            {label}
+                          </EntityLink>
+                        ) : (
+                          label
+                        )
+                      })()}
                     </TableCell>
                     <TableCell className="max-w-md truncate text-sm text-muted-foreground">
                       {log.summary || "—"}

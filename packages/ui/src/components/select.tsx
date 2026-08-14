@@ -8,6 +8,8 @@ import { IconSelector, IconCheck, IconChevronUp, IconChevronDown } from "@tabler
 
 const Select = SelectPrimitive.Root
 
+/** Pass `items={{ [value]: label }}` (or `{ value, label }[]`) so SelectValue shows labels, not raw ids. */
+
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
   return (
     <SelectPrimitive.Group

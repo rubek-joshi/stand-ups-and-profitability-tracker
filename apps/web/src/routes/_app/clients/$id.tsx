@@ -1,9 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
-import { Button } from "@workspace/ui/components/button"
-import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
-import { Textarea } from "@workspace/ui/components/textarea"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
@@ -21,11 +18,8 @@ function ClientDetailPage() {
   const navigate = useNavigate()
   const { confirm, dialog } = useConfirmDialog()
   const [client, setClient] = React.useState<Client | null>(null)
-  const [name, setName] = React.useState("")
-  const [contactInfo, setContactInfo] = React.useState("")
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const [saving, setSaving] = React.useState(false)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -33,8 +27,6 @@ function ClientDetailPage() {
     try {
       const res = await api<Envelope<Client>>(`/clients/${id}`)
       setClient(res.data)
-      setName(res.data.name)
-      setContactInfo(res.data.contactInfo ?? "")
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load client")
     } finally {
@@ -60,6 +52,13 @@ function ClientDetailPage() {
         actions={
           <>
             <StatusBadge status={client.status} />
+            <Link
+              to="/clients/$id/edit"
+              params={{ id }}
+              className={buttonVariants()}
+            >
+              Edit
+            </Link>
             {client.status === "active" ? (
               <Button
                 variant="outline"
@@ -107,43 +106,17 @@ function ClientDetailPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Edit</CardTitle>
+            <CardTitle className="text-base">Details</CardTitle>
           </CardHeader>
-          <CardContent>
-            <form
-              className="space-y-3"
-              onSubmit={async (e) => {
-                e.preventDefault()
-                setSaving(true)
-                try {
-                  await api(`/clients/${id}`, {
-                    method: "PATCH",
-                    body: { name: name.trim(), contactInfo: contactInfo.trim() || null },
-                  })
-                  await load()
-                } catch (err) {
-                  alert(err instanceof ApiError ? err.message : "Save failed")
-                } finally {
-                  setSaving(false)
-                }
-              }}
-            >
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="contact">Contact info</Label>
-                <Textarea
-                  id="contact"
-                  value={contactInfo}
-                  onChange={(e) => setContactInfo(e.target.value)}
-                />
-              </div>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving…" : "Save changes"}
-              </Button>
-            </form>
+          <CardContent className="space-y-3 text-sm">
+            <DetailRow label="Name" value={client.name} />
+            <DetailRow label="Status" value={client.status} />
+            <div className="space-y-1 border-b py-2 last:border-0">
+              <span className="text-muted-foreground">Contact info</span>
+              <p className="whitespace-pre-wrap font-medium">
+                {client.contactInfo?.trim() || "—"}
+              </p>
+            </div>
           </CardContent>
         </Card>
 
@@ -170,6 +143,15 @@ function ClientDetailPage() {
         </Card>
       </div>
       {dialog}
+    </div>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4 border-b py-2 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-right font-medium capitalize">{value}</span>
     </div>
   )
 }

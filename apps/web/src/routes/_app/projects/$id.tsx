@@ -1,11 +1,10 @@
 import * as React from "react"
-import { createFileRoute } from "@tanstack/react-router"
-import { Button } from "@workspace/ui/components/button"
+import { Link, createFileRoute } from "@tanstack/react-router"
+import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { Switch } from "@workspace/ui/components/switch"
-import { Checkbox } from "@workspace/ui/components/checkbox"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import {
@@ -27,11 +26,11 @@ import { PageHeader } from "@/components/page-header"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
+import { CoreMemberLink, EmployeeLink } from "@/components/resource-link"
 import { api, ApiError, type Envelope } from "@/lib/api"
-import { formatNpr, parseNprInput, paisaToNpr } from "@/lib/money"
+import { formatNpr, parseNprInput } from "@/lib/money"
 import type {
   AmcRecord,
-  Category,
   CoreMember,
   CoreMemberAssignment,
   Employee,
@@ -53,18 +52,9 @@ function ProjectDetailPage() {
   }>({ employees: [], coreMembers: [] })
   const [employees, setEmployees] = React.useState<Employee[]>([])
   const [coreMembers, setCoreMembers] = React.useState<CoreMember[]>([])
-  const [categories, setCategories] = React.useState<Category[]>([])
   const [amc, setAmc] = React.useState<AmcRecord | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const [edit, setEdit] = React.useState({
-    name: "",
-    categoryIds: [] as string[],
-    budgetNpr: "",
-    startDate: "",
-    endDate: "",
-    isVatApplicable: true,
-  })
   const [extReason, setExtReason] = React.useState("")
   const [extAmount, setExtAmount] = React.useState("0")
   const [employeeId, setEmployeeId] = React.useState("")
@@ -80,31 +70,18 @@ function ProjectDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const [p, a, emps, cores, cats] = await Promise.all([
+      const [p, a, emps, cores] = await Promise.all([
         api<Envelope<Project>>(`/projects/${id}`),
         api<Envelope<{ employees: ProjectAssignment[]; coreMembers: CoreMemberAssignment[] }>>(
           `/projects/${id}/assignments`,
         ),
         api<Envelope<Employee[]>>("/employees"),
         api<Envelope<CoreMember[]>>("/core-members"),
-        api<Envelope<Category[]>>("/categories"),
       ])
       setProject(p.data)
       setAssignments(a.data)
       setEmployees(emps.data.filter((e) => e.status === "active"))
       setCoreMembers(cores.data.filter((m) => m.status === "active"))
-      setCategories(cats.data.filter((c) => c.isActive))
-      setEdit({
-        name: p.data.name,
-        categoryIds:
-          p.data.categoryIds ??
-          p.data.categories?.map((c) => c.id) ??
-          [],
-        budgetNpr: String(paisaToNpr(p.data.budgetPaisa)),
-        startDate: String(p.data.startDate).slice(0, 10),
-        endDate: String(p.data.endDate).slice(0, 10),
-        isVatApplicable: p.data.isVatApplicable,
-      })
       try {
         const amcRes = await api<Envelope<AmcRecord>>(`/amc/projects/${id}`)
         setAmc(amcRes.data)
@@ -127,6 +104,14 @@ function ProjectDetailPage() {
   if (!project) return null
 
   const profit = project.profitability
+  const assignedEmployeeIds = new Set(
+    assignments.employees.filter((a) => !a.unassignedAt).map((a) => a.employeeId),
+  )
+  const assignedCoreMemberIds = new Set(
+    assignments.coreMembers.filter((a) => !a.unassignedAt).map((a) => a.coreMemberId),
+  )
+  const availableEmployees = employees.filter((e) => !assignedEmployeeIds.has(e.id))
+  const availableCoreMembers = coreMembers.filter((m) => !assignedCoreMemberIds.has(m.id))
 
   return (
     <div>
@@ -137,6 +122,9 @@ function ProjectDetailPage() {
           <>
             <StatusBadge status={project.status} />
             {profit ? <HealthBadge marginPercent={profit.marginPercent} /> : null}
+            <Link to="/projects/$id/edit" params={{ id }} className={buttonVariants()}>
+              Edit
+            </Link>
             {project.status !== "closed" && project.status !== "under_amc" ? (
               <Button
                 variant="outline"
@@ -182,94 +170,23 @@ function ProjectDetailPage() {
         <TabsContent value="overview" className="mt-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Edit project</CardTitle>
+              <CardTitle className="text-base">Details</CardTitle>
             </CardHeader>
-            <CardContent>
-              <form
-                className="grid max-w-xl gap-3"
-                onSubmit={async (e) => {
-                  e.preventDefault()
-                  await api(`/projects/${id}`, {
-                    method: "PATCH",
-                    body: {
-                      name: edit.name.trim(),
-                      categoryIds: edit.categoryIds,
-                      budgetNpr: parseNprInput(edit.budgetNpr),
-                      startDate: edit.startDate,
-                      endDate: edit.endDate,
-                      isVatApplicable: edit.isVatApplicable,
-                    },
-                  })
-                  await load()
-                }}
-              >
-                <div className="space-y-2">
-                  <Label>Name</Label>
-                  <Input
-                    value={edit.name}
-                    onChange={(e) => setEdit((f) => ({ ...f, name: e.target.value }))}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Categories</Label>
-                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-3">
-                    {categories.map((c) => {
-                      const checked = edit.categoryIds.includes(c.id)
-                      return (
-                        <label key={c.id} className="flex items-center gap-2 text-sm">
-                          <Checkbox
-                            checked={checked}
-                            onCheckedChange={(value) => {
-                              setEdit((f) => ({
-                                ...f,
-                                categoryIds: value
-                                  ? [...f.categoryIds, c.id]
-                                  : f.categoryIds.filter((id) => id !== c.id),
-                              }))
-                            }}
-                          />
-                          {c.name}
-                        </label>
-                      )
-                    })}
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Budget (NPR)</Label>
-                  <Input
-                    value={edit.budgetNpr}
-                    onChange={(e) => setEdit((f) => ({ ...f, budgetNpr: e.target.value }))}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-2">
-                    <Label>Start</Label>
-                    <Input
-                      type="date"
-                      value={edit.startDate}
-                      onChange={(e) => setEdit((f) => ({ ...f, startDate: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>End</Label>
-                    <Input
-                      type="date"
-                      value={edit.endDate}
-                      onChange={(e) => setEdit((f) => ({ ...f, endDate: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between rounded-md border px-3 py-2">
-                  <Label>VAT applicable</Label>
-                  <Switch
-                    checked={edit.isVatApplicable}
-                    onCheckedChange={(c) => setEdit((f) => ({ ...f, isVatApplicable: Boolean(c) }))}
-                  />
-                </div>
-                <Button type="submit" className="w-fit">
-                  Save
-                </Button>
-              </form>
+            <CardContent className="space-y-3 text-sm">
+              <DetailRow label="Name" value={project.name} />
+              <DetailRow label="Client" value={project.client?.name ?? "—"} />
+              <DetailRow
+                label="Categories"
+                value={(project.categories ?? []).map((c) => c.name).join(", ") || "—"}
+              />
+              <DetailRow label="Budget" value={formatNpr(project.budgetPaisa)} />
+              <DetailRow label="Start" value={String(project.startDate).slice(0, 10)} />
+              <DetailRow label="End" value={String(project.endDate).slice(0, 10)} />
+              <DetailRow label="Status" value={project.status} />
+              <DetailRow
+                label="VAT"
+                value={project.isVatApplicable ? `Yes (${project.vatRateApplied}%)` : "No"}
+              />
             </CardContent>
           </Card>
         </TabsContent>
@@ -281,12 +198,23 @@ function ProjectDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2">
-                <Select value={employeeId || undefined} onValueChange={(v) => setEmployeeId(v ?? "")}>
+                <Select
+                  value={employeeId || null}
+                  onValueChange={(v) => setEmployeeId(v ?? "")}
+                  items={Object.fromEntries(availableEmployees.map((e) => [e.id, e.name]))}
+                  disabled={availableEmployees.length === 0}
+                >
                   <SelectTrigger className="w-64">
-                    <SelectValue placeholder="Assign employee" />
+                    <SelectValue
+                      placeholder={
+                        availableEmployees.length === 0
+                          ? "All employees assigned"
+                          : "Assign employee"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {employees.map((e) => (
+                    {availableEmployees.map((e) => (
                       <SelectItem key={e.id} value={e.id}>
                         {e.name}
                       </SelectItem>
@@ -319,9 +247,15 @@ function ProjectDetailPage() {
                 <TableBody>
                   {assignments.employees.map((a) => (
                     <TableRow key={a.id}>
-                      <TableCell>{a.employee?.name ?? a.employeeId}</TableCell>
+                      <TableCell>
+                        <EmployeeLink id={a.employeeId}>
+                          {a.employee?.name ?? a.employeeId}
+                        </EmployeeLink>
+                      </TableCell>
                       <TableCell>{String(a.assignedAt).slice(0, 10)}</TableCell>
-                      <TableCell>{a.unassignedAt ? String(a.unassignedAt).slice(0, 10) : "—"}</TableCell>
+                      <TableCell>
+                        {a.unassignedAt ? String(a.unassignedAt).slice(0, 10) : "—"}
+                      </TableCell>
                       <TableCell className="text-right">
                         {!a.unassignedAt ? (
                           <Button
@@ -353,14 +287,22 @@ function ProjectDetailPage() {
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-2">
                 <Select
-                  value={coreMemberId || undefined}
+                  value={coreMemberId || null}
                   onValueChange={(v) => setCoreMemberId(v ?? "")}
+                  items={Object.fromEntries(availableCoreMembers.map((m) => [m.id, m.name]))}
+                  disabled={availableCoreMembers.length === 0}
                 >
                   <SelectTrigger className="w-64">
-                    <SelectValue placeholder="Assign core member" />
+                    <SelectValue
+                      placeholder={
+                        availableCoreMembers.length === 0
+                          ? "All core members assigned"
+                          : "Assign core member"
+                      }
+                    />
                   </SelectTrigger>
                   <SelectContent>
-                    {coreMembers.map((m) => (
+                    {availableCoreMembers.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
                         {m.name}
                       </SelectItem>
@@ -393,9 +335,15 @@ function ProjectDetailPage() {
                 <TableBody>
                   {assignments.coreMembers.map((a) => (
                     <TableRow key={a.id}>
-                      <TableCell>{a.coreMember?.name ?? a.coreMemberId}</TableCell>
+                      <TableCell>
+                        <CoreMemberLink id={a.coreMemberId}>
+                          {a.coreMember?.name ?? a.coreMemberId}
+                        </CoreMemberLink>
+                      </TableCell>
                       <TableCell>{String(a.assignedAt).slice(0, 10)}</TableCell>
-                      <TableCell>{a.unassignedAt ? String(a.unassignedAt).slice(0, 10) : "—"}</TableCell>
+                      <TableCell>
+                        {a.unassignedAt ? String(a.unassignedAt).slice(0, 10) : "—"}
+                      </TableCell>
                       <TableCell className="text-right">
                         {!a.unassignedAt ? (
                           <Button
@@ -599,6 +547,15 @@ function ProjectDetailPage() {
         </TabsContent>
       </Tabs>
       {dialog}
+    </div>
+  )
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-4 border-b py-2 last:border-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="text-right font-medium capitalize">{value}</span>
     </div>
   )
 }

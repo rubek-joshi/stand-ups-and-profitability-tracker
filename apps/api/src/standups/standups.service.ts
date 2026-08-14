@@ -35,10 +35,7 @@ export class StandupsService {
 
   async create(dto: CreateStandupDto, actorId: string) {
     const date = parseIsoDate(dto.date);
-    const employees = await this.prismaService.employee.findMany({
-      where: { status: PersonStatus.active },
-      select: { id: true },
-    });
+    const employees = await this.findActiveEmployeesForDate(date);
     const standup = await this.prismaService.standup.create({
       data: {
         date,
@@ -76,24 +73,11 @@ export class StandupsService {
   }
 
   async findOne(id: string) {
-    const standup = await this.prismaService.standup.findUnique({
-      where: { id },
-      include: {
-        createdBy: { select: { id: true, name: true, email: true } },
-        overrides: true,
-        entries: {
-          include: {
-            employee: true,
-            allocations: { include: { project: true } },
-          },
-          orderBy: { employee: { name: "asc" } },
-        },
-      },
-    });
-    if (!standup) {
-      throw new NotFoundException(`Standup ${id} not found`);
+    const existing = await this.loadStandupOrThrow(id);
+    if (existing.status !== StandupStatus.completed) {
+      await this.syncMissingParticipants(existing);
     }
-    return standup;
+    return this.loadStandupOrThrow(id);
   }
 
   async updateEntry(
@@ -303,6 +287,58 @@ export class StandupsService {
       metadata: { standupId, projectId: dto.projectId, reason: dto.reason },
     });
     return override;
+  }
+
+  private async loadStandupOrThrow(id: string) {
+    const standup = await this.prismaService.standup.findUnique({
+      where: { id },
+      include: {
+        createdBy: { select: { id: true, name: true, email: true } },
+        overrides: { include: { project: { select: { id: true, name: true } } } },
+        entries: {
+          include: {
+            employee: true,
+            allocations: { include: { project: true } },
+          },
+          orderBy: { employee: { name: "asc" } },
+        },
+      },
+    });
+    if (!standup) {
+      throw new NotFoundException(`Standup ${id} not found`);
+    }
+    return standup;
+  }
+
+  private async findActiveEmployeesForDate(date: Date) {
+    return this.prismaService.employee.findMany({
+      where: {
+        status: PersonStatus.active,
+        dateJoined: { lte: date },
+      },
+      select: { id: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
+  /** Draft/in-progress standups should include employees hired after creation. */
+  private async syncMissingParticipants(
+    standup: Awaited<ReturnType<StandupsService["loadStandupOrThrow"]>>,
+  ) {
+    const active = await this.findActiveEmployeesForDate(standup.date);
+    const existingIds = new Set(standup.entries.map((entry) => entry.employeeId));
+    const missing = active.filter((employee) => !existingIds.has(employee.id));
+    if (missing.length === 0) {
+      return;
+    }
+    await this.prismaService.standupEntry.createMany({
+      data: missing.map((employee) => ({
+        standupId: standup.id,
+        employeeId: employee.id,
+        attendanceStatus: AttendanceStatus.present,
+      })),
+      skipDuplicates: true,
+    });
   }
 
   private validateAllocations(

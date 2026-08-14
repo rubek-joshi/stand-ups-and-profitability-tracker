@@ -45,6 +45,10 @@ const ATTENDANCE: AttendanceStatus[] = [
   "absent",
 ]
 
+const ATTENDANCE_ITEMS = Object.fromEntries(
+  ATTENDANCE.map((a) => [a, a.replaceAll("_", " ")]),
+) as Record<AttendanceStatus, string>
+
 function StandupDetailPage() {
   const { id } = Route.useParams()
   const { confirm, dialog } = useConfirmDialog()
@@ -252,6 +256,7 @@ function StandupDetailPage() {
                 <Select
                   value={draft.attendanceStatus}
                   disabled={readonly}
+                  items={ATTENDANCE_ITEMS}
                   onValueChange={(v) => {
                     const status = (v ?? "present") as AttendanceStatus
                     setDrafts((prev) => ({
@@ -267,12 +272,12 @@ function StandupDetailPage() {
                   }}
                 >
                   <SelectTrigger className="w-full max-w-xs">
-                    <SelectValue />
+                    <SelectValue placeholder="Attendance" />
                   </SelectTrigger>
                   <SelectContent>
                     {ATTENDANCE.map((a) => (
                       <SelectItem key={a} value={a}>
-                        {a.replaceAll("_", " ")}
+                        {ATTENDANCE_ITEMS[a]}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -311,11 +316,23 @@ function StandupDetailPage() {
                       </span>
                     </div>
                     <div className="space-y-2">
-                      {draft.allocations.map((alloc, idx) => (
+                      {draft.allocations.map((alloc, idx) => {
+                        const usedElsewhere = new Set(
+                          draft.allocations
+                            .map((a, i) => (i === idx ? null : a.projectId))
+                            .filter((pid): pid is string => Boolean(pid)),
+                        )
+                        const availableProjects = projects.filter(
+                          (p) => p.id === alloc.projectId || !usedElsewhere.has(p.id),
+                        )
+                        return (
                         <div key={idx} className="flex flex-wrap items-center gap-2">
                           <Select
                             disabled={readonly}
-                            value={alloc.projectId || undefined}
+                            value={alloc.projectId || null}
+                            items={Object.fromEntries(
+                              availableProjects.map((p) => [p.id, p.name]),
+                            )}
                             onValueChange={(v) => {
                               setDrafts((prev) => {
                                 const list = [...prev[activeEntry.id]!.allocations]
@@ -331,7 +348,7 @@ function StandupDetailPage() {
                               <SelectValue placeholder="Project" />
                             </SelectTrigger>
                             <SelectContent>
-                              {projects.map((p) => (
+                              {availableProjects.map((p) => (
                                 <SelectItem key={p.id} value={p.id}>
                                   {p.name}
                                 </SelectItem>
@@ -377,12 +394,18 @@ function StandupDetailPage() {
                             </Button>
                           ) : null}
                         </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     {!readonly ? (
                       <Button
                         size="sm"
                         variant="outline"
+                        disabled={
+                          projects.filter(
+                            (p) => !draft.allocations.some((a) => a.projectId === p.id),
+                          ).length === 0
+                        }
                         onClick={() => {
                           setDrafts((prev) => ({
                             ...prev,
@@ -446,7 +469,9 @@ function StandupDetailPage() {
           </CardHeader>
           <CardContent>
             <OverrideForm
-              projects={projects}
+              projects={projects.filter(
+                (p) => !(standup.overrides ?? []).some((o) => o.projectId === p.id),
+              )}
               onSubmit={async (projectId, reason) => {
                 await api(`/standups/${id}/overrides`, {
                   method: "POST",
@@ -484,9 +509,16 @@ function OverrideForm({
     >
       <div className="space-y-1">
         <Label>Project</Label>
-        <Select value={projectId || undefined} onValueChange={(v) => setProjectId(v ?? "")}>
+        <Select
+          value={projectId || null}
+          onValueChange={(v) => setProjectId(v ?? "")}
+          items={Object.fromEntries(projects.map((p) => [p.id, p.name]))}
+          disabled={projects.length === 0}
+        >
           <SelectTrigger className="w-56">
-            <SelectValue placeholder="Closed project" />
+            <SelectValue
+              placeholder={projects.length === 0 ? "No projects left" : "Closed project"}
+            />
           </SelectTrigger>
           <SelectContent>
             {projects.map((p) => (

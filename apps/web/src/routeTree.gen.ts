@@ -26,6 +26,10 @@ import { Route as AppProjectsIdRouteImport } from './routes/_app/projects/$id'
 import { Route as AppEmployeesIdRouteImport } from './routes/_app/employees/$id'
 import { Route as AppCoreMembersIdRouteImport } from './routes/_app/core-members/$id'
 import { Route as AppClientsIdRouteImport } from './routes/_app/clients/$id'
+import { Route as AppProjectsIdEditRouteImport } from './routes/_app/projects/$id_.edit'
+import { Route as AppEmployeesIdEditRouteImport } from './routes/_app/employees/$id_.edit'
+import { Route as AppCoreMembersIdEditRouteImport } from './routes/_app/core-members/$id_.edit'
+import { Route as AppClientsIdEditRouteImport } from './routes/_app/clients/$id_.edit'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -111,6 +115,26 @@ const AppClientsIdRoute = AppClientsIdRouteImport.update({
   path: '/clients/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppProjectsIdEditRoute = AppProjectsIdEditRouteImport.update({
+  id: '/projects/$id_/edit',
+  path: '/projects/$id/edit',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppEmployeesIdEditRoute = AppEmployeesIdEditRouteImport.update({
+  id: '/employees/$id_/edit',
+  path: '/employees/$id/edit',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppCoreMembersIdEditRoute = AppCoreMembersIdEditRouteImport.update({
+  id: '/core-members/$id_/edit',
+  path: '/core-members/$id/edit',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppClientsIdEditRoute = AppClientsIdEditRouteImport.update({
+  id: '/clients/$id_/edit',
+  path: '/clients/$id/edit',
+  getParentRoute: () => AppRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -129,6 +153,10 @@ export interface FileRoutesByFullPath {
   '/employees/': typeof AppEmployeesIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/standups/': typeof AppStandupsIndexRoute
+  '/clients/$id/edit': typeof AppClientsIdEditRoute
+  '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
+  '/employees/$id/edit': typeof AppEmployeesIdEditRoute
+  '/projects/$id/edit': typeof AppProjectsIdEditRoute
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
@@ -147,6 +175,10 @@ export interface FileRoutesByTo {
   '/employees': typeof AppEmployeesIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/standups': typeof AppStandupsIndexRoute
+  '/clients/$id/edit': typeof AppClientsIdEditRoute
+  '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
+  '/employees/$id/edit': typeof AppEmployeesIdEditRoute
+  '/projects/$id/edit': typeof AppProjectsIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -167,6 +199,10 @@ export interface FileRoutesById {
   '/_app/employees/': typeof AppEmployeesIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/standups/': typeof AppStandupsIndexRoute
+  '/_app/clients/$id_/edit': typeof AppClientsIdEditRoute
+  '/_app/core-members/$id_/edit': typeof AppCoreMembersIdEditRoute
+  '/_app/employees/$id_/edit': typeof AppEmployeesIdEditRoute
+  '/_app/projects/$id_/edit': typeof AppProjectsIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -187,6 +223,10 @@ export interface FileRouteTypes {
     | '/employees/'
     | '/projects/'
     | '/standups/'
+    | '/clients/$id/edit'
+    | '/core-members/$id/edit'
+    | '/employees/$id/edit'
+    | '/projects/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
@@ -205,6 +245,10 @@ export interface FileRouteTypes {
     | '/employees'
     | '/projects'
     | '/standups'
+    | '/clients/$id/edit'
+    | '/core-members/$id/edit'
+    | '/employees/$id/edit'
+    | '/projects/$id/edit'
   id:
     | '__root__'
     | '/_app'
@@ -224,6 +268,10 @@ export interface FileRouteTypes {
     | '/_app/employees/'
     | '/_app/projects/'
     | '/_app/standups/'
+    | '/_app/clients/$id_/edit'
+    | '/_app/core-members/$id_/edit'
+    | '/_app/employees/$id_/edit'
+    | '/_app/projects/$id_/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -352,6 +400,34 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientsIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/projects/$id_/edit': {
+      id: '/_app/projects/$id_/edit'
+      path: '/projects/$id/edit'
+      fullPath: '/projects/$id/edit'
+      preLoaderRoute: typeof AppProjectsIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/employees/$id_/edit': {
+      id: '/_app/employees/$id_/edit'
+      path: '/employees/$id/edit'
+      fullPath: '/employees/$id/edit'
+      preLoaderRoute: typeof AppEmployeesIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/core-members/$id_/edit': {
+      id: '/_app/core-members/$id_/edit'
+      path: '/core-members/$id/edit'
+      fullPath: '/core-members/$id/edit'
+      preLoaderRoute: typeof AppCoreMembersIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/clients/$id_/edit': {
+      id: '/_app/clients/$id_/edit'
+      path: '/clients/$id/edit'
+      fullPath: '/clients/$id/edit'
+      preLoaderRoute: typeof AppClientsIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
@@ -371,6 +447,10 @@ interface AppRouteChildren {
   AppEmployeesIndexRoute: typeof AppEmployeesIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppStandupsIndexRoute: typeof AppStandupsIndexRoute
+  AppClientsIdEditRoute: typeof AppClientsIdEditRoute
+  AppCoreMembersIdEditRoute: typeof AppCoreMembersIdEditRoute
+  AppEmployeesIdEditRoute: typeof AppEmployeesIdEditRoute
+  AppProjectsIdEditRoute: typeof AppProjectsIdEditRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -389,6 +469,10 @@ const AppRouteChildren: AppRouteChildren = {
   AppEmployeesIndexRoute: AppEmployeesIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppStandupsIndexRoute: AppStandupsIndexRoute,
+  AppClientsIdEditRoute: AppClientsIdEditRoute,
+  AppCoreMembersIdEditRoute: AppCoreMembersIdEditRoute,
+  AppEmployeesIdEditRoute: AppEmployeesIdEditRoute,
+  AppProjectsIdEditRoute: AppProjectsIdEditRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
