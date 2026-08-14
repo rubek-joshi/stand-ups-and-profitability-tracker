@@ -13,6 +13,14 @@ import { AuditService } from "./audit.service";
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
+  @Get("actors")
+  @RequirePermission("audit", "read")
+  @ApiOperation({ summary: "List actors for audit filters" })
+  @ApiOkResponse()
+  async listActors() {
+    return this.auditService.listActors();
+  }
+
   @Get()
   @RequirePermission("audit", "read")
   @ApiOperation({ summary: "List audit logs (super admin)" })

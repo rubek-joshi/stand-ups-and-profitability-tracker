@@ -26,16 +26,16 @@ const ATTENDANCE_OPTIONS: Array<{
 }> = [
   { value: "present", label: "Present", short: "P" },
   { value: "late", label: "Late", short: "L" },
-  { value: "first_half_leave", label: "1st half", short: "1H" },
-  { value: "second_half_leave", label: "2nd half", short: "2H" },
+  { value: "first_half_leave", label: "1st half leave", short: "1HL" },
+  { value: "second_half_leave", label: "2nd half leave", short: "2HL" },
   { value: "absent", label: "Absent", short: "A" },
 ]
 
 const statusActive: Record<AttendanceStatus, string> = {
   present: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
-  late: "bg-secondary text-secondary-foreground hover:bg-secondary",
-  first_half_leave: "bg-secondary text-secondary-foreground hover:bg-secondary",
-  second_half_leave: "bg-secondary text-secondary-foreground hover:bg-secondary",
+  late: "bg-orange-600/90 text-secondary-foreground hover:bg-secondary",
+  first_half_leave: "bg-amber-600/90 text-secondary-foreground hover:bg-secondary",
+  second_half_leave: "bg-amber-600/90 text-secondary-foreground hover:bg-secondary",
   absent: "bg-destructive text-destructive-foreground hover:bg-destructive hover:text-destructive-foreground",
 }
 

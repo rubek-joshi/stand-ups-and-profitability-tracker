@@ -1,7 +1,6 @@
 import * as React from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import { Button } from "@workspace/ui/components/button"
-import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import {
   Select,
@@ -21,12 +20,18 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import { EntityLink } from "@/components/resource-link"
-import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
+import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
 import type { AuditLog } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/audit")({
   component: AuditPage,
 })
+
+type AuditActor = {
+  id: string
+  name: string
+  email: string
+}
 
 const ACTIONS = [
   "CLIENT_CREATED",
@@ -48,11 +53,29 @@ const ACTIONS = [
 
 function AuditPage() {
   const [logs, setLogs] = React.useState<AuditLog[]>([])
+  const [actors, setActors] = React.useState<AuditActor[]>([])
   const [total, setTotal] = React.useState(0)
   const [action, setAction] = React.useState("")
   const [actorId, setActorId] = React.useState("")
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+
+  const actorItems = React.useMemo(
+    () =>
+      Object.fromEntries(
+        actors.map((a) => [a.id, a.name?.trim() ? `${a.name} (${a.email})` : a.email]),
+      ),
+    [actors],
+  )
+
+  const loadActors = React.useCallback(async () => {
+    try {
+      const res = await api<Envelope<AuditActor[]>>("/audit/actors")
+      setActors(res.data)
+    } catch {
+      setActors([])
+    }
+  }, [])
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -60,7 +83,7 @@ function AuditPage() {
     try {
       const params = new URLSearchParams()
       if (action) params.set("action", action)
-      if (actorId.trim()) params.set("actorId", actorId.trim())
+      if (actorId) params.set("actorId", actorId)
       params.set("take", "50")
       const qs = params.toString()
       const res = await api<PaginatedEnvelope<AuditLog[]>>(`/audit?${qs}`)
@@ -80,6 +103,10 @@ function AuditPage() {
       setLoading(false)
     }
   }, [action, actorId])
+
+  React.useEffect(() => {
+    void loadActors()
+  }, [loadActors])
 
   React.useEffect(() => {
     void load()
@@ -112,13 +139,23 @@ function AuditPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Actor ID</Label>
-              <Input
-                className="w-48"
-                value={actorId}
-                onChange={(e) => setActorId(e.target.value)}
-                placeholder="user id"
-              />
+              <Label className="text-xs">Actor</Label>
+              <Select
+                value={actorId || null}
+                onValueChange={(v) => setActorId(v ?? "")}
+                items={actorItems}
+              >
+                <SelectTrigger className="w-64">
+                  <SelectValue placeholder="All actors" />
+                </SelectTrigger>
+                <SelectContent>
+                  {actors.map((a) => (
+                    <SelectItem key={a.id} value={a.id}>
+                      {a.name?.trim() ? `${a.name} (${a.email})` : a.email}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             {action || actorId ? (
               <Button

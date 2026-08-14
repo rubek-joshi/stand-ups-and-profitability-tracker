@@ -59,4 +59,12 @@ export class AuditService {
     ]);
     return { data, meta: { total } };
   }
+
+  async listActors() {
+    return this.prismaService.user.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, email: true },
+      orderBy: { name: "asc" },
+    });
+  }
 }
