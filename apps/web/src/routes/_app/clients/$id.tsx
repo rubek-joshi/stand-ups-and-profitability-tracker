@@ -1,8 +1,14 @@
 import * as React from "react"
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
+import { IconChevronDown } from "@tabler/icons-react"
 import { formatDistanceStrict, isBefore, parseISO, startOfDay } from "date-fns"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@workspace/ui/components/collapsible"
 import { PageHeader } from "@/components/page-header"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
@@ -14,6 +20,10 @@ import type { Client, OrgSettings, Project } from "@/lib/types"
 export const Route = createFileRoute("/_app/clients/$id")({
   component: ClientDetailPage,
 })
+
+function isClosedProject(project: Project) {
+  return project.status === "closed"
+}
 
 function ClientDetailPage() {
   const { id } = Route.useParams()
@@ -51,6 +61,13 @@ function ClientDetailPage() {
 
   const canDelete = (client._count?.projects ?? client.projects?.length ?? 0) === 0
   const projects = client.projects ?? []
+  const openProjects = projects.filter((p) => !isClosedProject(p))
+  const closedProjects = projects.filter(isClosedProject)
+  const stats = client.stats
+  const totalPl = paisaToNpr(stats?.profitLossPaisa)
+  const coreMembers = Array.isArray(stats?.coreMembersInvolved)
+    ? stats.coreMembersInvolved
+    : []
 
   return (
     <div>
@@ -111,13 +128,52 @@ function ClientDetailPage() {
         }
       />
 
+      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Project profit / loss"
+          value={formatNpr(stats?.profitLossPaisa ?? "0", { signed: true })}
+          valueClassName={
+            totalPl > 0
+              ? "text-emerald-600 dark:text-emerald-400"
+              : totalPl < 0
+                ? "text-red-600 dark:text-red-400"
+                : undefined
+          }
+        />
+        <StatCard
+          title="Employees involved"
+          value={String(stats?.employeesInvolved ?? 0)}
+        />
+        <StatCard
+          title="Core members involved"
+          value={String(coreMembers.length)}
+        >
+          {coreMembers.length > 0 ? (
+            <ul className="mt-2 space-y-1">
+              {coreMembers.map((member) => (
+                <li key={member.id} className="truncate text-sm font-medium">
+                  <Link
+                    to="/core-members/$id"
+                    params={{ id: member.id }}
+                    className="hover:underline"
+                  >
+                    {member.name}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">None assigned</p>
+          )}
+        </StatCard>
+        <StatCard
+          title="Standups mentioned"
+          value={String(stats?.standupsMentioned ?? 0)}
+        />
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <section className="min-w-0 space-y-4">
-          <div className="flex items-center justify-between gap-2">
-            <h2 className="text-sm font-medium text-muted-foreground">
-              Projects ({projects.length})
-            </h2>
-          </div>
           {projects.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-sm text-muted-foreground">
@@ -125,15 +181,24 @@ function ClientDetailPage() {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {projects.map((project) => (
-                <ProjectCard
-                  key={project.id}
-                  project={project}
-                  settings={settings}
-                />
-              ))}
-            </div>
+            <>
+              <ProjectSection
+                title="Open projects"
+                count={openProjects.length}
+                defaultOpen
+                projects={openProjects}
+                settings={settings}
+                emptyLabel="No open projects."
+              />
+              <ProjectSection
+                title="Closed projects"
+                count={closedProjects.length}
+                defaultOpen={false}
+                projects={closedProjects}
+                settings={settings}
+                emptyLabel="No closed projects."
+              />
+            </>
           )}
         </section>
 
@@ -155,12 +220,59 @@ function ClientDetailPage() {
                 </p>
               </div>
               <DetailRow label="Projects" value={String(projects.length)} />
+              <DetailRow label="Open" value={String(openProjects.length)} />
+              <DetailRow label="Closed" value={String(closedProjects.length)} />
             </CardContent>
           </Card>
         </aside>
       </div>
       {dialog}
     </div>
+  )
+}
+
+function ProjectSection({
+  title,
+  count,
+  defaultOpen,
+  projects,
+  settings,
+  emptyLabel,
+}: {
+  title: string
+  count: number
+  defaultOpen: boolean
+  projects: Project[]
+  settings: OrgSettings | null
+  emptyLabel: string
+}) {
+  const [open, setOpen] = React.useState(defaultOpen)
+
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="space-y-3">
+      <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-left text-sm font-medium hover:bg-muted/40">
+        <span>
+          {title}{" "}
+          <span className="text-muted-foreground">({count})</span>
+        </span>
+        <IconChevronDown
+          className={`size-4 shrink-0 text-muted-foreground transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        {projects.length === 0 ? (
+          <p className="px-1 py-2 text-sm text-muted-foreground">{emptyLabel}</p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} settings={settings} />
+            ))}
+          </div>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -191,7 +303,7 @@ function ProjectCard({
             </CardTitle>
             <StatusBadge status={project.status} />
           </div>
-          <p className="text-xs text-muted-foreground line-clamp-1">{categories}</p>
+          <p className="line-clamp-1 text-xs text-muted-foreground">{categories}</p>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
@@ -240,6 +352,32 @@ function ProjectCard({
         </CardContent>
       </Card>
     </Link>
+  )
+}
+
+function StatCard({
+  title,
+  value,
+  valueClassName,
+  children,
+}: {
+  title: string
+  value: string
+  valueClassName?: string
+  children?: React.ReactNode
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className={`text-xl font-semibold tabular-nums ${valueClassName ?? ""}`}>
+          {value}
+        </p>
+        {children}
+      </CardContent>
+    </Card>
   )
 }
 

@@ -93,8 +93,8 @@ export class ClientsService {
             ? serializeMoneyFields(amcRecord, AMC_MONEY_FIELDS)
             : null,
           profitability: {
-            projectId: profitability.projectId,
             ...serializeMoneyFields(profitability, PROFIT_MONEY_FIELDS),
+            projectId: profitability.projectId,
             forecastProfitLossPaisa:
               profitability.forecastProfitLossPaisa === null
                 ? null
@@ -102,13 +102,76 @@ export class ClientsService {
             marginPercent: profitability.marginPercent,
             isTrendingOverBudget: profitability.isTrendingOverBudget,
           },
+          _profitLossPaisa: profitability.profitLossPaisa,
         };
       }),
     );
 
+    const totalProfitLossPaisa = projects.reduce(
+      (sum, project) => sum + project._profitLossPaisa,
+      0n,
+    );
+    const serializedProjects = projects.map(
+      ({ _profitLossPaisa: _, ...project }) => project,
+    );
+    const projectIds = client.projects.map((project) => project.id);
+    const stats = await this.buildClientStats(projectIds, totalProfitLossPaisa);
+
     return {
       ...client,
-      projects,
+      projects: serializedProjects,
+      stats,
+    };
+  }
+
+  private async buildClientStats(
+    projectIds: string[],
+    totalProfitLossPaisa: bigint,
+  ) {
+    if (projectIds.length === 0) {
+      return {
+        profitLossPaisa: "0",
+        employeesInvolved: 0,
+        coreMembersInvolved: [] as Array<{ id: string; name: string }>,
+        standupsMentioned: 0,
+      };
+    }
+
+    const [employees, coreMemberAssignments, allocations] = await Promise.all([
+      this.prismaService.projectAssignment.findMany({
+        where: { projectId: { in: projectIds } },
+        distinct: ["employeeId"],
+        select: { employeeId: true },
+      }),
+      this.prismaService.coreMemberAssignment.findMany({
+        where: { projectId: { in: projectIds } },
+        select: {
+          coreMemberId: true,
+          coreMember: { select: { id: true, name: true } },
+        },
+      }),
+      this.prismaService.projectAllocation.findMany({
+        where: { projectId: { in: projectIds } },
+        select: { standupEntry: { select: { standupId: true } } },
+      }),
+    ]);
+
+    const standupIds = new Set(
+      allocations.map((row) => row.standupEntry.standupId),
+    );
+
+    const coreMembersById = new Map<string, { id: string; name: string }>();
+    for (const row of coreMemberAssignments) {
+      coreMembersById.set(row.coreMember.id, row.coreMember);
+    }
+
+    return {
+      profitLossPaisa: String(totalProfitLossPaisa),
+      employeesInvolved: employees.length,
+      coreMembersInvolved: [...coreMembersById.values()].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
+      standupsMentioned: standupIds.size,
     };
   }
 

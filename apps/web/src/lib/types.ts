@@ -1,3 +1,10 @@
+export type ClientStats = {
+  profitLossPaisa: string
+  employeesInvolved: number
+  coreMembersInvolved: Array<{ id: string; name: string }>
+  standupsMentioned: number
+}
+
 export type Client = {
   id: string
   name: string
@@ -7,6 +14,7 @@ export type Client = {
   updatedAt?: string
   _count?: { projects: number }
   projects?: Project[]
+  stats?: ClientStats
 }
 
 export type Category = {
