@@ -1,13 +1,15 @@
 import * as React from "react"
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
+import { formatDistanceStrict, isBefore, parseISO, startOfDay } from "date-fns"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { PageHeader } from "@/components/page-header"
-import { StatusBadge } from "@/components/health-badge"
+import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
-import type { Client } from "@/lib/types"
+import { formatNpr, paisaToNpr } from "@/lib/money"
+import type { Client, OrgSettings, Project } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/clients/$id")({
   component: ClientDetailPage,
@@ -18,6 +20,7 @@ function ClientDetailPage() {
   const navigate = useNavigate()
   const { confirm, dialog } = useConfirmDialog()
   const [client, setClient] = React.useState<Client | null>(null)
+  const [settings, setSettings] = React.useState<OrgSettings | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -25,8 +28,12 @@ function ClientDetailPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await api<Envelope<Client>>(`/clients/${id}`)
-      setClient(res.data)
+      const [clientRes, settingsRes] = await Promise.all([
+        api<Envelope<Client>>(`/clients/${id}`),
+        api<Envelope<OrgSettings>>("/settings").catch(() => null),
+      ])
+      setClient(clientRes.data)
+      setSettings(settingsRes?.data ?? null)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load client")
     } finally {
@@ -43,6 +50,7 @@ function ClientDetailPage() {
   if (!client) return null
 
   const canDelete = (client._count?.projects ?? client.projects?.length ?? 0) === 0
+  const projects = client.projects ?? []
 
   return (
     <div>
@@ -103,55 +111,167 @@ function ClientDetailPage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <DetailRow label="Name" value={client.name} />
-            <DetailRow label="Status" value={client.status} />
-            <div className="space-y-1 border-b py-2 last:border-0">
-              <span className="text-muted-foreground">Contact info</span>
-              <p className="whitespace-pre-wrap font-medium">
-                {client.contactInfo?.trim() || "—"}
-              </p>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <section className="min-w-0 space-y-4">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-medium text-muted-foreground">
+              Projects ({projects.length})
+            </h2>
+          </div>
+          {projects.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-sm text-muted-foreground">
+                No projects for this client.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {projects.map((project) => (
+                <ProjectCard
+                  key={project.id}
+                  project={project}
+                  settings={settings}
+                />
+              ))}
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </section>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Projects</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(client.projects ?? []).length === 0 ? (
-              <p className="text-sm text-muted-foreground">No projects</p>
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {client.projects!.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between gap-2">
-                    <Link to="/projects/$id" params={{ id: p.id }} className="hover:underline">
-                      {p.name}
-                    </Link>
-                    <StatusBadge status={p.status} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+        <aside className="lg:sticky lg:top-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Client details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <DetailRow label="Name" value={client.name} />
+              <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
+                <span className="text-muted-foreground">Status</span>
+                <StatusBadge status={client.status} />
+              </div>
+              <div className="space-y-1 border-b py-2 last:border-0">
+                <span className="text-muted-foreground">Contact info</span>
+                <p className="whitespace-pre-wrap font-medium">
+                  {client.contactInfo?.trim() || "—"}
+                </p>
+              </div>
+              <DetailRow label="Projects" value={String(projects.length)} />
+            </CardContent>
+          </Card>
+        </aside>
       </div>
       {dialog}
     </div>
   )
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function ProjectCard({
+  project,
+  settings,
+}: {
+  project: Project
+  settings: OrgSettings | null
+}) {
+  const profit = project.profitability
+  const pl = profit ? paisaToNpr(profit.profitLossPaisa) : 0
+  const duration = projectDurationSoFar(project.startDate, project.endDate)
+  const categories =
+    project.categories?.map((c) => c.name).filter(Boolean).join(", ") || "—"
+
+  return (
+    <Link
+      to="/projects/$id"
+      params={{ id: project.id }}
+      className="block rounded-xl outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Card className="h-full hover:bg-muted/40">
+        <CardHeader className="space-y-3 pb-3">
+          <div className="flex items-start justify-between gap-2">
+            <CardTitle className="line-clamp-2 text-base leading-snug">
+              {project.name}
+            </CardTitle>
+            <StatusBadge status={project.status} />
+          </div>
+          <p className="text-xs text-muted-foreground line-clamp-1">{categories}</p>
+        </CardHeader>
+        <CardContent className="space-y-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            {profit ? (
+              <HealthBadge marginPercent={profit.marginPercent} settings={settings} />
+            ) : null}
+            {project.amcRecord ? (
+              <span className="inline-flex items-center gap-1.5 text-xs">
+                <span className="text-muted-foreground">AMC</span>
+                <StatusBadge status={project.amcRecord.status} />
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground">No AMC</span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
+            <Meta label="Timeline">
+              {String(project.startDate).slice(0, 10)} →{" "}
+              {String(project.endDate).slice(0, 10)}
+            </Meta>
+            {duration ? <Meta label="Duration so far">{duration}</Meta> : null}
+            <Meta label="Extensions">{String(project.extensionCount ?? 0)}</Meta>
+            <Meta label="Budget">{formatNpr(project.budgetPaisa)}</Meta>
+          </div>
+
+          {profit ? (
+            <div className="flex items-baseline justify-between gap-2 border-t pt-3">
+              <span className="text-xs text-muted-foreground">Profit / Loss</span>
+              <span
+                className={`tabular-nums text-sm font-semibold ${
+                  pl > 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : pl < 0
+                      ? "text-red-600 dark:text-red-400"
+                      : "text-muted-foreground"
+                }`}
+              >
+                {formatNpr(profit.profitLossPaisa, { signed: true })}
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  ({profit.marginPercent.toFixed(1)}%)
+                </span>
+              </span>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+    </Link>
+  )
+}
+
+function Meta({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="min-w-0 space-y-0.5">
+      <div className="text-muted-foreground">{label}</div>
+      <div className="truncate font-medium">{children}</div>
+    </div>
+  )
+}
+
+function projectDurationSoFar(startDate: string, endDate: string): string | null {
+  const start = startOfDay(parseISO(String(startDate).slice(0, 10)))
+  const end = startOfDay(parseISO(String(endDate).slice(0, 10)))
+  const today = startOfDay(new Date())
+  if (isBefore(today, start)) return null
+  const until = isBefore(today, end) ? today : end
+  return formatDistanceStrict(start, until)
+}
+
+function DetailRow({
+  label,
+  value,
+}: {
+  label: string
+  value: string
+}) {
   return (
     <div className="flex justify-between gap-4 border-b py-2 last:border-0">
       <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium capitalize">{value}</span>
+      <span className="text-right font-medium">{value}</span>
     </div>
   )
 }

@@ -33,6 +33,7 @@ export type Project = {
   client?: { id: string; name: string }
   categories?: Array<{ id: string; name: string }>
   profitability?: ProjectProfitability
+  extensionCount?: number
   extensions?: ProjectExtension[]
   amcRecord?: AmcRecord | null
   employeeAssignments?: ProjectAssignment[]
@@ -59,6 +60,7 @@ export type ProjectExtension = {
   amountPaisa: string
   isProfit: boolean
   isAuto: boolean
+  endDate: string | null
   createdAt: string
 }
 

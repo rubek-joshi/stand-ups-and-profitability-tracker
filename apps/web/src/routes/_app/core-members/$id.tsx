@@ -124,7 +124,7 @@ function CoreMemberDetailPage() {
               label="Left"
               value={member.dateLeft ? String(member.dateLeft).slice(0, 10) : "—"}
             />
-            <DetailRow label="Status" value={member.status} />
+            <DetailRow label="Status" value={member.status} capitalize />
           </CardContent>
         </Card>
 
@@ -165,11 +165,19 @@ function CoreMemberDetailPage() {
   )
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({
+  label,
+  value,
+  capitalize,
+}: {
+  label: string
+  value: string
+  capitalize?: boolean
+}) {
   return (
     <div className="flex justify-between gap-4 border-b py-2 last:border-0">
       <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium capitalize">{value}</span>
+      <span className={`text-right font-medium${capitalize ? " capitalize" : ""}`}>{value}</span>
     </div>
   )
 }

@@ -6,15 +6,28 @@ import {
 import { AuditAction, ClientStatus } from "@workspace/database";
 import { AuditService } from "../audit/audit.service";
 import { serializeMoneyFields } from "../_shared/utils/serialize-money.util";
+import { ProfitabilityService } from "../profitability/profitability.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateClientDto } from "./dto/create-client.dto";
 import { UpdateClientDto } from "./dto/update-client.dto";
+
+const AMC_MONEY_FIELDS = ["amcAmountPaisa"] as const;
+const PROFIT_MONEY_FIELDS = [
+  "budgetPaisa",
+  "extensionsPaisa",
+  "revenuePaisa",
+  "employeeCostPaisa",
+  "coreMemberCostPaisa",
+  "totalCostPaisa",
+  "profitLossPaisa",
+] as const;
 
 @Injectable()
 export class ClientsService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly auditService: AuditService,
+    private readonly profitabilityService: ProfitabilityService,
   ) {}
 
   async create(dto: CreateClientDto, actorId: string) {
@@ -48,6 +61,8 @@ export class ClientsService {
         projects: {
           include: {
             projectCategories: { include: { category: true } },
+            amcRecord: true,
+            _count: { select: { extensions: true } },
           },
           orderBy: { createdAt: "desc" },
         },
@@ -56,15 +71,44 @@ export class ClientsService {
     if (!client) {
       throw new NotFoundException(`Client ${id} not found`);
     }
+
+    const projects = await Promise.all(
+      client.projects.map(async (project) => {
+        const {
+          projectCategories,
+          amcRecord,
+          _count,
+          ...projectFields
+        } = project;
+        const profitability =
+          await this.profitabilityService.calculateProjectProfitLoss(project.id);
+        const categories =
+          projectCategories?.map((row) => row.category) ?? [];
+        return {
+          ...serializeMoneyFields(projectFields, ["budgetPaisa"] as const),
+          categories,
+          categoryIds: categories.map((category) => category.id),
+          extensionCount: _count.extensions,
+          amcRecord: amcRecord
+            ? serializeMoneyFields(amcRecord, AMC_MONEY_FIELDS)
+            : null,
+          profitability: {
+            projectId: profitability.projectId,
+            ...serializeMoneyFields(profitability, PROFIT_MONEY_FIELDS),
+            forecastProfitLossPaisa:
+              profitability.forecastProfitLossPaisa === null
+                ? null
+                : String(profitability.forecastProfitLossPaisa),
+            marginPercent: profitability.marginPercent,
+            isTrendingOverBudget: profitability.isTrendingOverBudget,
+          },
+        };
+      }),
+    );
+
     return {
       ...client,
-      projects: client.projects.map((project) => ({
-        ...serializeMoneyFields(project, ["budgetPaisa"] as const),
-        categories:
-          project.projectCategories?.map((row) => row.category) ?? [],
-        categoryIds:
-          project.projectCategories?.map((row) => row.categoryId) ?? [],
-      })),
+      projects,
     };
   }
 

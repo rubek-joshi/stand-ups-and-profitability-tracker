@@ -110,4 +110,11 @@ export class CreateExtensionDto {
   @IsNumber()
   @Min(0)
   amountNpr?: number;
+
+  @ApiProperty({
+    example: "2026-12-31",
+    description: "New project end date (must be after the current end date)",
+  })
+  @IsDateString()
+  endDate!: string;
 }

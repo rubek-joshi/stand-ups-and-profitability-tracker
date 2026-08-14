@@ -302,33 +302,53 @@ export class ProjectsService {
     actorId: string,
   ) {
     const project = await this.getProjectOrThrow(projectId);
-    const amountPaisa = nprToPaisa(dto.amountNpr ?? 0);
-    const extension = await this.prismaService.projectExtension.create({
-      data: {
-        projectId,
-        reason: dto.reason,
-        amountPaisa,
-        isProfit: amountPaisa > 0n,
-        isAuto: false,
-        createdById: actorId,
-      },
-    });
     if (
-      project.status === ProjectStatus.active ||
-      project.status === ProjectStatus.extended
+      project.status === ProjectStatus.closed ||
+      project.status === ProjectStatus.under_amc
     ) {
-      await this.prismaService.project.update({
-        where: { id: projectId },
-        data: { status: ProjectStatus.extended },
-      });
+      throw new BadRequestException("Cannot extend a closed project");
     }
+    const endDate = parseIsoDate(dto.endDate);
+    const currentEnd = new Date(project.endDate);
+    currentEnd.setUTCHours(0, 0, 0, 0);
+    if (endDate <= currentEnd) {
+      throw new BadRequestException(
+        "Extension end date must be after the project's current end date",
+      );
+    }
+    const amountPaisa = nprToPaisa(dto.amountNpr ?? 0);
+    const extension = await this.prismaService.$transaction(async (tx) => {
+      const created = await tx.projectExtension.create({
+        data: {
+          projectId,
+          reason: dto.reason,
+          amountPaisa,
+          isProfit: amountPaisa > 0n,
+          isAuto: false,
+          endDate,
+          createdById: actorId,
+        },
+      });
+      await tx.project.update({
+        where: { id: projectId },
+        data: {
+          endDate,
+          status: ProjectStatus.extended,
+        },
+      });
+      return created;
+    });
     this.profitabilityService.clearCache(projectId);
     await this.auditService.write({
       actorId,
       action: AuditAction.PROJECT_EXTENDED,
       targetType: "ProjectExtension",
       targetId: extension.id,
-      metadata: { after: serializeMoneyFields(extension, EXTENSION_MONEY_FIELDS) },
+      metadata: {
+        after: serializeMoneyFields(extension, EXTENSION_MONEY_FIELDS),
+        previousEndDate: project.endDate,
+        newEndDate: endDate,
+      },
     });
     return serializeMoneyFields(extension, EXTENSION_MONEY_FIELDS);
   }

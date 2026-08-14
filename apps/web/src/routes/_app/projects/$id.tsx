@@ -57,6 +57,7 @@ function ProjectDetailPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [extReason, setExtReason] = React.useState("")
   const [extAmount, setExtAmount] = React.useState("0")
+  const [extEndDate, setExtEndDate] = React.useState("")
   const [employeeId, setEmployeeId] = React.useState("")
   const [coreMemberId, setCoreMemberId] = React.useState("")
   const [amcForm, setAmcForm] = React.useState({
@@ -182,7 +183,7 @@ function ProjectDetailPage() {
               <DetailRow label="Budget" value={formatNpr(project.budgetPaisa)} />
               <DetailRow label="Start" value={String(project.startDate).slice(0, 10)} />
               <DetailRow label="End" value={String(project.endDate).slice(0, 10)} />
-              <DetailRow label="Status" value={project.status} />
+              <DetailRow label="Status" value={project.status} capitalize />
               <DetailRow
                 label="VAT"
                 value={project.isVatApplicable ? `Yes (${project.vatRateApplied}%)` : "No"}
@@ -384,10 +385,12 @@ function ProjectDetailPage() {
                     body: {
                       reason: extReason.trim(),
                       amountNpr: parseNprInput(extAmount || "0"),
+                      endDate: extEndDate,
                     },
                   })
                   setExtReason("")
                   setExtAmount("0")
+                  setExtEndDate("")
                   await load()
                 }}
               >
@@ -403,7 +406,24 @@ function ProjectDetailPage() {
                   <Label>Amount (NPR)</Label>
                   <Input value={extAmount} onChange={(e) => setExtAmount(e.target.value)} />
                 </div>
-                <Button type="submit" className="w-fit">
+                <div className="space-y-2">
+                  <Label>New end date</Label>
+                  <Input
+                    type="date"
+                    required
+                    min={(() => {
+                      const current = new Date(String(project.endDate).slice(0, 10))
+                      current.setUTCDate(current.getUTCDate() + 1)
+                      return current.toISOString().slice(0, 10)
+                    })()}
+                    value={extEndDate}
+                    onChange={(e) => setExtEndDate(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Current end date: {String(project.endDate).slice(0, 10)}
+                  </p>
+                </div>
+                <Button type="submit" className="w-fit" disabled={!extEndDate}>
                   Add extension
                 </Button>
               </form>
@@ -419,7 +439,8 @@ function ProjectDetailPage() {
                   <TableRow>
                     <TableHead>Reason</TableHead>
                     <TableHead>Amount</TableHead>
-                    <TableHead>Date</TableHead>
+                    <TableHead>New end</TableHead>
+                    <TableHead>Logged</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -430,6 +451,9 @@ function ProjectDetailPage() {
                         {x.isAuto ? " (auto)" : ""}
                       </TableCell>
                       <TableCell>{formatNpr(x.amountPaisa)}</TableCell>
+                      <TableCell>
+                        {x.endDate ? String(x.endDate).slice(0, 10) : "—"}
+                      </TableCell>
                       <TableCell>{String(x.createdAt).slice(0, 10)}</TableCell>
                     </TableRow>
                   ))}
@@ -551,11 +575,19 @@ function ProjectDetailPage() {
   )
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({
+  label,
+  value,
+  capitalize,
+}: {
+  label: string
+  value: string
+  capitalize?: boolean
+}) {
   return (
     <div className="flex justify-between gap-4 border-b py-2 last:border-0">
       <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium capitalize">{value}</span>
+      <span className={`text-right font-medium${capitalize ? " capitalize" : ""}`}>{value}</span>
     </div>
   )
 }

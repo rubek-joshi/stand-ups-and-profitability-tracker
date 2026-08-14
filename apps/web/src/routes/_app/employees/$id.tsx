@@ -124,7 +124,7 @@ function EmployeeDetailPage() {
               label="Left"
               value={employee.dateLeft ? String(employee.dateLeft).slice(0, 10) : "—"}
             />
-            <DetailRow label="Status" value={employee.status} />
+            <DetailRow label="Status" value={employee.status} capitalize />
             {employee.attendanceSummary ? (
               <div className="mt-4 grid grid-cols-2 gap-2">
                 {Object.entries(employee.attendanceSummary).map(([k, v]) => (
@@ -177,11 +177,19 @@ function EmployeeDetailPage() {
   )
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({
+  label,
+  value,
+  capitalize,
+}: {
+  label: string
+  value: string
+  capitalize?: boolean
+}) {
   return (
     <div className="flex justify-between gap-4 border-b py-2 last:border-0">
       <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium capitalize">{value}</span>
+      <span className={`text-right font-medium${capitalize ? " capitalize" : ""}`}>{value}</span>
     </div>
   )
 }
