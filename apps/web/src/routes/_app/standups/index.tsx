@@ -34,12 +34,24 @@ export const Route = createFileRoute("/_app/standups/")({
   component: StandupsPage,
 })
 
+/** UTC calendar date as YYYY-MM-DD (matches API date parsing). */
+function utcIsoDate(date = new Date()) {
+  return date.toISOString().slice(0, 10)
+}
+
+/** Yesterday UTC (stand-ups cannot be today or future). */
+function maxStandupDate() {
+  const d = new Date(`${utcIsoDate()}T00:00:00.000Z`)
+  d.setUTCDate(d.getUTCDate() - 1)
+  return d.toISOString().slice(0, 10)
+}
+
 function StandupsPage() {
   const [items, setItems] = React.useState<Standup[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [open, setOpen] = React.useState(false)
-  const [date, setDate] = React.useState(new Date().toISOString().slice(0, 10))
+  const [date, setDate] = React.useState(maxStandupDate)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -58,12 +70,27 @@ function StandupsPage() {
     void load()
   }, [load])
 
+  const maxDate = maxStandupDate()
+  const takenDates = React.useMemo(
+    () => new Set(items.map((s) => String(s.date).slice(0, 10))),
+    [items],
+  )
+
   return (
     <div>
       <PageHeader
         title="Stand-ups"
         description="Daily allocations and attendance"
-        actions={<Button onClick={() => setOpen(true)}>New stand-up</Button>}
+        actions={
+          <Button
+            onClick={() => {
+              setDate(maxStandupDate())
+              setOpen(true)
+            }}
+          >
+            New stand-up
+          </Button>
+        }
       />
       {loading ? <LoadingState /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}
@@ -122,6 +149,14 @@ function StandupsPage() {
             className="space-y-3"
             onSubmit={async (e) => {
               e.preventDefault()
+              if (date >= utcIsoDate()) {
+                alert("Stand-ups can only be created for past dates.")
+                return
+              }
+              if (takenDates.has(date)) {
+                alert(`A stand-up already exists for ${date}.`)
+                return
+              }
               try {
                 await api("/standups", { method: "POST", body: { date } })
                 setOpen(false)
@@ -133,7 +168,16 @@ function StandupsPage() {
           >
             <div className="space-y-2">
               <Label>Date</Label>
-              <Input type="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+              <Input
+                type="date"
+                required
+                max={maxDate}
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Past dates only — not today or future. One stand-up per day.
+              </p>
             </div>
             <DialogFooter>
               <Button type="submit">Create</Button>

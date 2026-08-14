@@ -15,6 +15,7 @@ import {
 import { AuditService } from "../audit/audit.service";
 import {
   parseIsoDate,
+  toIsoDate,
   toMonthKey,
 } from "../_shared/utils/date.util";
 import { PrismaService } from "../prisma/prisma.service";
@@ -35,6 +36,28 @@ export class StandupsService {
 
   async create(dto: CreateStandupDto, actorId: string) {
     const date = parseIsoDate(dto.date);
+    const today = parseIsoDate(toIsoDate(new Date()));
+    if (date.getTime() > today.getTime()) {
+      throw new BadRequestException(
+        "Cannot create a stand-up for a future date",
+      );
+    }
+    if (date.getTime() === today.getTime()) {
+      throw new BadRequestException(
+        "Cannot create a stand-up for today; use a past date",
+      );
+    }
+
+    const existing = await this.prismaService.standup.findFirst({
+      where: { date },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        `A stand-up already exists for ${dto.date}`,
+      );
+    }
+
     const employees = await this.findActiveEmployeesForDate(date);
     const standup = await this.prismaService.standup.create({
       data: {
