@@ -32,7 +32,7 @@ export function AppSidebar() {
       <Sidebar collapsible="icon">
         <SidebarHeader className="gap-1 px-3 py-3">
           <Link to="/" className="flex items-center gap-2 truncate font-semibold">
-            <span className="truncate">Profitability Tracker</span>
+            <span className="truncate">Tracker</span>
           </Link>
           {user ? (
             <p className="truncate text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">

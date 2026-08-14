@@ -32,8 +32,8 @@ async function bootstrap(): Promise<void> {
   app.useGlobalInterceptors(new TransformResInterceptor());
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle("Profitability Tracker API")
-    .setDescription("Internal profitability tracker API")
+    .setTitle("Tracker API")
+    .setDescription("Internal tracker API")
     .setVersion("1.0")
     .addBearerAuth()
     .build();
