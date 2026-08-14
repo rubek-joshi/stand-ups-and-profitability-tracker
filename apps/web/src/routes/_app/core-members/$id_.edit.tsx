@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
+import { IconPencil, IconTrash } from "@tabler/icons-react"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
@@ -22,6 +23,11 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
+import {
+  TableActionButton,
+  TableActionsCell,
+  TableActionsHead,
+} from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { formatNpr, parseNprInput, paisaToNpr } from "@/lib/money"
 import type { CoreMember, SalaryEntry } from "@/lib/types"
@@ -189,7 +195,7 @@ function CoreMemberEditPage() {
                     <TableHead>Effective</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Reason</TableHead>
-                    <TableHead />
+                    <TableActionsHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -200,14 +206,16 @@ function CoreMemberEditPage() {
                       <TableCell className="max-w-40 truncate">
                         {entry.reason?.trim() || "—"}
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Button size="sm" variant="outline" onClick={() => openEditSalary(entry)}>
-                          Edit
-                        </Button>
-                        <Button
-                          size="sm"
+                      <TableActionsCell>
+                        <TableActionButton
+                          label="Edit"
+                          onClick={() => openEditSalary(entry)}
+                        >
+                          <IconPencil className="size-3.5" />
+                        </TableActionButton>
+                        <TableActionButton
+                          label="Delete"
                           variant="destructive"
-                          className="ml-2"
                           onClick={async () => {
                             const ok = await confirm({
                               title: "Delete salary entry?",
@@ -223,9 +231,9 @@ function CoreMemberEditPage() {
                             await load()
                           }}
                         >
-                          Delete
-                        </Button>
-                      </TableCell>
+                          <IconTrash className="size-3.5" />
+                        </TableActionButton>
+                      </TableActionsCell>
                     </TableRow>
                   ))}
                 </TableBody>

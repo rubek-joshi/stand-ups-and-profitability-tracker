@@ -37,7 +37,16 @@ export function ConfirmDialog({
   const isBusy = busy || loading
 
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog
+      open={open}
+      onOpenChange={(nextOpen, eventDetails) => {
+        if (!nextOpen && isBusy) {
+          eventDetails?.cancel?.()
+          return
+        }
+        onOpenChange(nextOpen)
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>

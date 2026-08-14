@@ -1,5 +1,6 @@
 import * as React from "react"
 import { createFileRoute } from "@tanstack/react-router"
+import { IconExternalLink } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Label } from "@workspace/ui/components/label"
 import {
@@ -20,6 +21,11 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import { EntityLink } from "@/components/resource-link"
+import {
+  TableActionLink,
+  TableActionsCell,
+  TableActionsHead,
+} from "@/components/table-row-actions"
 import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
 import type { AuditLog } from "@/lib/types"
 
@@ -50,6 +56,14 @@ const ACTIONS = [
   "AMC_SET",
   "AMC_CANCELLED",
 ]
+
+const ENTITY_ROUTES: Record<string, string> = {
+  Client: "/clients/$id",
+  Project: "/projects/$id",
+  Employee: "/employees/$id",
+  CoreMember: "/core-members/$id",
+  Standup: "/standups/$id",
+}
 
 function AuditPage() {
   const [logs, setLogs] = React.useState<AuditLog[]>([])
@@ -192,35 +206,49 @@ function AuditPage() {
                   <TableHead>Actor</TableHead>
                   <TableHead>Entity</TableHead>
                   <TableHead>Summary</TableHead>
+                  <TableActionsHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {logs.map((log) => (
-                  <TableRow key={log.id}>
-                    <TableCell className="whitespace-nowrap text-sm">
-                      {new Date(log.createdAt).toLocaleString()}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{log.action}</TableCell>
-                    <TableCell>{log.actor?.name ?? log.actor?.email ?? "—"}</TableCell>
-                    <TableCell className="text-sm">
-                      {(() => {
-                        const type = log.targetType ?? log.entityType ?? ""
-                        const id = log.targetId ?? log.entityId ?? ""
-                        const label = `${type} · ${id.slice(0, 8)}…`
-                        return id ? (
-                          <EntityLink type={type} id={id}>
+                {logs.map((log) => {
+                  const type = log.targetType ?? log.entityType ?? ""
+                  const entityId = log.targetId ?? log.entityId ?? ""
+                  const entityRoute = entityId ? ENTITY_ROUTES[type] : undefined
+                  const label = `${type} · ${entityId.slice(0, 8)}…`
+
+                  return (
+                    <TableRow key={log.id}>
+                      <TableCell className="whitespace-nowrap text-sm">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{log.action}</TableCell>
+                      <TableCell>{log.actor?.name ?? log.actor?.email ?? "—"}</TableCell>
+                      <TableCell className="text-sm">
+                        {entityId ? (
+                          <EntityLink type={type} id={entityId}>
                             {label}
                           </EntityLink>
                         ) : (
                           label
-                        )
-                      })()}
-                    </TableCell>
-                    <TableCell className="max-w-md truncate text-sm text-muted-foreground">
-                      {log.summary || "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-md truncate text-sm text-muted-foreground">
+                        {log.summary || "—"}
+                      </TableCell>
+                      <TableActionsCell>
+                        {entityRoute ? (
+                          <TableActionLink
+                            label="Open entity"
+                            to={entityRoute}
+                            params={{ id: entityId }}
+                          >
+                            <IconExternalLink className="size-3.5" />
+                          </TableActionLink>
+                        ) : null}
+                      </TableActionsCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </div>

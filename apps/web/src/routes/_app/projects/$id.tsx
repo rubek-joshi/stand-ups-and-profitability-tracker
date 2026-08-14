@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
+import { IconUserMinus } from "@tabler/icons-react"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
@@ -27,6 +28,11 @@ import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { CoreMemberLink, EmployeeLink } from "@/components/resource-link"
+import {
+  TableActionButton,
+  TableActionsCell,
+  TableActionsHead,
+} from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { formatNpr, parseNprInput } from "@/lib/money"
 import type {
@@ -242,7 +248,7 @@ function ProjectDetailPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Assigned</TableHead>
                     <TableHead>Ended</TableHead>
-                    <TableHead />
+                    <TableActionsHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -257,11 +263,11 @@ function ProjectDetailPage() {
                       <TableCell>
                         {a.unassignedAt ? String(a.unassignedAt).slice(0, 10) : "—"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableActionsCell>
                         {!a.unassignedAt ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
+                          <TableActionButton
+                            label="Unassign"
+                            variant="destructive"
                             onClick={async () => {
                               await api(
                                 `/projects/${id}/assignments/employees/${a.employeeId}`,
@@ -270,10 +276,10 @@ function ProjectDetailPage() {
                               await load()
                             }}
                           >
-                            Unassign
-                          </Button>
+                            <IconUserMinus className="size-3.5" />
+                          </TableActionButton>
                         ) : null}
-                      </TableCell>
+                      </TableActionsCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -330,7 +336,7 @@ function ProjectDetailPage() {
                     <TableHead>Name</TableHead>
                     <TableHead>Assigned</TableHead>
                     <TableHead>Ended</TableHead>
-                    <TableHead />
+                    <TableActionsHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -345,11 +351,11 @@ function ProjectDetailPage() {
                       <TableCell>
                         {a.unassignedAt ? String(a.unassignedAt).slice(0, 10) : "—"}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableActionsCell>
                         {!a.unassignedAt ? (
-                          <Button
-                            size="sm"
-                            variant="outline"
+                          <TableActionButton
+                            label="Unassign"
+                            variant="destructive"
                             onClick={async () => {
                               await api(
                                 `/projects/${id}/assignments/core-members/${a.coreMemberId}`,
@@ -358,10 +364,10 @@ function ProjectDetailPage() {
                               await load()
                             }}
                           >
-                            Unassign
-                          </Button>
+                            <IconUserMinus className="size-3.5" />
+                          </TableActionButton>
                         ) : null}
-                      </TableCell>
+                      </TableActionsCell>
                     </TableRow>
                   ))}
                 </TableBody>

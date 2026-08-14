@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
+import { IconEye, IconPencil } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -30,6 +31,11 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
+import {
+  TableActionLink,
+  TableActionsCell,
+  TableActionsHead,
+} from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { formatNpr, parseNprInput } from "@/lib/money"
 import type { Category, Client, Project } from "@/lib/types"
@@ -129,6 +135,7 @@ function ProjectsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Budget</TableHead>
                 <TableHead>Dates</TableHead>
+                <TableActionsHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -163,6 +170,22 @@ function ProjectsPage() {
                   <TableCell className="text-sm text-muted-foreground">
                     {String(p.startDate).slice(0, 10)} → {String(p.endDate).slice(0, 10)}
                   </TableCell>
+                  <TableActionsCell>
+                    <TableActionLink
+                      label="View"
+                      to="/projects/$id"
+                      params={{ id: p.id }}
+                    >
+                      <IconEye className="size-3.5" />
+                    </TableActionLink>
+                    <TableActionLink
+                      label="Edit"
+                      to="/projects/$id/edit"
+                      params={{ id: p.id }}
+                    >
+                      <IconPencil className="size-3.5" />
+                    </TableActionLink>
+                  </TableActionsCell>
                 </TableRow>
               ))}
             </TableBody>

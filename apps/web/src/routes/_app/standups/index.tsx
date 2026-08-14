@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
+import { IconEye } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -21,6 +22,11 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
+import {
+  TableActionLink,
+  TableActionsCell,
+  TableActionsHead,
+} from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import type { Standup } from "@/lib/types"
 
@@ -71,6 +77,7 @@ function StandupsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Entries</TableHead>
                 <TableHead>Created by</TableHead>
+                <TableActionsHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -90,6 +97,15 @@ function StandupsPage() {
                   </TableCell>
                   <TableCell>{s._count?.entries ?? "—"}</TableCell>
                   <TableCell>{s.createdBy?.name ?? "—"}</TableCell>
+                  <TableActionsCell>
+                    <TableActionLink
+                      label="Open"
+                      to="/standups/$id"
+                      params={{ id: s.id }}
+                    >
+                      <IconEye className="size-3.5" />
+                    </TableActionLink>
+                  </TableActionsCell>
                 </TableRow>
               ))}
             </TableBody>

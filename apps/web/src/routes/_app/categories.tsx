@@ -1,5 +1,6 @@
 import * as React from "react"
 import { createFileRoute } from "@tanstack/react-router"
+import { IconPencil, IconPlayerPause } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
@@ -22,6 +23,11 @@ import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
+import {
+  TableActionButton,
+  TableActionsCell,
+  TableActionsHead,
+} from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import type { Category } from "@/lib/types"
 
@@ -73,7 +79,7 @@ function CategoriesPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableActionsHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -89,60 +95,57 @@ function CategoriesPage() {
                   <TableCell>
                     <StatusBadge status={c.isActive ? "active" : "inactive"} />
                   </TableCell>
-                  <TableCell className="space-x-2 text-right">
-                    {editId === c.id ? (
-                      <>
-                        <Button
-                          size="sm"
+                  {editId === c.id ? (
+                    <TableCell className="space-x-2 text-right">
+                      <Button
+                        size="sm"
+                        onClick={async () => {
+                          await api(`/categories/${c.id}`, {
+                            method: "PATCH",
+                            body: { name: editName.trim() },
+                          })
+                          setEditId(null)
+                          await load()
+                        }}
+                      >
+                        Save
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => setEditId(null)}>
+                        Cancel
+                      </Button>
+                    </TableCell>
+                  ) : (
+                    <TableActionsCell>
+                      <TableActionButton
+                        label="Edit"
+                        onClick={() => {
+                          setEditId(c.id)
+                          setEditName(c.name)
+                        }}
+                      >
+                        <IconPencil className="size-3.5" />
+                      </TableActionButton>
+                      {c.isActive ? (
+                        <TableActionButton
+                          label="Deactivate"
+                          variant="destructive"
                           onClick={async () => {
-                            await api(`/categories/${c.id}`, {
-                              method: "PATCH",
-                              body: { name: editName.trim() },
+                            const ok = await confirm({
+                              title: "Deactivate category?",
+                              description: `"${c.name}" will be marked inactive.`,
+                              confirmLabel: "Deactivate",
+                              destructive: true,
                             })
-                            setEditId(null)
+                            if (!ok) return
+                            await api(`/categories/${c.id}/deactivate`, { method: "POST" })
                             await load()
                           }}
                         >
-                          Save
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditId(null)}>
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => {
-                            setEditId(c.id)
-                            setEditName(c.name)
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        {c.isActive ? (
-                          <Button
-                            size="sm"
-                            variant="destructive"
-                            onClick={async () => {
-                              const ok = await confirm({
-                                title: "Deactivate category?",
-                                description: `"${c.name}" will be marked inactive.`,
-                                confirmLabel: "Deactivate",
-                                destructive: true,
-                              })
-                              if (!ok) return
-                              await api(`/categories/${c.id}/deactivate`, { method: "POST" })
-                              await load()
-                            }}
-                          >
-                            Deactivate
-                          </Button>
-                        ) : null}
-                      </>
-                    )}
-                  </TableCell>
+                          <IconPlayerPause className="size-3.5" />
+                        </TableActionButton>
+                      ) : null}
+                    </TableActionsCell>
+                  )}
                 </TableRow>
               ))}
             </TableBody>

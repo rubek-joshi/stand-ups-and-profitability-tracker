@@ -31,7 +31,14 @@ function TableBody({ className, ...props }: React.ComponentProps<"tbody">) {
   return (
     <tbody
       data-slot="table-body"
-      className={cn("[&_tr:last-child]:border-0", className)}
+      className={cn(
+        "[&_tr:last-child]:border-0",
+        "[&_[data-slot=row-actions]]:pointer-events-none [&_[data-slot=row-actions]]:opacity-0 [&_[data-slot=row-actions]]:transition-opacity",
+        "[&_tr:hover_[data-slot=row-actions]]:pointer-events-auto [&_tr:hover_[data-slot=row-actions]]:opacity-100",
+        "[&_tr:focus-within_[data-slot=row-actions]]:pointer-events-auto [&_tr:focus-within_[data-slot=row-actions]]:opacity-100",
+        "[@media(hover:none)_&_[data-slot=row-actions]]:pointer-events-auto [@media(hover:none)_&_[data-slot=row-actions]]:opacity-100",
+        className
+      )}
       {...props}
     />
   )

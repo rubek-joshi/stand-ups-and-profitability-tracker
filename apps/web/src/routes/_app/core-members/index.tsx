@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
+import { IconEye, IconPencil } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -21,6 +22,11 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
+import {
+  TableActionLink,
+  TableActionsCell,
+  TableActionsHead,
+} from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { parseNprInput } from "@/lib/money"
 import type { CoreMember } from "@/lib/types"
@@ -77,6 +83,7 @@ function CoreMembersPage() {
                 <TableHead>Email</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
+                <TableActionsHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -96,6 +103,22 @@ function CoreMembersPage() {
                     <StatusBadge status={m.status} />
                   </TableCell>
                   <TableCell>{String(m.dateJoined).slice(0, 10)}</TableCell>
+                  <TableActionsCell>
+                    <TableActionLink
+                      label="View"
+                      to="/core-members/$id"
+                      params={{ id: m.id }}
+                    >
+                      <IconEye className="size-3.5" />
+                    </TableActionLink>
+                    <TableActionLink
+                      label="Edit"
+                      to="/core-members/$id/edit"
+                      params={{ id: m.id }}
+                    >
+                      <IconPencil className="size-3.5" />
+                    </TableActionLink>
+                  </TableActionsCell>
                 </TableRow>
               ))}
             </TableBody>

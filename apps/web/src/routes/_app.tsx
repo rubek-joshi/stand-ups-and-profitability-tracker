@@ -2,6 +2,7 @@ import * as React from "react"
 import { Outlet, createFileRoute, redirect } from "@tanstack/react-router"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@workspace/ui/components/sidebar"
 import { Separator } from "@workspace/ui/components/separator"
+import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandPalette } from "@/components/command-palette"
 import { getToken } from "@/lib/api"
@@ -40,19 +41,21 @@ function AppLayout() {
   if (!token) return null
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
-          <SidebarTrigger />
-          <Separator orientation="vertical" className="h-4" />
-          <span className="text-sm font-medium">Tracker</span>
-        </header>
-        <div className="flex-1 p-4 md:p-6">
-          <Outlet />
-        </div>
-      </SidebarInset>
-      <CommandPalette />
-    </SidebarProvider>
+    <TooltipProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
+            <SidebarTrigger />
+            <Separator orientation="vertical" className="h-4" />
+            <span className="text-sm font-medium">Tracker</span>
+          </header>
+          <div className="flex-1 p-4 md:p-6">
+            <Outlet />
+          </div>
+        </SidebarInset>
+        <CommandPalette />
+      </SidebarProvider>
+    </TooltipProvider>
   )
 }

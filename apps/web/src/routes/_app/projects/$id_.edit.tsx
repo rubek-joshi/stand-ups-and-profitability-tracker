@@ -4,12 +4,18 @@ import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Checkbox } from "@workspace/ui/components/checkbox"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
 import { PageHeader } from "@/components/page-header"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { parseNprInput, paisaToNpr } from "@/lib/money"
 import type { Category, Project } from "@/lib/types"
+import { Switch } from "@workspace/ui/components/switch"
 
 export const Route = createFileRoute("/_app/projects/$id_/edit")({
   component: ProjectEditPage,
@@ -44,7 +50,8 @@ function ProjectEditPage() {
       setCategories(cats.data.filter((c) => c.isActive))
       setEdit({
         name: p.data.name,
-        categoryIds: p.data.categoryIds ?? p.data.categories?.map((c) => c.id) ?? [],
+        categoryIds:
+          p.data.categoryIds ?? p.data.categories?.map((c) => c.id) ?? [],
         budgetNpr: String(paisaToNpr(p.data.budgetPaisa)),
         startDate: String(p.data.startDate).slice(0, 10),
         endDate: String(p.data.endDate).slice(0, 10),
@@ -116,7 +123,9 @@ function ProjectEditPage() {
               <Input
                 required
                 value={edit.name}
-                onChange={(e) => setEdit((f) => ({ ...f, name: e.target.value }))}
+                onChange={(e) =>
+                  setEdit((f) => ({ ...f, name: e.target.value }))
+                }
               />
             </div>
             <div className="space-y-2">
@@ -125,7 +134,10 @@ function ProjectEditPage() {
                 {categories.map((c) => {
                   const checked = edit.categoryIds.includes(c.id)
                   return (
-                    <label key={c.id} className="flex items-center gap-2 text-sm">
+                    <label
+                      key={c.id}
+                      className="flex items-center gap-2 text-sm"
+                    >
                       <Checkbox
                         checked={checked}
                         onCheckedChange={(value) => {
@@ -148,7 +160,9 @@ function ProjectEditPage() {
               <Input
                 required
                 value={edit.budgetNpr}
-                onChange={(e) => setEdit((f) => ({ ...f, budgetNpr: e.target.value }))}
+                onChange={(e) =>
+                  setEdit((f) => ({ ...f, budgetNpr: e.target.value }))
+                }
               />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -158,7 +172,9 @@ function ProjectEditPage() {
                   type="date"
                   required
                   value={edit.startDate}
-                  onChange={(e) => setEdit((f) => ({ ...f, startDate: e.target.value }))}
+                  onChange={(e) =>
+                    setEdit((f) => ({ ...f, startDate: e.target.value }))
+                  }
                 />
               </div>
               <div className="space-y-2">
@@ -167,7 +183,9 @@ function ProjectEditPage() {
                   type="date"
                   required
                   value={edit.endDate}
-                  onChange={(e) => setEdit((f) => ({ ...f, endDate: e.target.value }))}
+                  onChange={(e) =>
+                    setEdit((f) => ({ ...f, endDate: e.target.value }))
+                  }
                 />
               </div>
             </div>
@@ -175,7 +193,9 @@ function ProjectEditPage() {
               <Label>VAT applicable</Label>
               <Switch
                 checked={edit.isVatApplicable}
-                onCheckedChange={(c) => setEdit((f) => ({ ...f, isVatApplicable: Boolean(c) }))}
+                onCheckedChange={(c) =>
+                  setEdit((f) => ({ ...f, isVatApplicable: Boolean(c) }))
+                }
               />
             </div>
             <Button type="submit" disabled={saving} className="w-fit">

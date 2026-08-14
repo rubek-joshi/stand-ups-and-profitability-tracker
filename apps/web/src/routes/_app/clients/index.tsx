@@ -1,5 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
+import { IconEye, IconPencil } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -22,6 +23,11 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
+import {
+  TableActionLink,
+  TableActionsCell,
+  TableActionsHead,
+} from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import type { Client } from "@/lib/types"
 
@@ -74,6 +80,7 @@ function ClientsPage() {
                 <TableHead>Status</TableHead>
                 <TableHead>Projects</TableHead>
                 <TableHead>Contact</TableHead>
+                <TableActionsHead />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -95,6 +102,22 @@ function ClientsPage() {
                   <TableCell className="max-w-xs truncate text-muted-foreground">
                     {c.contactInfo || "—"}
                   </TableCell>
+                  <TableActionsCell>
+                    <TableActionLink
+                      label="View"
+                      to="/clients/$id"
+                      params={{ id: c.id }}
+                    >
+                      <IconEye className="size-3.5" />
+                    </TableActionLink>
+                    <TableActionLink
+                      label="Edit"
+                      to="/clients/$id/edit"
+                      params={{ id: c.id }}
+                    >
+                      <IconPencil className="size-3.5" />
+                    </TableActionLink>
+                  </TableActionsCell>
                 </TableRow>
               ))}
             </TableBody>
