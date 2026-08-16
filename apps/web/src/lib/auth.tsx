@@ -6,6 +6,9 @@ export type AuthUser = {
   email: string
   name: string
   isActive: boolean
+  mustChangePassword?: boolean
+  lastLoginAt?: string | null
+  role?: string | null
   createdAt?: string
   updatedAt?: string
 }
@@ -14,9 +17,10 @@ type AuthContextValue = {
   user: AuthUser | null
   token: string | null
   loading: boolean
-  login: (email: string, password: string) => Promise<void>
+  login: (email: string, password: string) => Promise<AuthUser>
   logout: () => void
   refreshUser: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
 }
 
 const AuthContext = React.createContext<AuthContextValue | null>(null)
@@ -67,6 +71,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(res.data.accessToken)
     setTokenState(res.data.accessToken)
     setUser(res.data.user)
+    return res.data.user
   }, [])
 
   const logout = React.useCallback(() => {
@@ -75,9 +80,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null)
   }, [])
 
+  const changePassword = React.useCallback(
+    async (currentPassword: string, newPassword: string) => {
+      await api("/auth/change-password", {
+        method: "POST",
+        body: { currentPassword, newPassword },
+      })
+      await refreshUser()
+    },
+    [refreshUser],
+  )
+
   const value = React.useMemo(
-    () => ({ user, token, loading, login, logout, refreshUser }),
-    [user, token, loading, login, logout, refreshUser],
+    () => ({ user, token, loading, login, logout, refreshUser, changePassword }),
+    [user, token, loading, login, logout, refreshUser, changePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

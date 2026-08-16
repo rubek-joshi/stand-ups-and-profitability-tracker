@@ -24,4 +24,36 @@ export class CasbinService implements OnModuleInit {
   getEnforcer(): Enforcer {
     return this.enforcer;
   }
+
+  subjectForUser(userId: string): string {
+    return `user:${userId}`;
+  }
+
+  async getRolesForUser(userId: string): Promise<string[]> {
+    return this.enforcer.getRolesForUser(this.subjectForUser(userId));
+  }
+
+  async getPrimaryRoleForUser(userId: string): Promise<string | null> {
+    const roles = await this.getRolesForUser(userId);
+    return roles[0] ?? null;
+  }
+
+  async setRoleForUser(userId: string, role: string): Promise<void> {
+    const subject = this.subjectForUser(userId);
+    const current = await this.enforcer.getRolesForUser(subject);
+    for (const existing of current) {
+      await this.enforcer.deleteRoleForUser(subject, existing);
+    }
+    await this.enforcer.addRoleForUser(subject, role);
+  }
+
+  async getRoleMap(userIds: string[]): Promise<Map<string, string | null>> {
+    const map = new Map<string, string | null>();
+    await Promise.all(
+      userIds.map(async (id) => {
+        map.set(id, await this.getPrimaryRoleForUser(id));
+      }),
+    );
+    return map;
+  }
 }

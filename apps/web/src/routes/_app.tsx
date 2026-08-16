@@ -21,7 +21,7 @@ export const Route = createFileRoute("/_app")({
 })
 
 function AppLayout() {
-  const { loading, token } = useAuth()
+  const { loading, token, user } = useAuth()
   const navigate = Route.useNavigate()
 
   React.useEffect(() => {
@@ -29,6 +29,12 @@ function AppLayout() {
       void navigate({ to: "/login" })
     }
   }, [loading, token, navigate])
+
+  React.useEffect(() => {
+    if (!loading && token && user?.mustChangePassword) {
+      void navigate({ to: "/change-password" })
+    }
+  }, [loading, token, user?.mustChangePassword, navigate])
 
   if (loading) {
     return (
@@ -39,6 +45,7 @@ function AppLayout() {
   }
 
   if (!token) return null
+  if (user?.mustChangePassword) return null
 
   return (
     <TooltipProvider>

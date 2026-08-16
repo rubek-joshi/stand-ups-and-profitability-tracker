@@ -10,12 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as ChangePasswordRouteImport } from './routes/change-password'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppVatRouteImport } from './routes/_app/vat'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppCategoriesRouteImport } from './routes/_app/categories'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
+import { Route as AppUsersIndexRouteImport } from './routes/_app/users/index'
 import { Route as AppStandUpsIndexRouteImport } from './routes/_app/stand-ups/index'
 import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/index'
 import { Route as AppEmployeesIndexRouteImport } from './routes/_app/employees/index'
@@ -34,6 +36,11 @@ import { Route as AppClientsIdEditRouteImport } from './routes/_app/clients/$id_
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChangePasswordRoute = ChangePasswordRouteImport.update({
+  id: '/change-password',
+  path: '/change-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AppRoute = AppRouteImport.update({
@@ -63,6 +70,11 @@ const AppCategoriesRoute = AppCategoriesRouteImport.update({
 const AppAuditRoute = AppAuditRouteImport.update({
   id: '/audit',
   path: '/audit',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppUsersIndexRoute = AppUsersIndexRouteImport.update({
+  id: '/users/',
+  path: '/users/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppStandUpsIndexRoute = AppStandUpsIndexRouteImport.update({
@@ -138,6 +150,7 @@ const AppClientsIdEditRoute = AppClientsIdEditRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
   '/audit': typeof AppAuditRoute
   '/categories': typeof AppCategoriesRoute
@@ -153,12 +166,14 @@ export interface FileRoutesByFullPath {
   '/employees/': typeof AppEmployeesIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/stand-ups/': typeof AppStandUpsIndexRoute
+  '/users/': typeof AppUsersIndexRoute
   '/clients/$id/edit': typeof AppClientsIdEditRoute
   '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
   '/employees/$id/edit': typeof AppEmployeesIdEditRoute
   '/projects/$id/edit': typeof AppProjectsIdEditRoute
 }
 export interface FileRoutesByTo {
+  '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
   '/audit': typeof AppAuditRoute
   '/categories': typeof AppCategoriesRoute
@@ -175,6 +190,7 @@ export interface FileRoutesByTo {
   '/employees': typeof AppEmployeesIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/stand-ups': typeof AppStandUpsIndexRoute
+  '/users': typeof AppUsersIndexRoute
   '/clients/$id/edit': typeof AppClientsIdEditRoute
   '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
   '/employees/$id/edit': typeof AppEmployeesIdEditRoute
@@ -183,6 +199,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
   '/_app/audit': typeof AppAuditRoute
   '/_app/categories': typeof AppCategoriesRoute
@@ -199,6 +216,7 @@ export interface FileRoutesById {
   '/_app/employees/': typeof AppEmployeesIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/stand-ups/': typeof AppStandUpsIndexRoute
+  '/_app/users/': typeof AppUsersIndexRoute
   '/_app/clients/$id_/edit': typeof AppClientsIdEditRoute
   '/_app/core-members/$id_/edit': typeof AppCoreMembersIdEditRoute
   '/_app/employees/$id_/edit': typeof AppEmployeesIdEditRoute
@@ -208,6 +226,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/change-password'
     | '/login'
     | '/audit'
     | '/categories'
@@ -223,12 +242,14 @@ export interface FileRouteTypes {
     | '/employees/'
     | '/projects/'
     | '/stand-ups/'
+    | '/users/'
     | '/clients/$id/edit'
     | '/core-members/$id/edit'
     | '/employees/$id/edit'
     | '/projects/$id/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/change-password'
     | '/login'
     | '/audit'
     | '/categories'
@@ -245,6 +266,7 @@ export interface FileRouteTypes {
     | '/employees'
     | '/projects'
     | '/stand-ups'
+    | '/users'
     | '/clients/$id/edit'
     | '/core-members/$id/edit'
     | '/employees/$id/edit'
@@ -252,6 +274,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/change-password'
     | '/login'
     | '/_app/audit'
     | '/_app/categories'
@@ -268,6 +291,7 @@ export interface FileRouteTypes {
     | '/_app/employees/'
     | '/_app/projects/'
     | '/_app/stand-ups/'
+    | '/_app/users/'
     | '/_app/clients/$id_/edit'
     | '/_app/core-members/$id_/edit'
     | '/_app/employees/$id_/edit'
@@ -276,6 +300,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  ChangePasswordRoute: typeof ChangePasswordRoute
   LoginRoute: typeof LoginRoute
 }
 
@@ -286,6 +311,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/change-password': {
+      id: '/change-password'
+      path: '/change-password'
+      fullPath: '/change-password'
+      preLoaderRoute: typeof ChangePasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_app': {
@@ -328,6 +360,13 @@ declare module '@tanstack/react-router' {
       path: '/audit'
       fullPath: '/audit'
       preLoaderRoute: typeof AppAuditRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/users/': {
+      id: '/_app/users/'
+      path: '/users'
+      fullPath: '/users/'
+      preLoaderRoute: typeof AppUsersIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/stand-ups/': {
@@ -447,6 +486,7 @@ interface AppRouteChildren {
   AppEmployeesIndexRoute: typeof AppEmployeesIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppStandUpsIndexRoute: typeof AppStandUpsIndexRoute
+  AppUsersIndexRoute: typeof AppUsersIndexRoute
   AppClientsIdEditRoute: typeof AppClientsIdEditRoute
   AppCoreMembersIdEditRoute: typeof AppCoreMembersIdEditRoute
   AppEmployeesIdEditRoute: typeof AppEmployeesIdEditRoute
@@ -469,6 +509,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppEmployeesIndexRoute: AppEmployeesIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppStandUpsIndexRoute: AppStandUpsIndexRoute,
+  AppUsersIndexRoute: AppUsersIndexRoute,
   AppClientsIdEditRoute: AppClientsIdEditRoute,
   AppCoreMembersIdEditRoute: AppCoreMembersIdEditRoute,
   AppEmployeesIdEditRoute: AppEmployeesIdEditRoute,
@@ -479,6 +520,7 @@ const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  ChangePasswordRoute: ChangePasswordRoute,
   LoginRoute: LoginRoute,
 }
 export const routeTree = rootRouteImport

@@ -1,4 +1,4 @@
-import { ApiProperty } from "@nestjs/swagger";
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 
 export class UserResponseDto {
   @ApiProperty()
@@ -12,6 +12,15 @@ export class UserResponseDto {
 
   @ApiProperty()
   isActive!: boolean;
+
+  @ApiProperty()
+  mustChangePassword!: boolean;
+
+  @ApiPropertyOptional({ nullable: true, type: String, format: "date-time" })
+  lastLoginAt!: Date | null;
+
+  @ApiPropertyOptional()
+  role?: string | null;
 
   @ApiProperty()
   createdAt!: Date;

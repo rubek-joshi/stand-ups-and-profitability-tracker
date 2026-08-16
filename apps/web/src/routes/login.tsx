@@ -41,8 +41,10 @@ function LoginPage() {
               setError(null)
               setLoading(true)
               try {
-                await login(email.trim(), password)
-                void navigate({ to: "/" })
+                const user = await login(email.trim(), password)
+                void navigate({
+                  to: user.mustChangePassword ? "/change-password" : "/",
+                })
               } catch (err) {
                 setError(err instanceof ApiError ? err.message : "Login failed")
               } finally {

@@ -259,3 +259,17 @@ export type DashboardSummary = {
     marginPercent: number
   }>
 }
+
+export type UserRole = "super_admin" | "admin" | "manager"
+
+export type SystemUser = {
+  id: string
+  email: string
+  name: string
+  isActive: boolean
+  mustChangePassword: boolean
+  lastLoginAt: string | null
+  role: UserRole | string | null
+  createdAt: string
+  updatedAt?: string
+}

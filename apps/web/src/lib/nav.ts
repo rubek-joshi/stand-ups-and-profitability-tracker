@@ -7,6 +7,7 @@ import {
   IconReceiptTax,
   IconSettings,
   IconUsers,
+  IconUserCog,
   IconUserStar,
   IconBriefcase,
 } from "@tabler/icons-react"
@@ -28,6 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Core Members", to: "/core-members", icon: IconUserStar, keywords: ["core"] },
   { title: "Categories", to: "/categories", icon: IconCategory },
   { title: "VAT", to: "/vat", icon: IconReceiptTax },
+  { title: "Users", to: "/users", icon: IconUserCog, keywords: ["accounts", "roles", "admin"] },
   { title: "Audit", to: "/audit", icon: IconScanTraces, keywords: ["logs"] },
   { title: "Settings", to: "/settings", icon: IconSettings },
 ]

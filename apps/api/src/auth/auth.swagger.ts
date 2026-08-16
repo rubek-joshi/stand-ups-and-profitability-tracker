@@ -21,3 +21,11 @@ export function MeDocs() {
     ApiOkResponse({ type: UserResponseDto }),
   );
 }
+
+export function ChangePasswordDocs() {
+  return applyDecorators(
+    ApiBearerAuth(),
+    ApiOperation({ summary: "Change password for the current user" }),
+    ApiOkResponse({ schema: { properties: { ok: { type: "boolean" } } } }),
+  );
+}
