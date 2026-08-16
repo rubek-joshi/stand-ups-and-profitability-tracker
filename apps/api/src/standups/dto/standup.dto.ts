@@ -57,15 +57,3 @@ export class UpdateStandupEntryDto {
   @Type(() => AllocationDto)
   allocations?: AllocationDto[];
 }
-
-export class GrantOverrideDto {
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  projectId!: string;
-
-  @ApiProperty()
-  @IsString()
-  @IsNotEmpty()
-  reason!: string;
-}

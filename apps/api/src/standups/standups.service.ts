@@ -26,7 +26,6 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProfitabilityService } from "../profitability/profitability.service";
 import {
   CreateStandupDto,
-  GrantOverrideDto,
   UpdateStandupEntryDto,
 } from "./dto/standup.dto";
 
@@ -139,7 +138,6 @@ export class StandupsService {
       this.validateAllocations(attendanceStatus, dto.allocations);
       await this.validateAllocationProjects(
         entry.employeeId,
-        standupId,
         dto.allocations.map((a) => a.projectId),
       );
     }
@@ -276,63 +274,11 @@ export class StandupsService {
     return this.findOne(standupId);
   }
 
-  async grantOverride(
-    standupId: string,
-    dto: GrantOverrideDto,
-    actorId: string,
-  ) {
-    await this.findOne(standupId);
-    const project = await this.prismaService.project.findUnique({
-      where: { id: dto.projectId },
-      include: { amcRecord: true },
-    });
-    if (!project) {
-      throw new NotFoundException(`Project ${dto.projectId} not found`);
-    }
-    const needsOverride =
-      (project.status === ProjectStatus.closed ||
-        project.status === ProjectStatus.under_amc) &&
-      (project.amcRecord === null ||
-        project.amcRecord.status === AmcStatus.cancelled);
-    if (!needsOverride) {
-      throw new BadRequestException(
-        "Override is only for closed/cancelled or closed-without-AMC projects",
-      );
-    }
-    const override = await this.prismaService.standupProjectOverride.upsert({
-      where: {
-        standupId_projectId: {
-          standupId,
-          projectId: dto.projectId,
-        },
-      },
-      create: {
-        standupId,
-        projectId: dto.projectId,
-        reason: dto.reason,
-        approvedById: actorId,
-      },
-      update: {
-        reason: dto.reason,
-        approvedById: actorId,
-      },
-    });
-    await this.auditService.write({
-      actorId,
-      action: AuditAction.STANDUP_OVERRIDE_GRANTED,
-      targetType: "StandupProjectOverride",
-      targetId: override.id,
-      metadata: { standupId, projectId: dto.projectId, reason: dto.reason },
-    });
-    return override;
-  }
-
   private async loadStandupOrThrow(id: string) {
     const standup = await this.prismaService.standup.findUnique({
       where: { id },
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
-        overrides: { include: { project: { select: { id: true, name: true } } } },
         entries: {
           include: {
             employee: true,
@@ -401,7 +347,6 @@ export class StandupsService {
 
   private async validateAllocationProjects(
     employeeId: string,
-    standupId: string,
     projectIds: string[],
   ): Promise<void> {
     for (const projectId of projectIds) {
@@ -426,17 +371,9 @@ export class StandupsService {
         (project.amcRecord === null ||
           project.amcRecord.status === AmcStatus.cancelled);
       if (blocked) {
-        const override =
-          await this.prismaService.standupProjectOverride.findUnique({
-            where: {
-              standupId_projectId: { standupId, projectId },
-            },
-          });
-        if (!override) {
-          throw new BadRequestException(
-            `Project ${projectId} requires an admin override for this standup`,
-          );
-        }
+        throw new BadRequestException(
+          `Project ${project.name} is closed or cancelled and cannot be allocated`,
+        );
       }
     }
   }

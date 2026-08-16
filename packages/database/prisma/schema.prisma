@@ -115,7 +115,6 @@ model User {
   coreMemberSalaryChanges CoreMemberSalaryEntry[] @relation("CoreMemberSalaryChangedBy")
   vatClearances      VatClearance[]
   dbSnapshots        DbSnapshot[]
-  standupOverrides   StandupProjectOverride[]
 
   @@map("users")
 }
@@ -191,7 +190,6 @@ model Project {
   extensions            ProjectExtension[]
   allocations           ProjectAllocation[]
   amcRecord             AmcRecord?
-  standupOverrides      StandupProjectOverride[]
 
   @@index([clientId])
   @@index([status])
@@ -337,9 +335,8 @@ model Standup {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
-  createdBy  User                     @relation("StandupCreator", fields: [createdById], references: [id])
+  createdBy  User             @relation("StandupCreator", fields: [createdById], references: [id])
   entries    StandupEntry[]
-  overrides  StandupProjectOverride[]
   attendance AttendanceRecord[]
 
   @@index([date])
@@ -375,22 +372,6 @@ model ProjectAllocation {
 
   @@unique([standupEntryId, projectId])
   @@map("project_allocations")
-}
-
-model StandupProjectOverride {
-  id         String   @id @default(cuid())
-  standupId  String
-  projectId  String
-  reason     String
-  approvedById String
-  createdAt  DateTime @default(now())
-
-  standup    Standup @relation(fields: [standupId], references: [id], onDelete: Cascade)
-  project    Project @relation(fields: [projectId], references: [id])
-  approvedBy User    @relation(fields: [approvedById], references: [id])
-
-  @@unique([standupId, projectId])
-  @@map("standup_project_overrides")
 }
 
 model AttendanceRecord {

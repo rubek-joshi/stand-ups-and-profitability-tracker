@@ -18,7 +18,6 @@ export type {
   Standup,
   StandupEntry,
   ProjectAllocation,
-  StandupProjectOverride,
   AttendanceRecord,
   AmcRecord,
   VatClearance,

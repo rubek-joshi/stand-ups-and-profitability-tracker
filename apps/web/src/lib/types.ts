@@ -177,7 +177,6 @@ export type Standup = {
   createdBy?: { id: string; name: string; email: string }
   _count?: { entries: number }
   entries?: StandupEntry[]
-  overrides?: Array<{ id: string; projectId: string; reason: string; project?: { name: string } }>
 }
 
 export type StandupEntry = {

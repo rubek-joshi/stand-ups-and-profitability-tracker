@@ -16,7 +16,6 @@ import { RequirePermission } from "../casbin/decorators/require-permission.decor
 import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import {
   CreateStandupDto,
-  GrantOverrideDto,
   UpdateStandupEntryDto,
 } from "./dto/standup.dto";
 import { StandupsService } from "./standups.service";
@@ -79,16 +78,5 @@ export class StandupsController {
   @ApiOperation({ summary: "Reopen completed standup (admin)" })
   async reopen(@Param("id") id: string, @CurrentUser() user: AuthUser) {
     return this.standupsService.reopen(id, user.id);
-  }
-
-  @Post(":id/overrides")
-  @RequirePermission("standups", "*")
-  @ApiOperation({ summary: "Grant override for closed/cancelled project" })
-  async grantOverride(
-    @Param("id") id: string,
-    @Body() dto: GrantOverrideDto,
-    @CurrentUser() user: AuthUser,
-  ) {
-    return this.standupsService.grantOverride(id, dto, user.id);
   }
 }

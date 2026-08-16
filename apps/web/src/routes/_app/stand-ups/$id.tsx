@@ -8,16 +8,8 @@ import {
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { Label } from "@workspace/ui/components/label"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import { Card, CardContent } from "@workspace/ui/components/card"
 import { Badge } from "@workspace/ui/components/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
@@ -333,97 +325,7 @@ function StandupDetailPage() {
         ) : null}
       </div>
 
-      {(standup.overrides ?? []).length > 0 ? (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="text-base">Overrides</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <ul className="space-y-1">
-              {standup.overrides!.map((o) => (
-                <li key={o.id}>
-                  {o.project?.name ?? o.projectId}: {o.reason}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {!readonly ? (
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle className="text-base">Grant project override</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <OverrideForm
-              projects={projects.filter(
-                (p) => !(standup.overrides ?? []).some((o) => o.projectId === p.id),
-              )}
-              onSubmit={async (projectId, reason) => {
-                await api(`/standups/${id}/overrides`, {
-                  method: "POST",
-                  body: { projectId, reason },
-                })
-                await load()
-              }}
-            />
-          </CardContent>
-        </Card>
-      ) : null}
-
       {dialog}
     </div>
-  )
-}
-
-function OverrideForm({
-  projects,
-  onSubmit,
-}: {
-  projects: Project[]
-  onSubmit: (projectId: string, reason: string) => Promise<void>
-}) {
-  const [projectId, setProjectId] = React.useState("")
-  const [reason, setReason] = React.useState("")
-  return (
-    <form
-      className="flex flex-wrap items-end gap-2"
-      onSubmit={async (e) => {
-        e.preventDefault()
-        await onSubmit(projectId, reason.trim())
-        setReason("")
-      }}
-    >
-      <div className="space-y-1">
-        <Label>Project</Label>
-        <Select
-          value={projectId || null}
-          onValueChange={(v) => setProjectId(v ?? "")}
-          items={Object.fromEntries(projects.map((p) => [p.id, p.name]))}
-          disabled={projects.length === 0}
-        >
-          <SelectTrigger className="w-56">
-            <SelectValue
-              placeholder={projects.length === 0 ? "No projects left" : "Closed project"}
-            />
-          </SelectTrigger>
-          <SelectContent>
-            {projects.map((p) => (
-              <SelectItem key={p.id} value={p.id}>
-                {p.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="min-w-48 flex-1 space-y-1">
-        <Label>Reason</Label>
-        <Input required value={reason} onChange={(e) => setReason(e.target.value)} />
-      </div>
-      <Button type="submit" disabled={!projectId || !reason.trim()}>
-        Grant
-      </Button>
-    </form>
   )
 }
