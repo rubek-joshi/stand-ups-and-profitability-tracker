@@ -35,17 +35,21 @@ export const Route = createFileRoute("/_app/core-members/")({
   component: CoreMembersPage,
 })
 
+function emptyForm() {
+  return {
+    name: "",
+    email: "",
+    dateJoined: new Date().toISOString().slice(0, 10),
+    initialSalaryNpr: "",
+  }
+}
+
 function CoreMembersPage() {
   const [items, setItems] = React.useState<CoreMember[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [open, setOpen] = React.useState(false)
-  const [form, setForm] = React.useState({
-    name: "",
-    email: "",
-    dateJoined: new Date().toISOString().slice(0, 10),
-    initialSalaryNpr: "",
-  })
+  const [form, setForm] = React.useState(emptyForm)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -64,12 +68,17 @@ function CoreMembersPage() {
     void load()
   }, [load])
 
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next)
+    if (next) setForm(emptyForm())
+  }
+
   return (
     <div>
       <PageHeader
         title="Core Members"
         description="Always-on cost contributors (not in stand-ups)"
-        actions={<Button onClick={() => setOpen(true)}>New core member</Button>}
+        actions={<Button onClick={() => handleOpenChange(true)}>New core member</Button>}
       />
       {loading ? <LoadingState /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}
@@ -126,7 +135,7 @@ function CoreMembersPage() {
         </div>
       ) : null}
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Create core member</DialogTitle>
@@ -147,6 +156,7 @@ function CoreMembersPage() {
                       : undefined,
                   },
                 })
+                setForm(emptyForm())
                 setOpen(false)
                 await load()
               } catch (err) {

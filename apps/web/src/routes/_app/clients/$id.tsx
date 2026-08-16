@@ -11,6 +11,7 @@ import {
 } from "@workspace/ui/components/collapsible"
 import { PageHeader } from "@/components/page-header"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
+import { CreateProjectDialog } from "@/components/create-project-dialog"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
@@ -33,6 +34,7 @@ function ClientDetailPage() {
   const [settings, setSettings] = React.useState<OrgSettings | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [createOpen, setCreateOpen] = React.useState(false)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -174,6 +176,12 @@ function ClientDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <section className="min-w-0 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-muted-foreground">Projects</h2>
+            <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+              Add project
+            </Button>
+          </div>
           {projects.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-sm text-muted-foreground">
@@ -226,6 +234,14 @@ function ClientDetailPage() {
           </Card>
         </aside>
       </div>
+      <CreateProjectDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        defaultClientId={client.id}
+        defaultClientName={client.name}
+        lockClient
+        onCreated={() => load()}
+      />
       {dialog}
     </div>
   )

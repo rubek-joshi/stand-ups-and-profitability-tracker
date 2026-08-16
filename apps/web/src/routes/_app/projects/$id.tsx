@@ -61,6 +61,7 @@ function ProjectDetailPage() {
   const [amc, setAmc] = React.useState<AmcRecord | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [tab, setTab] = React.useState("overview")
   const [extReason, setExtReason] = React.useState("")
   const [extAmount, setExtAmount] = React.useState("0")
   const [extEndDate, setExtEndDate] = React.useState("")
@@ -72,9 +73,10 @@ function ProjectDetailPage() {
     amcAmountNpr: "",
     isVatApplicable: true,
   })
+  const initialLoad = React.useRef(true)
 
   const load = React.useCallback(async () => {
-    setLoading(true)
+    if (initialLoad.current) setLoading(true)
     setError(null)
     try {
       const [p, a, emps, cores] = await Promise.all([
@@ -99,10 +101,12 @@ function ProjectDetailPage() {
       setError(e instanceof ApiError ? e.message : "Failed to load project")
     } finally {
       setLoading(false)
+      initialLoad.current = false
     }
   }, [id])
 
   React.useEffect(() => {
+    initialLoad.current = true
     void load()
   }, [load])
 
@@ -166,7 +170,7 @@ function ProjectDetailPage() {
         </div>
       ) : null}
 
-      <Tabs defaultValue="overview">
+      <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="assignments">Assignments</TabsTrigger>
