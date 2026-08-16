@@ -44,6 +44,7 @@ function EmployeesPage() {
     name: "",
     email: "",
     dateJoined: new Date().toISOString().slice(0, 10),
+    dateOfBirth: "",
     initialSalaryNpr: "",
   })
 
@@ -135,6 +136,11 @@ function EmployeesPage() {
             className="space-y-3"
             onSubmit={async (ev) => {
               ev.preventDefault()
+              const today = new Date().toISOString().slice(0, 10)
+              if (form.dateOfBirth && form.dateOfBirth > today) {
+                alert("Date of birth cannot be in the future")
+                return
+              }
               try {
                 await api("/employees", {
                   method: "POST",
@@ -142,12 +148,20 @@ function EmployeesPage() {
                     name: form.name.trim(),
                     email: form.email.trim(),
                     dateJoined: form.dateJoined,
+                    dateOfBirth: form.dateOfBirth || undefined,
                     initialSalaryNpr: form.initialSalaryNpr
                       ? parseNprInput(form.initialSalaryNpr)
                       : undefined,
                   },
                 })
                 setOpen(false)
+                setForm({
+                  name: "",
+                  email: "",
+                  dateJoined: new Date().toISOString().slice(0, 10),
+                  dateOfBirth: "",
+                  initialSalaryNpr: "",
+                })
                 await load()
               } catch (err) {
                 alert(err instanceof ApiError ? err.message : "Failed")
@@ -178,6 +192,15 @@ function EmployeesPage() {
                 required
                 value={form.dateJoined}
                 onChange={(e) => setForm((f) => ({ ...f, dateJoined: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Date of birth (optional)</Label>
+              <Input
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                value={form.dateOfBirth}
+                onChange={(e) => setForm((f) => ({ ...f, dateOfBirth: e.target.value }))}
               />
             </div>
             <div className="space-y-2">

@@ -260,19 +260,20 @@ model ProjectExtension {
 }
 
 model Employee {
-  id         String       @id @default(cuid())
-  name       String
-  email      String       @unique
-  status     PersonStatus @default(active)
-  dateJoined DateTime     @db.Date
-  dateLeft   DateTime?    @db.Date
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  id          String       @id @default(cuid())
+  name        String
+  email       String       @unique
+  status      PersonStatus @default(active)
+  dateJoined  DateTime     @db.Date
+  dateOfBirth DateTime?    @db.Date
+  dateLeft    DateTime?    @db.Date
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
-  salaryEntries   EmployeeSalaryEntry[]
-  assignments     ProjectAssignment[]
+  salaryEntries     EmployeeSalaryEntry[]
+  assignments       ProjectAssignment[]
   attendanceRecords AttendanceRecord[]
-  standupEntries  StandupEntry[]
+  standupEntries    StandupEntry[]
 
   @@map("employees")
 }

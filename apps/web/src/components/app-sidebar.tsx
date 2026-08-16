@@ -12,6 +12,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
+  useSidebar,
 } from "@workspace/ui/components/sidebar"
 import { Button } from "@workspace/ui/components/button"
 import { IconLogout, IconMoon, IconSun } from "@tabler/icons-react"
@@ -26,12 +27,21 @@ export function AppSidebar() {
   const { user, logout } = useAuth()
   const { isDark, toggleTheme } = useTheme()
   const { confirm, dialog } = useConfirmDialog()
+  const { isMobile, setOpenMobile } = useSidebar()
+
+  const dismissMobile = () => {
+    if (isMobile) setOpenMobile(false)
+  }
 
   return (
     <>
       <Sidebar collapsible="icon">
         <SidebarHeader className="gap-1 px-3 py-3">
-          <Link to="/" className="flex items-center gap-2 truncate font-semibold">
+          <Link
+            to="/"
+            onClick={dismissMobile}
+            className="flex items-center gap-2 truncate font-semibold"
+          >
             <span className="truncate">Tracker</span>
           </Link>
           {user ? (

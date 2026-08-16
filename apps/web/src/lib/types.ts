@@ -107,9 +107,40 @@ export type Employee = {
   email: string
   status: PersonStatus
   dateJoined: string
+  dateOfBirth?: string | null
   dateLeft: string | null
   salaryEntries?: SalaryEntry[]
-  attendanceSummary?: Record<string, number>
+  attendanceSummary?: {
+    firstHalfLeave: number
+    secondHalfLeave: number
+    late: number
+    paidAbsence: number
+    unpaidAbsence: number
+  }
+  assignments?: Array<{
+    id: string
+    assignedAt: string
+    unassignedAt: string | null
+    project: { id: string; name: string; status: string }
+  }>
+  attendanceRecords?: Array<{
+    id: string
+    date: string
+    type: "first_half_leave" | "second_half_leave" | "late" | "paid_absence" | "unpaid_absence"
+  }>
+  standupEntries?: Array<{
+    id: string
+    attendanceStatus: AttendanceStatus
+    notesMarkdown: string | null
+    standup: { id: string; date: string; status: string }
+    allocations: Array<{
+      id: string
+      projectId: string
+      percentage: number
+      isNonBillable?: boolean
+      project?: { id: string; name: string; status: string }
+    }>
+  }>
 }
 
 export type CoreMember = {

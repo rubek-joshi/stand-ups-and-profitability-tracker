@@ -95,7 +95,6 @@ export function TableActionLink({
   return (
     <Tooltip>
       <TooltipTrigger
-        nativeButton={false}
         render={
           <Link
             to={to as never}

@@ -59,6 +59,7 @@ function EmployeeEditPage() {
   const [name, setName] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [dateJoined, setDateJoined] = React.useState("")
+  const [dateOfBirth, setDateOfBirth] = React.useState("")
   const [salaryOpen, setSalaryOpen] = React.useState(false)
   const [editingEntry, setEditingEntry] = React.useState<SalaryEntry | null>(null)
   const [salaryForm, setSalaryForm] = React.useState<SalaryForm>(emptySalaryForm)
@@ -72,6 +73,9 @@ function EmployeeEditPage() {
       setName(res.data.name)
       setEmail(res.data.email)
       setDateJoined(String(res.data.dateJoined).slice(0, 10))
+      setDateOfBirth(
+        res.data.dateOfBirth ? String(res.data.dateOfBirth).slice(0, 10) : "",
+      )
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load")
     } finally {
@@ -131,6 +135,11 @@ function EmployeeEditPage() {
               className="space-y-3"
               onSubmit={async (e) => {
                 e.preventDefault()
+                const today = new Date().toISOString().slice(0, 10)
+                if (dateOfBirth && dateOfBirth > today) {
+                  alert("Date of birth cannot be in the future")
+                  return
+                }
                 setSaving(true)
                 try {
                   await api(`/employees/${id}`, {
@@ -139,6 +148,7 @@ function EmployeeEditPage() {
                       name: name.trim(),
                       email: email.trim(),
                       dateJoined,
+                      dateOfBirth: dateOfBirth || null,
                     },
                   })
                   void navigate({ to: "/employees/$id", params: { id } })
@@ -169,6 +179,15 @@ function EmployeeEditPage() {
                   required
                   value={dateJoined}
                   onChange={(e) => setDateJoined(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Date of birth (optional)</Label>
+                <Input
+                  type="date"
+                  max={new Date().toISOString().slice(0, 10)}
+                  value={dateOfBirth}
+                  onChange={(e) => setDateOfBirth(e.target.value)}
                 />
               </div>
               <Button type="submit" disabled={saving}>

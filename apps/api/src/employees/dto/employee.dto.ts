@@ -8,7 +8,9 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateIf,
 } from "class-validator";
+import { IsNotFutureDate } from "../../_shared/validators/is-not-future-date.validator";
 
 export class CreateEmployeeDto {
   @ApiProperty()
@@ -24,6 +26,12 @@ export class CreateEmployeeDto {
   @ApiProperty({ example: "2026-01-01" })
   @IsDateString()
   dateJoined!: string;
+
+  @ApiPropertyOptional({ example: "1995-06-15" })
+  @IsOptional()
+  @IsDateString()
+  @IsNotFutureDate({ message: "Date of birth cannot be in the future" })
+  dateOfBirth?: string;
 
   @ApiPropertyOptional({ description: "Initial salary in NPR" })
   @IsOptional()
@@ -48,6 +56,12 @@ export class UpdateEmployeeDto {
   @IsOptional()
   @IsDateString()
   dateJoined?: string;
+
+  @ApiPropertyOptional({ example: "1995-06-15", nullable: true })
+  @ValidateIf((_, value) => value !== null && value !== undefined && value !== "")
+  @IsDateString()
+  @IsNotFutureDate({ message: "Date of birth cannot be in the future" })
+  dateOfBirth?: string | null;
 }
 
 export class MarkLeftDto {

@@ -37,6 +37,9 @@ export class EmployeesService {
         name: dto.name,
         email: dto.email,
         dateJoined: parseIsoDate(dto.dateJoined),
+        ...(dto.dateOfBirth
+          ? { dateOfBirth: parseIsoDate(dto.dateOfBirth) }
+          : {}),
         ...(dto.initialSalaryNpr !== undefined
           ? {
               salaryEntries: {
@@ -83,8 +86,22 @@ export class EmployeesService {
       where: { id },
       include: {
         salaryEntries: { orderBy: { effectiveDate: "desc" } },
-        assignments: { include: { project: true } },
+        assignments: {
+          include: { project: { select: { id: true, name: true, status: true } } },
+          orderBy: { assignedAt: "desc" },
+        },
         attendanceRecords: { orderBy: { date: "desc" } },
+        standupEntries: {
+          include: {
+            standup: { select: { id: true, date: true, status: true } },
+            allocations: {
+              include: {
+                project: { select: { id: true, name: true, status: true } },
+              },
+            },
+          },
+          orderBy: { standup: { date: "desc" } },
+        },
       },
     });
     if (!employee) {
@@ -104,11 +121,13 @@ export class EmployeesService {
       unpaidAbsence: employee.attendanceRecords.filter(
         (r) => r.type === "unpaid_absence",
       ).length,
-      byMonth: [] as Array<{ month: string; counts: Record<string, number> }>,
     };
     return {
       ...this.serializeEmployee(employee),
       salaryEntries: serializeMoneyList(employee.salaryEntries, SALARY_FIELDS),
+      assignments: employee.assignments,
+      attendanceRecords: employee.attendanceRecords,
+      standupEntries: employee.standupEntries,
       attendanceSummary,
     };
   }
@@ -123,6 +142,12 @@ export class EmployeesService {
         dateJoined: dto.dateJoined
           ? parseIsoDate(dto.dateJoined)
           : undefined,
+        dateOfBirth:
+          dto.dateOfBirth === undefined
+            ? undefined
+            : dto.dateOfBirth
+              ? parseIsoDate(dto.dateOfBirth)
+              : null,
       },
       include: { salaryEntries: true },
     });
