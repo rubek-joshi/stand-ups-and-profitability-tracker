@@ -28,14 +28,18 @@ export class AuditController {
   async findAll(
     @Query("action") action?: AuditAction,
     @Query("actorId") actorId?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
     @Query("skip") skip?: string,
     @Query("take") take?: string,
   ) {
     return this.auditService.findAll({
       action,
       actorId,
-      skip: skip ? Number(skip) : 0,
-      take: take ? Number(take) : 50,
+      page,
+      pageSize,
+      skip: skip ? Number(skip) : undefined,
+      take: take ? Number(take) : undefined,
     });
   }
 }

@@ -21,7 +21,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { title: "Dashboard", to: "/", icon: IconLayoutDashboard, keywords: ["home", "stats"] },
-  { title: "Stand-ups", to: "/standups", icon: IconClipboardList, keywords: ["standup"] },
+  { title: "Stand-ups", to: "/stand-ups", icon: IconClipboardList, keywords: ["standup"] },
   { title: "Clients", to: "/clients", icon: IconBuilding },
   { title: "Projects", to: "/projects", icon: IconBriefcase },
   { title: "Employees", to: "/employees", icon: IconUsers },

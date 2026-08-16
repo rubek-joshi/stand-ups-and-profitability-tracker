@@ -20,6 +20,7 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 import { PageHeader } from "@/components/page-header"
+import { PaginationBar } from "@/components/pagination-bar"
 import { StatusBadge } from "@/components/health-badge"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
@@ -27,12 +28,27 @@ import {
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
-import { api, ApiError, type Envelope } from "@/lib/api"
+import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
+import { buildListQuery, parsePage, parsePageSize, totalPagesFor } from "@/lib/list-query"
 import type { Standup } from "@/lib/types"
+import { format, parseISO } from "date-fns"
 
-export const Route = createFileRoute("/_app/standups/")({
+export const Route = createFileRoute("/_app/stand-ups/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    page: parsePage(search.page),
+    pageSize: parsePageSize(search.pageSize),
+  }),
   component: StandupsPage,
 })
+
+function formatStandupDate(value: string) {
+  const key = String(value).slice(0, 10)
+  try {
+    return format(parseISO(key), "EEE, d MMM yyyy")
+  } catch {
+    return key
+  }
+}
 
 /** UTC calendar date as YYYY-MM-DD (matches API date parsing). */
 function utcIsoDate(date = new Date()) {
@@ -47,7 +63,10 @@ function maxStandupDate() {
 }
 
 function StandupsPage() {
+  const navigate = Route.useNavigate()
+  const { page, pageSize } = Route.useSearch()
   const [items, setItems] = React.useState<Standup[]>([])
+  const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [open, setOpen] = React.useState(false)
@@ -57,24 +76,23 @@ function StandupsPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await api<Envelope<Standup[]>>("/standups")
+      const qs = buildListQuery({ page, pageSize })
+      const res = await api<PaginatedEnvelope<Standup[]>>(`/standups?${qs}`)
       setItems(res.data)
+      setTotal(res.meta?.total ?? res.data.length)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load stand-ups")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [page, pageSize])
 
   React.useEffect(() => {
     void load()
   }, [load])
 
   const maxDate = maxStandupDate()
-  const takenDates = React.useMemo(
-    () => new Set(items.map((s) => String(s.date).slice(0, 10))),
-    [items],
-  )
+  const totalPages = totalPagesFor(total, pageSize)
 
   return (
     <div>
@@ -96,47 +114,65 @@ function StandupsPage() {
       {error ? <ErrorState message={error} onRetry={load} /> : null}
       {!loading && items.length === 0 ? <EmptyState message="No stand-ups yet" /> : null}
       {items.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Entries</TableHead>
-                <TableHead>Created by</TableHead>
-                <TableActionsHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {items.map((s) => (
-                <TableRow key={s.id}>
-                  <TableCell>
-                    <Link
-                      to="/standups/$id"
-                      params={{ id: s.id }}
-                      className="font-medium hover:underline"
-                    >
-                      {String(s.date).slice(0, 10)}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={s.status} />
-                  </TableCell>
-                  <TableCell>{s._count?.entries ?? "—"}</TableCell>
-                  <TableCell>{s.createdBy?.name ?? "—"}</TableCell>
-                  <TableActionsCell>
-                    <TableActionLink
-                      label="Open"
-                      to="/standups/$id"
-                      params={{ id: s.id }}
-                    >
-                      <IconEye className="size-3.5" />
-                    </TableActionLink>
-                  </TableActionsCell>
+        <div className="space-y-4">
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Entries</TableHead>
+                  <TableHead>Created by</TableHead>
+                  <TableActionsHead />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {items.map((s) => (
+                  <TableRow key={s.id}>
+                    <TableCell>
+                      <Link
+                        to="/stand-ups/$id"
+                        params={{ id: s.id }}
+                        className="font-medium hover:underline"
+                      >
+                        {formatStandupDate(String(s.date))}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={s.status} />
+                    </TableCell>
+                    <TableCell>{s._count?.entries ?? "—"}</TableCell>
+                    <TableCell>{s.createdBy?.name ?? "—"}</TableCell>
+                    <TableActionsCell>
+                      <TableActionLink
+                        label="Open"
+                        to="/stand-ups/$id"
+                        params={{ id: s.id }}
+                      >
+                        <IconEye className="size-3.5" />
+                      </TableActionLink>
+                    </TableActionsCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={(nextPage) => {
+              void navigate({
+                search: (prev) => ({ ...prev, page: nextPage }),
+              })
+            }}
+            onPageSizeChange={(size) => {
+              void navigate({
+                search: (prev) => ({ ...prev, pageSize: size, page: 1 }),
+              })
+            }}
+          />
         </div>
       ) : null}
 
@@ -153,13 +189,12 @@ function StandupsPage() {
                 alert("Stand-ups can only be created for past dates.")
                 return
               }
-              if (takenDates.has(date)) {
-                alert(`A stand-up already exists for ${date}.`)
-                return
-              }
               try {
                 await api("/standups", { method: "POST", body: { date } })
                 setOpen(false)
+                void navigate({
+                  search: (prev) => ({ ...prev, page: 1 }),
+                })
                 await load()
               } catch (err) {
                 alert(err instanceof ApiError ? err.message : "Failed")

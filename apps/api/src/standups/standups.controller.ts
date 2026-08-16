@@ -5,6 +5,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -40,8 +41,11 @@ export class StandupsController {
   @Get()
   @RequirePermission("standups", "read")
   @ApiOperation({ summary: "List standups" })
-  async findAll() {
-    return this.standupsService.findAll();
+  async findAll(
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.standupsService.findAll({ page, pageSize });
   }
 
   @Get(":id")

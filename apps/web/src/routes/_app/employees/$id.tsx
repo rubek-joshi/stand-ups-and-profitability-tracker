@@ -527,7 +527,7 @@ function EmployeeDetailPage() {
                       className="flex flex-wrap items-center gap-3 py-3 text-sm"
                     >
                       <Link
-                        to="/standups/$id"
+                        to="/stand-ups/$id"
                         params={{ id: entry.standup.id }}
                         className="w-24 shrink-0 font-medium tabular-nums hover:underline"
                       >

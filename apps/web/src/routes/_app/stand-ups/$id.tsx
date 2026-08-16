@@ -36,7 +36,7 @@ import {
 } from "@/lib/standup-collab"
 import type { Project, Standup, StandupEntry } from "@/lib/types"
 
-export const Route = createFileRoute("/_app/standups/$id")({
+export const Route = createFileRoute("/_app/stand-ups/$id")({
   component: StandupDetailPage,
 })
 
@@ -210,7 +210,7 @@ function StandupDetailPage() {
   return (
     <div>
       <PageHeader
-        title={`Stand-up ${String(standup.date).slice(0, 10)}`}
+        title={`Stand-up · ${dateLabel}`}
         description="Attendance, notes, and project allocations"
         actions={
           <>

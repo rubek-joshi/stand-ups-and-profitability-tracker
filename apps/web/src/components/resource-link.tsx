@@ -78,7 +78,7 @@ export function StandupLink({
 }: ResourceLinkProps & { id: string }) {
   return (
     <Link
-      to="/standups/$id"
+      to="/stand-ups/$id"
       params={{ id }}
       className={cn("font-medium hover:underline", className)}
     >

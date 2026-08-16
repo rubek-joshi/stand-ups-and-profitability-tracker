@@ -14,6 +14,10 @@ import {
   serializeMoneyFields,
   serializeMoneyList,
 } from "../_shared/utils/serialize-money.util";
+import {
+  paginatedResult,
+  resolvePagination,
+} from "../_shared/utils/pagination.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProfitabilityService } from "../profitability/profitability.service";
 import {
@@ -69,16 +73,50 @@ export class ProjectsService {
     return this.serializeProject(project);
   }
 
-  async findAll(filters: { clientId?: string; status?: ProjectStatus }) {
-    const projects = await this.prismaService.project.findMany({
-      where: {
-        ...(filters.clientId ? { clientId: filters.clientId } : {}),
-        ...(filters.status ? { status: filters.status } : {}),
-      },
-      include: this.projectInclude,
-      orderBy: { createdAt: "desc" },
+  async findAll(filters: {
+    clientId?: string;
+    status?: ProjectStatus;
+    q?: string;
+    page?: string;
+    pageSize?: string;
+  }) {
+    const q = filters.q?.trim();
+    const where = {
+      ...(filters.clientId ? { clientId: filters.clientId } : {}),
+      ...(filters.status ? { status: filters.status } : {}),
+      ...(q
+        ? {
+            OR: [
+              { name: { contains: q, mode: "insensitive" as const } },
+              {
+                client: {
+                  name: { contains: q, mode: "insensitive" as const },
+                },
+              },
+            ],
+          }
+        : {}),
+    };
+    const pagination = resolvePagination({
+      page: filters.page,
+      pageSize: filters.pageSize,
     });
-    return projects.map((project) => this.serializeProject(project));
+    const [projects, total] = await Promise.all([
+      this.prismaService.project.findMany({
+        where,
+        include: this.projectInclude,
+        orderBy: { createdAt: "desc" },
+        ...(pagination
+          ? { skip: pagination.skip, take: pagination.take }
+          : {}),
+      }),
+      this.prismaService.project.count({ where }),
+    ]);
+    return paginatedResult(
+      projects.map((project) => this.serializeProject(project)),
+      total,
+      pagination,
+    );
   }
 
   async findOne(id: string) {

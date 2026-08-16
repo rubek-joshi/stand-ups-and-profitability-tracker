@@ -82,4 +82,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
 }
 
 export type Envelope<T> = { data: T }
-export type PaginatedEnvelope<T> = { data: T; meta: { total: number } }
+export type PaginatedEnvelope<T> = {
+  data: T
+  meta: { total: number; page?: number; pageSize?: number }
+}

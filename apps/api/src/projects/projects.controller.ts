@@ -48,8 +48,11 @@ export class ProjectsController {
   async findAll(
     @Query("clientId") clientId?: string,
     @Query("status") status?: ProjectStatus,
+    @Query("q") q?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
   ) {
-    return this.projectsService.findAll({ clientId, status });
+    return this.projectsService.findAll({ clientId, status, q, page, pageSize });
   }
 
   @Get(":id")

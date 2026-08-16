@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -38,8 +39,12 @@ export class ClientsController {
   @Get()
   @RequirePermission("clients", "read")
   @ApiOperation({ summary: "List clients" })
-  async findAll() {
-    return this.clientsService.findAll();
+  async findAll(
+    @Query("q") q?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.clientsService.findAll({ q, page, pageSize });
   }
 
   @Get(":id")

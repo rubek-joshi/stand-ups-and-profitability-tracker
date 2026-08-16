@@ -6,6 +6,10 @@ import {
 import { AuditAction, ClientStatus } from "@workspace/database";
 import { AuditService } from "../audit/audit.service";
 import { serializeMoneyFields } from "../_shared/utils/serialize-money.util";
+import {
+  paginatedResult,
+  resolvePagination,
+} from "../_shared/utils/pagination.util";
 import { ProfitabilityService } from "../profitability/profitability.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateClientDto } from "./dto/create-client.dto";
@@ -47,11 +51,32 @@ export class ClientsService {
     return client;
   }
 
-  async findAll() {
-    return this.prismaService.client.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { _count: { select: { projects: true } } },
+  async findAll(filters: { q?: string; page?: string; pageSize?: string } = {}) {
+    const q = filters.q?.trim();
+    const where = q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" as const } },
+            { contactInfo: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {};
+    const pagination = resolvePagination({
+      page: filters.page,
+      pageSize: filters.pageSize,
     });
+    const [data, total] = await Promise.all([
+      this.prismaService.client.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { projects: true } } },
+        ...(pagination
+          ? { skip: pagination.skip, take: pagination.take }
+          : {}),
+      }),
+      this.prismaService.client.count({ where }),
+    ]);
+    return paginatedResult(data, total, pagination);
   }
 
   async findOne(id: string) {

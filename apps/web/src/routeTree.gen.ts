@@ -16,12 +16,12 @@ import { Route as AppVatRouteImport } from './routes/_app/vat'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppCategoriesRouteImport } from './routes/_app/categories'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
-import { Route as AppStandupsIndexRouteImport } from './routes/_app/standups/index'
+import { Route as AppStandUpsIndexRouteImport } from './routes/_app/stand-ups/index'
 import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/index'
 import { Route as AppEmployeesIndexRouteImport } from './routes/_app/employees/index'
 import { Route as AppCoreMembersIndexRouteImport } from './routes/_app/core-members/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
-import { Route as AppStandupsIdRouteImport } from './routes/_app/standups/$id'
+import { Route as AppStandUpsIdRouteImport } from './routes/_app/stand-ups/$id'
 import { Route as AppProjectsIdRouteImport } from './routes/_app/projects/$id'
 import { Route as AppEmployeesIdRouteImport } from './routes/_app/employees/$id'
 import { Route as AppCoreMembersIdRouteImport } from './routes/_app/core-members/$id'
@@ -65,9 +65,9 @@ const AppAuditRoute = AppAuditRouteImport.update({
   path: '/audit',
   getParentRoute: () => AppRoute,
 } as any)
-const AppStandupsIndexRoute = AppStandupsIndexRouteImport.update({
-  id: '/standups/',
-  path: '/standups/',
+const AppStandUpsIndexRoute = AppStandUpsIndexRouteImport.update({
+  id: '/stand-ups/',
+  path: '/stand-ups/',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProjectsIndexRoute = AppProjectsIndexRouteImport.update({
@@ -90,9 +90,9 @@ const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
   path: '/clients/',
   getParentRoute: () => AppRoute,
 } as any)
-const AppStandupsIdRoute = AppStandupsIdRouteImport.update({
-  id: '/standups/$id',
-  path: '/standups/$id',
+const AppStandUpsIdRoute = AppStandUpsIdRouteImport.update({
+  id: '/stand-ups/$id',
+  path: '/stand-ups/$id',
   getParentRoute: () => AppRoute,
 } as any)
 const AppProjectsIdRoute = AppProjectsIdRouteImport.update({
@@ -147,12 +147,12 @@ export interface FileRoutesByFullPath {
   '/core-members/$id': typeof AppCoreMembersIdRoute
   '/employees/$id': typeof AppEmployeesIdRoute
   '/projects/$id': typeof AppProjectsIdRoute
-  '/standups/$id': typeof AppStandupsIdRoute
+  '/stand-ups/$id': typeof AppStandUpsIdRoute
   '/clients/': typeof AppClientsIndexRoute
   '/core-members/': typeof AppCoreMembersIndexRoute
   '/employees/': typeof AppEmployeesIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
-  '/standups/': typeof AppStandupsIndexRoute
+  '/stand-ups/': typeof AppStandUpsIndexRoute
   '/clients/$id/edit': typeof AppClientsIdEditRoute
   '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
   '/employees/$id/edit': typeof AppEmployeesIdEditRoute
@@ -169,12 +169,12 @@ export interface FileRoutesByTo {
   '/core-members/$id': typeof AppCoreMembersIdRoute
   '/employees/$id': typeof AppEmployeesIdRoute
   '/projects/$id': typeof AppProjectsIdRoute
-  '/standups/$id': typeof AppStandupsIdRoute
+  '/stand-ups/$id': typeof AppStandUpsIdRoute
   '/clients': typeof AppClientsIndexRoute
   '/core-members': typeof AppCoreMembersIndexRoute
   '/employees': typeof AppEmployeesIndexRoute
   '/projects': typeof AppProjectsIndexRoute
-  '/standups': typeof AppStandupsIndexRoute
+  '/stand-ups': typeof AppStandUpsIndexRoute
   '/clients/$id/edit': typeof AppClientsIdEditRoute
   '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
   '/employees/$id/edit': typeof AppEmployeesIdEditRoute
@@ -193,12 +193,12 @@ export interface FileRoutesById {
   '/_app/core-members/$id': typeof AppCoreMembersIdRoute
   '/_app/employees/$id': typeof AppEmployeesIdRoute
   '/_app/projects/$id': typeof AppProjectsIdRoute
-  '/_app/standups/$id': typeof AppStandupsIdRoute
+  '/_app/stand-ups/$id': typeof AppStandUpsIdRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/core-members/': typeof AppCoreMembersIndexRoute
   '/_app/employees/': typeof AppEmployeesIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
-  '/_app/standups/': typeof AppStandupsIndexRoute
+  '/_app/stand-ups/': typeof AppStandUpsIndexRoute
   '/_app/clients/$id_/edit': typeof AppClientsIdEditRoute
   '/_app/core-members/$id_/edit': typeof AppCoreMembersIdEditRoute
   '/_app/employees/$id_/edit': typeof AppEmployeesIdEditRoute
@@ -217,12 +217,12 @@ export interface FileRouteTypes {
     | '/core-members/$id'
     | '/employees/$id'
     | '/projects/$id'
-    | '/standups/$id'
+    | '/stand-ups/$id'
     | '/clients/'
     | '/core-members/'
     | '/employees/'
     | '/projects/'
-    | '/standups/'
+    | '/stand-ups/'
     | '/clients/$id/edit'
     | '/core-members/$id/edit'
     | '/employees/$id/edit'
@@ -239,12 +239,12 @@ export interface FileRouteTypes {
     | '/core-members/$id'
     | '/employees/$id'
     | '/projects/$id'
-    | '/standups/$id'
+    | '/stand-ups/$id'
     | '/clients'
     | '/core-members'
     | '/employees'
     | '/projects'
-    | '/standups'
+    | '/stand-ups'
     | '/clients/$id/edit'
     | '/core-members/$id/edit'
     | '/employees/$id/edit'
@@ -262,12 +262,12 @@ export interface FileRouteTypes {
     | '/_app/core-members/$id'
     | '/_app/employees/$id'
     | '/_app/projects/$id'
-    | '/_app/standups/$id'
+    | '/_app/stand-ups/$id'
     | '/_app/clients/'
     | '/_app/core-members/'
     | '/_app/employees/'
     | '/_app/projects/'
-    | '/_app/standups/'
+    | '/_app/stand-ups/'
     | '/_app/clients/$id_/edit'
     | '/_app/core-members/$id_/edit'
     | '/_app/employees/$id_/edit'
@@ -330,11 +330,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAuditRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/standups/': {
-      id: '/_app/standups/'
-      path: '/standups'
-      fullPath: '/standups/'
-      preLoaderRoute: typeof AppStandupsIndexRouteImport
+    '/_app/stand-ups/': {
+      id: '/_app/stand-ups/'
+      path: '/stand-ups'
+      fullPath: '/stand-ups/'
+      preLoaderRoute: typeof AppStandUpsIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/projects/': {
@@ -365,11 +365,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientsIndexRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/standups/$id': {
-      id: '/_app/standups/$id'
-      path: '/standups/$id'
-      fullPath: '/standups/$id'
-      preLoaderRoute: typeof AppStandupsIdRouteImport
+    '/_app/stand-ups/$id': {
+      id: '/_app/stand-ups/$id'
+      path: '/stand-ups/$id'
+      fullPath: '/stand-ups/$id'
+      preLoaderRoute: typeof AppStandUpsIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/projects/$id': {
@@ -441,12 +441,12 @@ interface AppRouteChildren {
   AppCoreMembersIdRoute: typeof AppCoreMembersIdRoute
   AppEmployeesIdRoute: typeof AppEmployeesIdRoute
   AppProjectsIdRoute: typeof AppProjectsIdRoute
-  AppStandupsIdRoute: typeof AppStandupsIdRoute
+  AppStandUpsIdRoute: typeof AppStandUpsIdRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppCoreMembersIndexRoute: typeof AppCoreMembersIndexRoute
   AppEmployeesIndexRoute: typeof AppEmployeesIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
-  AppStandupsIndexRoute: typeof AppStandupsIndexRoute
+  AppStandUpsIndexRoute: typeof AppStandUpsIndexRoute
   AppClientsIdEditRoute: typeof AppClientsIdEditRoute
   AppCoreMembersIdEditRoute: typeof AppCoreMembersIdEditRoute
   AppEmployeesIdEditRoute: typeof AppEmployeesIdEditRoute
@@ -463,12 +463,12 @@ const AppRouteChildren: AppRouteChildren = {
   AppCoreMembersIdRoute: AppCoreMembersIdRoute,
   AppEmployeesIdRoute: AppEmployeesIdRoute,
   AppProjectsIdRoute: AppProjectsIdRoute,
-  AppStandupsIdRoute: AppStandupsIdRoute,
+  AppStandUpsIdRoute: AppStandUpsIdRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppCoreMembersIndexRoute: AppCoreMembersIndexRoute,
   AppEmployeesIndexRoute: AppEmployeesIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
-  AppStandupsIndexRoute: AppStandupsIndexRoute,
+  AppStandUpsIndexRoute: AppStandUpsIndexRoute,
   AppClientsIdEditRoute: AppClientsIdEditRoute,
   AppCoreMembersIdEditRoute: AppCoreMembersIdEditRoute,
   AppEmployeesIdEditRoute: AppEmployeesIdEditRoute,

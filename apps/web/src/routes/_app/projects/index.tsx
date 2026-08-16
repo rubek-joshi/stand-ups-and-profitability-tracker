@@ -1,7 +1,8 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
-import { IconEye, IconPencil } from "@tabler/icons-react"
+import { IconEye, IconPencil, IconSearch } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
+import { Input } from "@workspace/ui/components/input"
 import {
   Select,
   SelectContent,
@@ -19,6 +20,7 @@ import {
 } from "@workspace/ui/components/table"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
 import { PageHeader } from "@/components/page-header"
+import { PaginationBar } from "@/components/pagination-bar"
 import { StatusBadge } from "@/components/health-badge"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
@@ -26,38 +28,84 @@ import {
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
-import { api, ApiError, type Envelope } from "@/lib/api"
+import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
+import {
+  buildListQuery,
+  parseListSearch,
+  parseOptionalString,
+  totalPagesFor,
+} from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
 import type { Project } from "@/lib/types"
 
+const PROJECT_STATUSES = ["active", "extended", "closed", "under_amc"] as const
+
 export const Route = createFileRoute("/_app/projects/")({
+  validateSearch: (search: Record<string, unknown>) => {
+    const base = parseListSearch(search)
+    const status = parseOptionalString(search.status)
+    return {
+      ...base,
+      status:
+        status && (PROJECT_STATUSES as readonly string[]).includes(status)
+          ? status
+          : undefined,
+    }
+  },
   component: ProjectsPage,
 })
 
 function ProjectsPage() {
+  const navigate = Route.useNavigate()
+  const { q, page, pageSize, status } = Route.useSearch()
   const [projects, setProjects] = React.useState<Project[]>([])
-  const [statusFilter, setStatusFilter] = React.useState<string>("")
+  const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [open, setOpen] = React.useState(false)
+  const [searchInput, setSearchInput] = React.useState(q ?? "")
+
+  React.useEffect(() => {
+    setSearchInput(q ?? "")
+  }, [q])
+
+  React.useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const next = searchInput.trim() || undefined
+      if (next === q) return
+      void navigate({
+        search: (prev) => ({ ...prev, q: next, page: 1 }),
+        replace: true,
+      })
+    }, 300)
+    return () => window.clearTimeout(timer)
+  }, [searchInput, q, navigate])
 
   const load = React.useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const qs = statusFilter ? `?status=${statusFilter}` : ""
-      const p = await api<Envelope<Project[]>>(`/projects${qs}`)
+      const qs = buildListQuery({
+        q,
+        page,
+        pageSize,
+        status: status || undefined,
+      })
+      const p = await api<PaginatedEnvelope<Project[]>>(`/projects?${qs}`)
       setProjects(p.data)
+      setTotal(p.meta?.total ?? p.data.length)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load projects")
     } finally {
       setLoading(false)
     }
-  }, [statusFilter])
+  }, [q, page, pageSize, status])
 
   React.useEffect(() => {
     void load()
   }, [load])
+
+  const totalPages = totalPagesFor(total, pageSize)
 
   return (
     <div>
@@ -67,8 +115,16 @@ function ProjectsPage() {
         actions={
           <>
             <Select
-              value={statusFilter || null}
-              onValueChange={(v) => setStatusFilter(v ?? "")}
+              value={status || null}
+              onValueChange={(v) => {
+                void navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    status: v || undefined,
+                    page: 1,
+                  }),
+                })
+              }}
               items={{
                 active: "Active",
                 extended: "Extended",
@@ -86,8 +142,19 @@ function ProjectsPage() {
                 <SelectItem value="under_amc">Under AMC</SelectItem>
               </SelectContent>
             </Select>
-            {statusFilter ? (
-              <Button variant="outline" onClick={() => setStatusFilter("")}>
+            {status ? (
+              <Button
+                variant="outline"
+                onClick={() => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      status: undefined,
+                      page: 1,
+                    }),
+                  })
+                }}
+              >
                 Clear filter
               </Button>
             ) : null}
@@ -95,74 +162,109 @@ function ProjectsPage() {
           </>
         }
       />
+
+      <div className="mb-4">
+        <div className="relative max-w-sm">
+          <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            className="pl-8"
+            placeholder="Search projects or clients…"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+          />
+        </div>
+      </div>
+
       {loading ? <LoadingState /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}
-      {!loading && projects.length === 0 ? <EmptyState message="No projects" /> : null}
+      {!loading && projects.length === 0 ? (
+        <EmptyState
+          message={q || status ? "No projects match your filters" : "No projects"}
+        />
+      ) : null}
       {projects.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Budget</TableHead>
-                <TableHead>Dates</TableHead>
-                <TableActionsHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {projects.map((p) => (
-                <TableRow key={p.id}>
-                  <TableCell>
-                    <Link
-                      to="/projects/$id"
-                      params={{ id: p.id }}
-                      className="font-medium hover:underline"
-                    >
-                      {p.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell>
-                    {p.client?.id ? (
-                      <Link
-                        to="/clients/$id"
-                        params={{ id: p.client.id }}
-                        className="hover:underline"
-                      >
-                        {p.client.name}
-                      </Link>
-                    ) : (
-                      (p.client?.name ?? "—")
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={p.status} />
-                  </TableCell>
-                  <TableCell className="tabular-nums">{formatNpr(p.budgetPaisa)}</TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {String(p.startDate).slice(0, 10)} → {String(p.endDate).slice(0, 10)}
-                  </TableCell>
-                  <TableActionsCell>
-                    <TableActionLink
-                      label="View"
-                      to="/projects/$id"
-                      params={{ id: p.id }}
-                    >
-                      <IconEye className="size-3.5" />
-                    </TableActionLink>
-                    <TableActionLink
-                      label="Edit"
-                      to="/projects/$id/edit"
-                      params={{ id: p.id }}
-                    >
-                      <IconPencil className="size-3.5" />
-                    </TableActionLink>
-                  </TableActionsCell>
+        <div className="space-y-4">
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Client</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Budget</TableHead>
+                  <TableHead>Dates</TableHead>
+                  <TableActionsHead />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {projects.map((p) => (
+                  <TableRow key={p.id}>
+                    <TableCell>
+                      <Link
+                        to="/projects/$id"
+                        params={{ id: p.id }}
+                        className="font-medium hover:underline"
+                      >
+                        {p.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell>
+                      {p.client?.id ? (
+                        <Link
+                          to="/clients/$id"
+                          params={{ id: p.client.id }}
+                          className="hover:underline"
+                        >
+                          {p.client.name}
+                        </Link>
+                      ) : (
+                        (p.client?.name ?? "—")
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge status={p.status} />
+                    </TableCell>
+                    <TableCell className="tabular-nums">{formatNpr(p.budgetPaisa)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {String(p.startDate).slice(0, 10)} → {String(p.endDate).slice(0, 10)}
+                    </TableCell>
+                    <TableActionsCell>
+                      <TableActionLink
+                        label="View"
+                        to="/projects/$id"
+                        params={{ id: p.id }}
+                      >
+                        <IconEye className="size-3.5" />
+                      </TableActionLink>
+                      <TableActionLink
+                        label="Edit"
+                        to="/projects/$id/edit"
+                        params={{ id: p.id }}
+                      >
+                        <IconPencil className="size-3.5" />
+                      </TableActionLink>
+                    </TableActionsCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+          <PaginationBar
+            page={page}
+            totalPages={totalPages}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={(nextPage) => {
+              void navigate({
+                search: (prev) => ({ ...prev, page: nextPage }),
+              })
+            }}
+            onPageSizeChange={(size) => {
+              void navigate({
+                search: (prev) => ({ ...prev, pageSize: size, page: 1 }),
+              })
+            }}
+          />
         </div>
       ) : null}
 

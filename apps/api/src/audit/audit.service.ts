@@ -1,5 +1,9 @@
 import { Injectable } from "@nestjs/common";
 import { AuditAction, Prisma } from "@workspace/database";
+import {
+  paginatedResult,
+  resolvePagination,
+} from "../_shared/utils/pagination.util";
 import { PrismaService } from "../prisma/prisma.service";
 
 export type WriteAuditInput = {
@@ -40,6 +44,8 @@ export class AuditService {
   async findAll(params: {
     action?: AuditAction;
     actorId?: string;
+    page?: string;
+    pageSize?: string;
     skip?: number;
     take?: number;
   }) {
@@ -47,17 +53,35 @@ export class AuditService {
       ...(params.action ? { action: params.action } : {}),
       ...(params.actorId ? { actorId: params.actorId } : {}),
     };
+    const pagination =
+      resolvePagination({
+        page: params.page,
+        pageSize: params.pageSize,
+      }) ??
+      (params.take !== undefined
+        ? {
+            page: Math.floor((params.skip ?? 0) / (params.take || 50)) + 1,
+            pageSize: params.take || 50,
+            skip: params.skip ?? 0,
+            take: params.take || 50,
+          }
+        : {
+            page: 1,
+            pageSize: 25,
+            skip: 0,
+            take: 25,
+          });
     const [data, total] = await Promise.all([
       this.prismaService.auditLog.findMany({
         where,
         include: { actor: { select: { id: true, name: true, email: true } } },
         orderBy: { createdAt: "desc" },
-        skip: params.skip ?? 0,
-        take: params.take ?? 50,
+        skip: pagination.skip,
+        take: pagination.take,
       }),
       this.prismaService.auditLog.count({ where }),
     ]);
-    return { data, meta: { total } };
+    return paginatedResult(data, total, pagination);
   }
 
   async listActors() {

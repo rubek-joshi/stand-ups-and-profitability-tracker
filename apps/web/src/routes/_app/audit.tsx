@@ -19,6 +19,7 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 import { PageHeader } from "@/components/page-header"
+import { PaginationBar } from "@/components/pagination-bar"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import { EntityLink } from "@/components/resource-link"
 import {
@@ -27,9 +28,26 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
+import {
+  buildListQuery,
+  parseOptionalString,
+  parsePage,
+  parsePageSize,
+  totalPagesFor,
+} from "@/lib/list-query"
 import type { AuditLog } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/audit")({
+  validateSearch: (search: Record<string, unknown>) => {
+    const action = parseOptionalString(search.action)
+    return {
+      page: parsePage(search.page),
+      pageSize: parsePageSize(search.pageSize),
+      action:
+        action && ACTIONS.includes(action) ? action : undefined,
+      actorId: parseOptionalString(search.actorId),
+    }
+  },
   component: AuditPage,
 })
 
@@ -62,15 +80,15 @@ const ENTITY_ROUTES: Record<string, string> = {
   Project: "/projects/$id",
   Employee: "/employees/$id",
   CoreMember: "/core-members/$id",
-  Standup: "/standups/$id",
+  Standup: "/stand-ups/$id",
 }
 
 function AuditPage() {
+  const navigate = Route.useNavigate()
+  const { page, pageSize, action, actorId } = Route.useSearch()
   const [logs, setLogs] = React.useState<AuditLog[]>([])
   const [actors, setActors] = React.useState<AuditActor[]>([])
   const [total, setTotal] = React.useState(0)
-  const [action, setAction] = React.useState("")
-  const [actorId, setActorId] = React.useState("")
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
 
@@ -95,11 +113,12 @@ function AuditPage() {
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams()
-      if (action) params.set("action", action)
-      if (actorId) params.set("actorId", actorId)
-      params.set("take", "50")
-      const qs = params.toString()
+      const qs = buildListQuery({
+        action: action || undefined,
+        actorId: actorId || undefined,
+        page,
+        pageSize,
+      })
       const res = await api<PaginatedEnvelope<AuditLog[]>>(`/audit?${qs}`)
       setLogs(res.data)
       setTotal(res.meta?.total ?? res.data.length)
@@ -116,7 +135,7 @@ function AuditPage() {
     } finally {
       setLoading(false)
     }
-  }, [action, actorId])
+  }, [action, actorId, page, pageSize])
 
   React.useEffect(() => {
     void loadActors()
@@ -137,7 +156,15 @@ function AuditPage() {
               <Label className="text-xs">Action</Label>
               <Select
                 value={action || null}
-                onValueChange={(v) => setAction(v ?? "")}
+                onValueChange={(v) => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      action: v || undefined,
+                      page: 1,
+                    }),
+                  })
+                }}
                 items={Object.fromEntries(ACTIONS.map((a) => [a, a]))}
               >
                 <SelectTrigger className="w-56">
@@ -156,7 +183,15 @@ function AuditPage() {
               <Label className="text-xs">Actor</Label>
               <Select
                 value={actorId || null}
-                onValueChange={(v) => setActorId(v ?? "")}
+                onValueChange={(v) => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      actorId: v || undefined,
+                      page: 1,
+                    }),
+                  })
+                }}
                 items={actorItems}
               >
                 <SelectTrigger className="w-64">
@@ -175,8 +210,14 @@ function AuditPage() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  setAction("")
-                  setActorId("")
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      action: undefined,
+                      actorId: undefined,
+                      page: 1,
+                    }),
+                  })
                 }}
               >
                 Clear
@@ -195,8 +236,7 @@ function AuditPage() {
         <EmptyState message="No audit entries" />
       ) : null}
       {!loading && logs.length > 0 ? (
-        <>
-          <p className="mb-2 text-sm text-muted-foreground">{total} total</p>
+        <div className="space-y-4">
           <div className="overflow-x-auto rounded-lg border">
             <Table>
               <TableHeader>
@@ -252,7 +292,23 @@ function AuditPage() {
               </TableBody>
             </Table>
           </div>
-        </>
+          <PaginationBar
+            page={page}
+            totalPages={totalPagesFor(total, pageSize)}
+            total={total}
+            pageSize={pageSize}
+            onPageChange={(nextPage) => {
+              void navigate({
+                search: (prev) => ({ ...prev, page: nextPage }),
+              })
+            }}
+            onPageSizeChange={(size) => {
+              void navigate({
+                search: (prev) => ({ ...prev, pageSize: size, page: 1 }),
+              })
+            }}
+          />
+        </div>
       ) : null}
     </div>
   )

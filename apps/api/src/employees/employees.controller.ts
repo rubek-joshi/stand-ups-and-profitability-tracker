@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
@@ -43,8 +44,12 @@ export class EmployeesController {
   @Get()
   @RequirePermission("employees", "read")
   @ApiOperation({ summary: "List employees" })
-  async findAll() {
-    return this.employeesService.findAll();
+  async findAll(
+    @Query("q") q?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+  ) {
+    return this.employeesService.findAll({ q, page, pageSize });
   }
 
   @Get(":id")

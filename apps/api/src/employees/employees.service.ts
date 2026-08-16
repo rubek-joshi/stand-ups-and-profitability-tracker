@@ -11,6 +11,10 @@ import {
   serializeMoneyFields,
   serializeMoneyList,
 } from "../_shared/utils/serialize-money.util";
+import {
+  paginatedResult,
+  resolvePagination,
+} from "../_shared/utils/pagination.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { QueuesService } from "../queues/queues.service";
 import {
@@ -71,14 +75,38 @@ export class EmployeesService {
     return this.serializeEmployee(employee);
   }
 
-  async findAll() {
-    const employees = await this.prismaService.employee.findMany({
-      orderBy: { name: "asc" },
-      include: {
-        salaryEntries: { orderBy: { effectiveDate: "desc" }, take: 1 },
-      },
+  async findAll(filters: { q?: string; page?: string; pageSize?: string } = {}) {
+    const q = filters.q?.trim();
+    const where = q
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" as const } },
+            { email: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
+      : {};
+    const pagination = resolvePagination({
+      page: filters.page,
+      pageSize: filters.pageSize,
     });
-    return employees.map((employee) => this.serializeEmployee(employee));
+    const [employees, total] = await Promise.all([
+      this.prismaService.employee.findMany({
+        where,
+        orderBy: { name: "asc" },
+        include: {
+          salaryEntries: { orderBy: { effectiveDate: "desc" }, take: 1 },
+        },
+        ...(pagination
+          ? { skip: pagination.skip, take: pagination.take }
+          : {}),
+      }),
+      this.prismaService.employee.count({ where }),
+    ]);
+    return paginatedResult(
+      employees.map((employee) => this.serializeEmployee(employee)),
+      total,
+      pagination,
+    );
   }
 
   async findOne(id: string) {

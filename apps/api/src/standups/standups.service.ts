@@ -18,6 +18,10 @@ import {
   toIsoDate,
   toMonthKey,
 } from "../_shared/utils/date.util";
+import {
+  paginatedResult,
+  resolvePagination,
+} from "../_shared/utils/pagination.util";
 import { PrismaService } from "../prisma/prisma.service";
 import { ProfitabilityService } from "../profitability/profitability.service";
 import {
@@ -85,14 +89,25 @@ export class StandupsService {
     return standup;
   }
 
-  async findAll() {
-    return this.prismaService.standup.findMany({
-      orderBy: { date: "desc" },
-      include: {
-        createdBy: { select: { id: true, name: true, email: true } },
-        _count: { select: { entries: true } },
-      },
+  async findAll(filters: { page?: string; pageSize?: string } = {}) {
+    const pagination = resolvePagination({
+      page: filters.page,
+      pageSize: filters.pageSize,
     });
+    const [data, total] = await Promise.all([
+      this.prismaService.standup.findMany({
+        orderBy: { date: "desc" },
+        include: {
+          createdBy: { select: { id: true, name: true, email: true } },
+          _count: { select: { entries: true } },
+        },
+        ...(pagination
+          ? { skip: pagination.skip, take: pagination.take }
+          : {}),
+      }),
+      this.prismaService.standup.count(),
+    ]);
+    return paginatedResult(data, total, pagination);
   }
 
   async findOne(id: string) {
