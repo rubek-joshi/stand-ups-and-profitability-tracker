@@ -65,6 +65,12 @@ enum AmcRenewalDecision {
   declined
 }
 
+enum StandupScopePreference {
+  ask
+  everyone
+  group
+}
+
 enum AuditAction {
   CLIENT_CREATED
   CLIENT_UPDATED
@@ -114,27 +120,36 @@ enum AuditAction {
   USER_DEACTIVATED
   USER_REACTIVATED
   USER_PASSWORD_CHANGED
+  EMPLOYEE_GROUP_CREATED
+  EMPLOYEE_GROUP_UPDATED
+  EMPLOYEE_GROUP_DELETED
+  EMPLOYEE_GROUP_MEMBER_ADDED
+  EMPLOYEE_GROUP_MEMBER_REMOVED
 }
 
 model User {
-  id                 String    @id @default(cuid())
-  email              String    @unique
-  passwordHash       String
-  name               String
-  isActive           Boolean   @default(true)
-  mustChangePassword Boolean   @default(false)
-  lastLoginAt        DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                       String                 @id @default(cuid())
+  email                    String                 @unique
+  passwordHash             String
+  name                     String
+  isActive                 Boolean                @default(true)
+  mustChangePassword       Boolean                @default(false)
+  lastLoginAt              DateTime?
+  standupScopePreference   StandupScopePreference @default(ask)
+  standupPreferredGroupId  String?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
 
-  auditLogs          AuditLog[]          @relation("AuditActor")
-  createdStandups    Standup[]           @relation("StandupCreator")
-  createdExtensions  ProjectExtension[]  @relation("ExtensionCreator")
-  employeeSalaryChanges EmployeeSalaryEntry[] @relation("EmployeeSalaryChangedBy")
-  coreMemberSalaryChanges CoreMemberSalaryEntry[] @relation("CoreMemberSalaryChangedBy")
-  vatClearances      VatClearance[]
-  dbSnapshots        DbSnapshot[]
+  auditLogs               AuditLog[]               @relation("AuditActor")
+  createdStandups         Standup[]                @relation("StandupCreator")
+  createdExtensions       ProjectExtension[]       @relation("ExtensionCreator")
+  employeeSalaryChanges   EmployeeSalaryEntry[]    @relation("EmployeeSalaryChangedBy")
+  coreMemberSalaryChanges CoreMemberSalaryEntry[]  @relation("CoreMemberSalaryChangedBy")
+  vatClearances           VatClearance[]
+  dbSnapshots             DbSnapshot[]
+  standupPreferredGroup   EmployeeGroup?           @relation("StandupPreferredGroup", fields: [standupPreferredGroupId], references: [id], onDelete: SetNull)
 
+  @@index([standupPreferredGroupId])
   @@map("users")
 }
 
@@ -291,8 +306,36 @@ model Employee {
   assignments       ProjectAssignment[]
   attendanceRecords AttendanceRecord[]
   standupEntries    StandupEntry[]
+  groupMemberships  EmployeeGroupMember[]
 
   @@map("employees")
+}
+
+model EmployeeGroup {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members          EmployeeGroupMember[]
+  standups         Standup[]
+  preferredByUsers User[]                @relation("StandupPreferredGroup")
+
+  @@map("employee_groups")
+}
+
+model EmployeeGroupMember {
+  groupId    String
+  employeeId String
+  createdAt  DateTime @default(now())
+
+  group    EmployeeGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  employee Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@id([groupId, employeeId])
+  @@index([employeeId])
+  @@map("employee_group_members")
 }
 
 model EmployeeSalaryEntry {
@@ -346,19 +389,22 @@ model CoreMemberSalaryEntry {
 }
 
 model Standup {
-  id          String        @id @default(cuid())
-  date        DateTime      @db.Date
-  status      StandupStatus @default(draft)
-  createdById String
-  yjsState    Bytes?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id              String        @id @default(cuid())
+  date            DateTime      @db.Date
+  status          StandupStatus @default(draft)
+  createdById     String
+  employeeGroupId String?
+  yjsState        Bytes?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 
-  createdBy  User             @relation("StandupCreator", fields: [createdById], references: [id])
-  entries    StandupEntry[]
-  attendance AttendanceRecord[]
+  createdBy     User              @relation("StandupCreator", fields: [createdById], references: [id])
+  employeeGroup EmployeeGroup?    @relation(fields: [employeeGroupId], references: [id], onDelete: Restrict)
+  entries       StandupEntry[]
+  attendance    AttendanceRecord[]
 
   @@index([date])
+  @@index([employeeGroupId])
   @@map("standups")
 }
 

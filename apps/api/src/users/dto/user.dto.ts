@@ -8,6 +8,7 @@ import {
   IsString,
   MaxLength,
   MinLength,
+  ValidateIf,
 } from "class-validator";
 
 export const USER_ROLES = ["super_admin", "admin", "manager"] as const;
@@ -83,4 +84,20 @@ export class ChangePasswordDto {
   @MinLength(8)
   @MaxLength(128)
   newPassword!: string;
+}
+
+export class UpdateMyPreferencesDto {
+  @ApiPropertyOptional({ enum: ["ask", "everyone", "group"] })
+  @IsOptional()
+  @IsIn(["ask", "everyone", "group"])
+  standupScopePreference?: "ask" | "everyone" | "group";
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: "Required when preference is group; null clears preferred group",
+  })
+  @ValidateIf((_, value) => value !== null && value !== undefined)
+  @IsOptional()
+  @IsString()
+  standupPreferredGroupId?: string | null;
 }

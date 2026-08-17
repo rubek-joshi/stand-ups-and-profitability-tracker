@@ -15,17 +15,15 @@ import {
   useSidebar,
 } from "@workspace/ui/components/sidebar"
 import { Button } from "@workspace/ui/components/button"
-import { IconLogout, IconMoon, IconSun } from "@tabler/icons-react"
+import { IconLogout, IconUser } from "@tabler/icons-react"
 import { NAV_ITEMS } from "@/lib/nav"
 import { useAuth } from "@/lib/auth"
-import { useTheme } from "@/lib/theme"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 
 export function AppSidebar() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const navigate = useNavigate()
   const { user, logout } = useAuth()
-  const { isDark, toggleTheme } = useTheme()
   const { confirm, dialog } = useConfirmDialog()
   const { isMobile, setOpenMobile } = useSidebar()
 
@@ -45,9 +43,13 @@ export function AppSidebar() {
             <span className="truncate">Tracker</span>
           </Link>
           {user ? (
-            <p className="truncate text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
+            <Link
+              to="/profile"
+              onClick={dismissMobile}
+              className="truncate text-xs text-muted-foreground hover:text-foreground group-data-[collapsible=icon]:hidden"
+            >
               {user.name}
-            </p>
+            </Link>
           ) : null}
         </SidebarHeader>
         <SidebarSeparator />
@@ -83,12 +85,10 @@ export function AppSidebar() {
             variant="ghost"
             size="sm"
             className="w-full justify-start"
-            onClick={toggleTheme}
+            render={<Link to="/profile" onClick={dismissMobile} />}
           >
-            {isDark ? <IconSun /> : <IconMoon />}
-            <span className="group-data-[collapsible=icon]:hidden">
-              {isDark ? "Light mode" : "Dark mode"}
-            </span>
+            <IconUser />
+            <span className="group-data-[collapsible=icon]:hidden">Profile</span>
           </Button>
           <Button
             variant="ghost"

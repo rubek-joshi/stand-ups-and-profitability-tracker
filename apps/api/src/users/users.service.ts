@@ -31,7 +31,12 @@ export class UsersService {
   }
 
   async findById(id: string): Promise<User> {
-    const user = await this.prismaService.user.findUnique({ where: { id } });
+    const user = await this.prismaService.user.findUnique({
+      where: { id },
+      include: {
+        standupPreferredGroup: { select: { id: true, name: true } },
+      },
+    });
     if (!user) {
       throw new NotFoundException("User not found");
     }
@@ -235,12 +240,74 @@ export class UsersService {
     return this.toResponse(updated, role);
   }
 
-  async toResponseAsync(user: User): Promise<UserResponseDto> {
-    const role = await this.casbinService.getPrimaryRoleForUser(user.id);
-    return this.toResponse(user, role);
+  async updateMyPreferences(
+    userId: string,
+    dto: {
+      standupScopePreference?: "ask" | "everyone" | "group";
+      standupPreferredGroupId?: string | null;
+    },
+  ): Promise<UserResponseDto> {
+    const preference =
+      dto.standupScopePreference ??
+      (await this.findById(userId)).standupScopePreference;
+
+    let preferredGroupId =
+      dto.standupPreferredGroupId !== undefined
+        ? dto.standupPreferredGroupId
+        : (await this.findById(userId)).standupPreferredGroupId;
+
+    if (preference === "ask" || preference === "everyone") {
+      preferredGroupId = null;
+    } else if (preference === "group") {
+      if (!preferredGroupId) {
+        throw new BadRequestException(
+          "standupPreferredGroupId is required when preference is group",
+        );
+      }
+      const group = await this.prismaService.employeeGroup.findUnique({
+        where: { id: preferredGroupId },
+      });
+      if (!group) {
+        throw new NotFoundException(
+          `Employee group ${preferredGroupId} not found`,
+        );
+      }
+    }
+
+    const updated = await this.prismaService.user.update({
+      where: { id: userId },
+      data: {
+        standupScopePreference: preference,
+        standupPreferredGroupId: preferredGroupId,
+      },
+      include: {
+        standupPreferredGroup: { select: { id: true, name: true } },
+      },
+    });
+    const role = await this.casbinService.getPrimaryRoleForUser(userId);
+    return this.toResponse(updated, role);
   }
 
-  toResponse(user: User, role?: string | null): UserResponseDto {
+  async toResponseAsync(user: User): Promise<UserResponseDto> {
+    const role = await this.casbinService.getPrimaryRoleForUser(user.id);
+    const full =
+      "standupPreferredGroup" in user
+        ? user
+        : await this.prismaService.user.findUnique({
+            where: { id: user.id },
+            include: {
+              standupPreferredGroup: { select: { id: true, name: true } },
+            },
+          });
+    return this.toResponse(full ?? user, role);
+  }
+
+  toResponse(
+    user: User & {
+      standupPreferredGroup?: { id: string; name: string } | null;
+    },
+    role?: string | null,
+  ): UserResponseDto {
     return {
       id: user.id,
       email: user.email,
@@ -249,6 +316,9 @@ export class UsersService {
       mustChangePassword: user.mustChangePassword,
       lastLoginAt: user.lastLoginAt,
       role: role ?? null,
+      standupScopePreference: user.standupScopePreference,
+      standupPreferredGroupId: user.standupPreferredGroupId,
+      standupPreferredGroup: user.standupPreferredGroup ?? null,
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

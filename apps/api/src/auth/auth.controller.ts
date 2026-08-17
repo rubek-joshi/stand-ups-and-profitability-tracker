@@ -1,7 +1,10 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Patch, Post, UseGuards } from "@nestjs/common";
 import { CurrentUser } from "../_shared/decorators/current-user.decorator";
 import { UsersService } from "../users/users.service";
-import { ChangePasswordDto } from "../users/dto/user.dto";
+import {
+  ChangePasswordDto,
+  UpdateMyPreferencesDto,
+} from "../users/dto/user.dto";
 import {
   AuthControllerDocs,
   ChangePasswordDocs,
@@ -33,6 +36,16 @@ export class AuthController {
   async me(@CurrentUser() authUser: AuthUser) {
     const user = await this.usersService.findById(authUser.id);
     return this.usersService.toResponseAsync(user);
+  }
+
+  @Patch("me")
+  @UseGuards(JwtAuthGuard)
+  @MeDocs()
+  async updateMe(
+    @CurrentUser() authUser: AuthUser,
+    @Body() dto: UpdateMyPreferencesDto,
+  ) {
+    return this.usersService.updateMyPreferences(authUser.id, dto);
   }
 
   @Post("change-password")

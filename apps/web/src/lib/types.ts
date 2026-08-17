@@ -162,6 +162,30 @@ export type Employee = {
       project?: { id: string; name: string; status: string }
     }>
   }>
+  groups?: Array<{ id: string; name: string }>
+}
+
+export type StandupScopePreference = "ask" | "everyone" | "group"
+
+export type EmployeeGroupMember = {
+  employeeId: string
+  createdAt: string
+  employee: {
+    id: string
+    name: string
+    email: string
+    status: PersonStatus
+  }
+}
+
+export type EmployeeGroup = {
+  id: string
+  name: string
+  description: string | null
+  memberCount?: number
+  members?: EmployeeGroupMember[]
+  createdAt: string
+  updatedAt: string
 }
 
 export type CoreMember = {
@@ -194,6 +218,8 @@ export type Standup = {
   id: string
   date: string
   status: StandupStatus
+  employeeGroupId?: string | null
+  employeeGroup?: { id: string; name: string } | null
   createdAt?: string
   createdBy?: { id: string; name: string; email: string }
   _count?: { entries: number }

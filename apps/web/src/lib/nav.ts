@@ -9,6 +9,7 @@ import {
   IconUsers,
   IconUserCog,
   IconUserStar,
+  IconUsersGroup,
   IconBriefcase,
   IconShieldCheck,
 } from "@tabler/icons-react"
@@ -28,6 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Projects", to: "/projects", icon: IconBriefcase },
   { title: "AMC", to: "/amc", icon: IconShieldCheck, keywords: ["maintenance", "renewal"] },
   { title: "Employees", to: "/employees", icon: IconUsers },
+  { title: "Groups", to: "/employee-groups", icon: IconUsersGroup, keywords: ["department", "team"] },
   { title: "Core Members", to: "/core-members", icon: IconUserStar, keywords: ["core"] },
   { title: "Categories", to: "/categories", icon: IconCategory },
   { title: "VAT", to: "/vat", icon: IconReceiptTax },

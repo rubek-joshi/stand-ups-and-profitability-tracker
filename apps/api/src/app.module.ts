@@ -13,6 +13,7 @@ import { CollabModule } from "./collab/collab.module";
 import { CoreMembersModule } from "./core-members/core-members.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { EmployeesModule } from "./employees/employees.module";
+import { EmployeeGroupsModule } from "./employee-groups/employee-groups.module";
 import { HealthModule } from "./health/health.module";
 import { JobsModule } from "./jobs/jobs.module";
 import { MailModule } from "./mail/mail.module";
@@ -49,6 +50,7 @@ import { VatModule } from "./vat/vat.module";
     CategoriesModule,
     ProjectsModule,
     EmployeesModule,
+    EmployeeGroupsModule,
     CoreMembersModule,
     StandupsModule,
     AmcModule,

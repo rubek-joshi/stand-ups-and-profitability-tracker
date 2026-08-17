@@ -2,6 +2,7 @@ import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
 import { IconEye } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
+import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   Dialog,
   DialogContent,
@@ -11,6 +12,13 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 import {
   Table,
   TableBody,
@@ -28,9 +36,10 @@ import {
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
-import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
+import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 import { buildListQuery, parsePage, parsePageSize, totalPagesFor } from "@/lib/list-query"
-import type { Standup } from "@/lib/types"
+import type { EmployeeGroup, Standup } from "@/lib/types"
 import { format, parseISO } from "date-fns"
 
 export const Route = createFileRoute("/_app/stand-ups/")({
@@ -58,12 +67,21 @@ function utcIsoDate(date = new Date()) {
 function StandupsPage() {
   const navigate = Route.useNavigate()
   const { page, pageSize } = Route.useSearch()
+  const { user, refreshUser } = useAuth()
   const [items, setItems] = React.useState<Standup[]>([])
   const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [open, setOpen] = React.useState(false)
   const [date, setDate] = React.useState(() => utcIsoDate())
+  const [groups, setGroups] = React.useState<EmployeeGroup[]>([])
+  const [scope, setScope] = React.useState<"everyone" | "group">("everyone")
+  const [groupId, setGroupId] = React.useState("")
+  const [remember, setRemember] = React.useState(false)
+  const [creating, setCreating] = React.useState(false)
+
+  const preference = user?.standupScopePreference ?? "ask"
+  const askEveryTime = preference === "ask"
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -84,24 +102,40 @@ function StandupsPage() {
     void load()
   }, [load])
 
+  const openCreate = async () => {
+    setDate(utcIsoDate())
+    setRemember(false)
+    if (preference === "group" && user?.standupPreferredGroupId) {
+      setScope("group")
+      setGroupId(user.standupPreferredGroupId)
+    } else if (preference === "everyone") {
+      setScope("everyone")
+      setGroupId("")
+    } else {
+      setScope("everyone")
+      setGroupId("")
+    }
+    try {
+      const res = await api<PaginatedEnvelope<EmployeeGroup[]> | Envelope<EmployeeGroup[]>>(
+        "/employee-groups",
+      )
+      setGroups(res.data)
+    } catch {
+      setGroups([])
+    }
+    setOpen(true)
+  }
+
   const maxDate = utcIsoDate()
   const totalPages = totalPagesFor(total, pageSize)
+  const groupItems = Object.fromEntries(groups.map((g) => [g.id, g.name]))
 
   return (
     <div>
       <PageHeader
         title="Stand-ups"
         description="Daily allocations and attendance"
-        actions={
-          <Button
-            onClick={() => {
-              setDate(utcIsoDate())
-              setOpen(true)
-            }}
-          >
-            New stand-up
-          </Button>
-        }
+        actions={<Button onClick={() => void openCreate()}>New stand-up</Button>}
       />
       {loading ? <LoadingState /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}
@@ -182,8 +216,45 @@ function StandupsPage() {
                 alert("Stand-ups cannot be created for a future date.")
                 return
               }
+              const effectiveScope =
+                askEveryTime
+                  ? scope
+                  : preference === "group"
+                    ? "group"
+                    : "everyone"
+              const effectiveGroupId =
+                effectiveScope === "group"
+                  ? askEveryTime
+                    ? groupId
+                    : user?.standupPreferredGroupId ?? groupId
+                  : undefined
+              if (effectiveScope === "group" && !effectiveGroupId) {
+                alert("Pick a group for this stand-up.")
+                return
+              }
+              setCreating(true)
               try {
-                await api("/standups", { method: "POST", body: { date } })
+                if (askEveryTime && remember) {
+                  await api("/auth/me", {
+                    method: "PATCH",
+                    body: {
+                      standupScopePreference:
+                        effectiveScope === "group" ? "group" : "everyone",
+                      standupPreferredGroupId:
+                        effectiveScope === "group" ? effectiveGroupId : null,
+                    },
+                  })
+                  await refreshUser()
+                }
+                await api("/standups", {
+                  method: "POST",
+                  body: {
+                    date,
+                    ...(effectiveGroupId
+                      ? { employeeGroupId: effectiveGroupId }
+                      : {}),
+                  },
+                })
                 setOpen(false)
                 void navigate({
                   search: (prev) => ({ ...prev, page: 1 }),
@@ -191,6 +262,8 @@ function StandupsPage() {
                 await load()
               } catch (err) {
                 alert(err instanceof ApiError ? err.message : "Failed")
+              } finally {
+                setCreating(false)
               }
             }}
           >
@@ -207,8 +280,93 @@ function StandupsPage() {
                 Today or a past date. One stand-up per day.
               </p>
             </div>
+
+            {askEveryTime ? (
+              <>
+                <div className="space-y-2">
+                  <Label>Who should be included?</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {(
+                      [
+                        ["everyone", "Everyone"],
+                        ["group", "A specific group"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setScope(value)}
+                        className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+                          scope === value
+                            ? "border-primary bg-primary/10 text-primary"
+                            : "border-border bg-card text-muted-foreground hover:bg-muted"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {scope === "group" ? (
+                  <div className="space-y-2">
+                    <Label>Group</Label>
+                    <Select
+                      value={groupId || null}
+                      onValueChange={(v) => setGroupId(v ?? "")}
+                      items={groupItems}
+                      disabled={groups.length === 0}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue
+                          placeholder={
+                            groups.length === 0
+                              ? "No groups yet"
+                              : "Choose a group"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {groups.map((g) => (
+                          <SelectItem key={g.id} value={g.id}>
+                            {g.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : null}
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={remember}
+                    onCheckedChange={(v) => setRemember(Boolean(v))}
+                  />
+                  Remember my choice
+                </label>
+                <p className="text-xs text-muted-foreground">
+                  Change this later from your{" "}
+                  <Link to="/profile" className="underline">
+                    profile
+                  </Link>
+                  .
+                </p>
+              </>
+            ) : (
+              <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
+                Using saved preference:{" "}
+                {preference === "group"
+                  ? `group “${user?.standupPreferredGroup?.name ?? "selected"}”`
+                  : "everyone"}
+                .{" "}
+                <Link to="/profile" className="underline">
+                  Change in profile
+                </Link>
+              </p>
+            )}
+
             <DialogFooter>
-              <Button type="submit">Create</Button>
+              <Button type="submit" disabled={creating}>
+                {creating ? "Creating…" : "Create"}
+              </Button>
             </DialogFooter>
           </form>
         </DialogContent>

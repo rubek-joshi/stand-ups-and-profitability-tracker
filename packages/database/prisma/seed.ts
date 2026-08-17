@@ -69,6 +69,7 @@ async function seed(): Promise<void> {
     ["admin", "categories", "*"],
     ["admin", "projects", "*"],
     ["admin", "employees", "*"],
+    ["admin", "employee-groups", "*"],
     ["admin", "core-members", "*"],
     ["admin", "standups", "*"],
     ["admin", "amc", "read"],
@@ -83,6 +84,7 @@ async function seed(): Promise<void> {
     ["manager", "standups", "*"],
     ["manager", "dashboard", "read"],
     ["manager", "employees", "read"],
+    ["manager", "employee-groups", "read"],
     ["manager", "core-members", "read"],
     ["manager", "clients", "read"],
   ];

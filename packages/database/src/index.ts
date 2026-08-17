@@ -12,6 +12,8 @@ export type {
   CoreMemberAssignment,
   ProjectExtension,
   Employee,
+  EmployeeGroup,
+  EmployeeGroupMember,
   EmployeeSalaryEntry,
   CoreMember,
   CoreMemberSalaryEntry,
@@ -35,5 +37,6 @@ export {
   AmcStatus,
   AmcType,
   AmcRenewalDecision,
+  StandupScopePreference,
   AuditAction,
 } from "./generated/prisma/client";

@@ -58,12 +58,33 @@ export class StandupsService {
       );
     }
 
-    const employees = await this.findActiveEmployeesForDate(date);
+    const employees = await this.findActiveEmployeesForDate(
+      date,
+      dto.employeeGroupId,
+    );
+    if (dto.employeeGroupId) {
+      const group = await this.prismaService.employeeGroup.findUnique({
+        where: { id: dto.employeeGroupId },
+      });
+      if (!group) {
+        throw new NotFoundException(
+          `Employee group ${dto.employeeGroupId} not found`,
+        );
+      }
+    }
+    if (employees.length === 0) {
+      throw new BadRequestException(
+        dto.employeeGroupId
+          ? "No active employees in this group for the selected date"
+          : "No active employees available for the selected date",
+      );
+    }
     const standup = await this.prismaService.standup.create({
       data: {
         date,
         status: StandupStatus.draft,
         createdById: actorId,
+        employeeGroupId: dto.employeeGroupId ?? null,
         entries: {
           create: employees.map((employee) => ({
             employeeId: employee.id,
@@ -73,6 +94,7 @@ export class StandupsService {
       },
       include: {
         entries: { include: { employee: true, allocations: true } },
+        employeeGroup: { select: { id: true, name: true } },
       },
     });
     await this.auditService.write({
@@ -80,7 +102,11 @@ export class StandupsService {
       action: AuditAction.STANDUP_CREATED,
       targetType: "Standup",
       targetId: standup.id,
-      metadata: { date: dto.date, entryCount: employees.length },
+      metadata: {
+        date: dto.date,
+        entryCount: employees.length,
+        employeeGroupId: dto.employeeGroupId ?? null,
+      },
     });
     return standup;
   }
@@ -319,6 +345,7 @@ export class StandupsService {
       where: { id },
       include: {
         createdBy: { select: { id: true, name: true, email: true } },
+        employeeGroup: { select: { id: true, name: true } },
         entries: {
           include: {
             employee: true,
@@ -334,11 +361,17 @@ export class StandupsService {
     return standup;
   }
 
-  private async findActiveEmployeesForDate(date: Date) {
+  private async findActiveEmployeesForDate(
+    date: Date,
+    employeeGroupId?: string | null,
+  ) {
     return this.prismaService.employee.findMany({
       where: {
         status: PersonStatus.active,
         dateJoined: { lte: date },
+        ...(employeeGroupId
+          ? { groupMemberships: { some: { groupId: employeeGroupId } } }
+          : {}),
       },
       select: { id: true },
       orderBy: { name: "asc" },
@@ -349,7 +382,10 @@ export class StandupsService {
   private async syncMissingParticipants(
     standup: Awaited<ReturnType<StandupsService["loadStandupOrThrow"]>>,
   ) {
-    const active = await this.findActiveEmployeesForDate(standup.date);
+    const active = await this.findActiveEmployeesForDate(
+      standup.date,
+      standup.employeeGroupId,
+    );
     const existingIds = new Set(standup.entries.map((entry) => entry.employeeId));
     const missing = active.filter((employee) => !existingIds.has(employee.id));
     if (missing.length === 0) {

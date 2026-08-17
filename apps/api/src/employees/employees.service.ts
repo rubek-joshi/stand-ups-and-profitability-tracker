@@ -130,6 +130,12 @@ export class EmployeesService {
           },
           orderBy: { standup: { date: "desc" } },
         },
+        groupMemberships: {
+          include: {
+            group: { select: { id: true, name: true } },
+          },
+          orderBy: { group: { name: "asc" } },
+        },
       },
     });
     if (!employee) {
@@ -156,6 +162,7 @@ export class EmployeesService {
       assignments: employee.assignments,
       attendanceRecords: employee.attendanceRecords,
       standupEntries: employee.standupEntries,
+      groups: employee.groupMemberships.map((m) => m.group),
       attendanceSummary,
     };
   }

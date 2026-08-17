@@ -19,6 +19,14 @@ export class CreateStandupDto {
   @ApiProperty({ example: "2026-08-13" })
   @IsDateString()
   date!: string;
+
+  @ApiPropertyOptional({
+    description: "Limit participants to this employee group; omit for everyone",
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  employeeGroupId?: string;
 }
 
 export class AllocationDto {

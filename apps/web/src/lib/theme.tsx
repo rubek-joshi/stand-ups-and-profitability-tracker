@@ -27,7 +27,7 @@ export function resolveIsDark(stored: ThemeChoice | null): boolean {
 type ThemeContextValue = {
   theme: ThemeChoice | "system"
   isDark: boolean
-  setTheme: (theme: ThemeChoice) => void
+  setTheme: (theme: ThemeChoice | "system") => void
   toggleTheme: () => void
 }
 
@@ -49,7 +49,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mql.removeEventListener("change", onChange)
   }, [stored])
 
-  const setTheme = React.useCallback((theme: ThemeChoice) => {
+  const setTheme = React.useCallback((theme: ThemeChoice | "system") => {
+    if (theme === "system") {
+      localStorage.removeItem(THEME_KEY)
+      setStored(null)
+      setIsDark(getSystemDark())
+      return
+    }
     localStorage.setItem(THEME_KEY, theme)
     setStored(theme)
     setIsDark(theme === "dark")

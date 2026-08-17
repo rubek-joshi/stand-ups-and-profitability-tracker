@@ -285,6 +285,15 @@ function EmployeeDetailPage() {
         actions={
           <>
             <StatusBadge status={employee.status} />
+            {(employee.groups ?? []).map((g) => (
+              <Link
+                key={g.id}
+                to="/employee-groups/$id"
+                params={{ id: g.id }}
+              >
+                <Badge variant="secondary">{g.name}</Badge>
+              </Link>
+            ))}
             <Link
               to="/employees/$id/edit"
               params={{ id }}

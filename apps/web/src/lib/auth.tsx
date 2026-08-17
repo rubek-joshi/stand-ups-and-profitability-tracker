@@ -9,6 +9,9 @@ export type AuthUser = {
   mustChangePassword?: boolean
   lastLoginAt?: string | null
   role?: string | null
+  standupScopePreference?: "ask" | "everyone" | "group"
+  standupPreferredGroupId?: string | null
+  standupPreferredGroup?: { id: string; name: string } | null
   createdAt?: string
   updatedAt?: string
 }
