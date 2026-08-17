@@ -71,7 +71,8 @@ async function seed(): Promise<void> {
     ["admin", "employees", "*"],
     ["admin", "core-members", "*"],
     ["admin", "standups", "*"],
-    ["admin", "amc", "*"],
+    ["admin", "amc", "read"],
+    ["admin", "amc", "write"],
     ["admin", "vat", "*"],
     ["admin", "users", "*"],
     ["admin", "dashboard", "read"],
@@ -89,6 +90,11 @@ async function seed(): Promise<void> {
   for (const [role, obj, act] of policies) {
     await upsertPolicy("p", role, obj, act);
   }
+
+  // Narrow AMC writes: admins keep write/read, hard-delete is super_admin-only via Casbin *.
+  await prisma.casbinRule.deleteMany({
+    where: { ptype: "p", v0: "admin", v1: "amc", v2: "*" },
+  });
 
   const subject = `user:${user.id}`;
   const membership = await prisma.casbinRule.findFirst({

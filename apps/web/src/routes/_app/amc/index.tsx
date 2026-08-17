@@ -8,6 +8,14 @@ import {
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent } from "@workspace/ui/components/card"
+import { Input } from "@workspace/ui/components/input"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 import {
   Tabs,
   TabsContent,
@@ -17,14 +25,23 @@ import {
 import { AmcCard } from "@/components/amc/amc-card"
 import { CreateAmcDialog } from "@/components/amc/create-amc-dialog"
 import { DeclineAmcDialog } from "@/components/amc/decline-amc-dialog"
+import { EditAmcDialog } from "@/components/amc/edit-amc-dialog"
+import { useConfirmDialog } from "@/components/confirm-dialog"
 import { PageHeader } from "@/components/page-header"
 import { ErrorState, LoadingState, EmptyState } from "@/components/ui-states"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { amcDisplayStatus } from "@/lib/amc"
+import { useAuth } from "@/lib/auth"
+import { buildListQuery, parseOptionalString } from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
-import type { AmcRecord } from "@/lib/types"
+import type { AmcRecord, Client } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/amc/")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    clientId: parseOptionalString(search.clientId),
+    from: parseOptionalString(search.from),
+    to: parseOptionalString(search.to),
+  }),
   component: AmcPage,
 })
 
@@ -54,29 +71,66 @@ function StatCard({
 }
 
 function AmcPage() {
+  const navigate = Route.useNavigate()
+  const { clientId, from, to } = Route.useSearch()
+  const { user } = useAuth()
+  const { confirm, dialog } = useConfirmDialog()
+  const canDelete = user?.role === "super_admin"
+
   const [amcs, setAmcs] = React.useState<AmcRecord[]>([])
+  const [clients, setClients] = React.useState<Client[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [createOpen, setCreateOpen] = React.useState(false)
   const [presetProjectId, setPresetProjectId] = React.useState<string | undefined>()
   const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
+  const [editAmc, setEditAmc] = React.useState<AmcRecord | null>(null)
 
   const load = React.useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await api<PaginatedEnvelope<AmcRecord[]>>("/amc")
+      const qs = buildListQuery({
+        clientId,
+        from,
+        to,
+      })
+      const res = await api<PaginatedEnvelope<AmcRecord[]>>(
+        qs ? `/amc?${qs}` : "/amc",
+      )
       setAmcs(res.data)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load AMCs")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [clientId, from, to])
 
   React.useEffect(() => {
     void load()
   }, [load])
+
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await api<PaginatedEnvelope<Client[]>>("/clients")
+        if (!cancelled) setClients(res.data)
+      } catch {
+        // Client filter stays empty if load fails
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const clientItems = React.useMemo(
+    () => Object.fromEntries(clients.map((c) => [c.id, c.name])),
+    [clients],
+  )
+
+  const hasFilters = Boolean(clientId || from || to)
 
   const groups = React.useMemo(() => {
     const withStatus = amcs.map((a) => ({ amc: a, status: amcDisplayStatus(a) }))
@@ -133,6 +187,23 @@ function AmcPage() {
     }
   }
 
+  const handleDelete = async (amc: AmcRecord) => {
+    const ok = await confirm({
+      title: "Delete AMC permanently?",
+      description:
+        "This cannot be undone. Prefer decline/cancel when the contract simply ended.",
+      confirmLabel: "Delete",
+      destructive: true,
+    })
+    if (!ok) return
+    try {
+      await api(`/amc/${amc.id}`, { method: "DELETE" })
+      await load()
+    } catch (e) {
+      alert(e instanceof ApiError ? e.message : "Failed to delete AMC")
+    }
+  }
+
   const list = (items: { amc: AmcRecord }[], empty: string) =>
     items.length ? (
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -142,6 +213,9 @@ function AmcPage() {
             amc={amc}
             onRenew={(a) => void handleRenew(a)}
             onDecline={(a) => void handleDecline(a)}
+            onEdit={setEditAmc}
+            onDelete={(a) => void handleDelete(a)}
+            canDelete={canDelete}
           />
         ))}
       </div>
@@ -167,6 +241,79 @@ function AmcPage() {
           </Button>
         }
       />
+
+      <div className="mb-6 flex flex-wrap items-end gap-3">
+        <div className="grid gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">Client</span>
+          <Select
+            value={clientId || null}
+            onValueChange={(v) => {
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  clientId: v || undefined,
+                }),
+              })
+            }}
+            items={clientItems}
+          >
+            <SelectTrigger className="w-52">
+              <SelectValue placeholder="All clients" />
+            </SelectTrigger>
+            <SelectContent>
+              {clients.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="grid gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">From</span>
+          <Input
+            type="date"
+            className="w-40"
+            value={from ?? ""}
+            onChange={(e) => {
+              const next = e.target.value || undefined
+              void navigate({
+                search: (prev) => ({ ...prev, from: next }),
+              })
+            }}
+          />
+        </div>
+        <div className="grid gap-1.5">
+          <span className="text-xs font-medium text-muted-foreground">To</span>
+          <Input
+            type="date"
+            className="w-40"
+            value={to ?? ""}
+            onChange={(e) => {
+              const next = e.target.value || undefined
+              void navigate({
+                search: (prev) => ({ ...prev, to: next }),
+              })
+            }}
+          />
+        </div>
+        {hasFilters ? (
+          <Button
+            variant="outline"
+            onClick={() => {
+              void navigate({
+                search: {
+                  clientId: undefined,
+                  from: undefined,
+                  to: undefined,
+                },
+              })
+            }}
+          >
+            Clear filters
+          </Button>
+        ) : null}
+      </div>
 
       {loading ? <LoadingState /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}
@@ -201,7 +348,13 @@ function AmcPage() {
           </section>
 
           {amcs.length === 0 ? (
-            <EmptyState message="No AMCs yet — create one for a closed project." />
+            <EmptyState
+              message={
+                hasFilters
+                  ? "No AMCs match these filters."
+                  : "No AMCs yet — create one for a closed project."
+              }
+            />
           ) : (
             <Tabs defaultValue="ongoing">
               <TabsList>
@@ -243,6 +396,14 @@ function AmcPage() {
         presetProjectId={presetProjectId}
         onCreated={() => void load()}
       />
+      <EditAmcDialog
+        amc={editAmc}
+        open={Boolean(editAmc)}
+        onOpenChange={(open) => {
+          if (!open) setEditAmc(null)
+        }}
+        onUpdated={() => void load()}
+      />
       <DeclineAmcDialog
         amc={declineAmc}
         open={Boolean(declineAmc)}
@@ -251,6 +412,7 @@ function AmcPage() {
         }}
         onConfirm={submitDecline}
       />
+      {dialog}
     </div>
   )
 }

@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  Delete,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -12,6 +14,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "../_shared/decorators/current-user.decorator";
 import { AuthUser } from "../auth/types/auth-user.type";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { CasbinService } from "../casbin/casbin.service";
 import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
 import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import { AmcService } from "./amc.service";
@@ -28,7 +31,10 @@ import {
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 @Controller("amc")
 export class AmcController {
-  constructor(private readonly amcService: AmcService) {}
+  constructor(
+    private readonly amcService: AmcService,
+    private readonly casbinService: CasbinService,
+  ) {}
 
   @Get()
   @RequirePermission("amc", "read")
@@ -36,21 +42,32 @@ export class AmcController {
   async findAll(
     @Query("q") q?: string,
     @Query("status") status?: string,
+    @Query("clientId") clientId?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
   ) {
-    return this.amcService.findAll({ q, status, page, pageSize });
+    return this.amcService.findAll({
+      q,
+      status,
+      clientId,
+      from,
+      to,
+      page,
+      pageSize,
+    });
   }
 
   @Post()
-  @RequirePermission("amc", "*")
+  @RequirePermission("amc", "write")
   @ApiOperation({ summary: "Create AMC on a project" })
   async create(@Body() dto: CreateAmcDto, @CurrentUser() user: AuthUser) {
     return this.amcService.create(dto, user.id);
   }
 
   @Post("projects/:projectId")
-  @RequirePermission("amc", "*")
+  @RequirePermission("amc", "write")
   @ApiOperation({ summary: "Set AMC on a closed project" })
   async setOnProject(
     @Param("projectId") projectId: string,
@@ -75,7 +92,7 @@ export class AmcController {
   }
 
   @Patch("projects/:projectId")
-  @RequirePermission("amc", "*")
+  @RequirePermission("amc", "write")
   @ApiOperation({ summary: "Update running AMC for a project" })
   async updateByProject(
     @Param("projectId") projectId: string,
@@ -86,7 +103,7 @@ export class AmcController {
   }
 
   @Post("projects/:projectId/cancel")
-  @RequirePermission("amc", "*")
+  @RequirePermission("amc", "write")
   @ApiOperation({ summary: "Cancel running AMC for a project" })
   async cancelByProject(
     @Param("projectId") projectId: string,
@@ -104,7 +121,7 @@ export class AmcController {
   }
 
   @Patch(":id")
-  @RequirePermission("amc", "*")
+  @RequirePermission("amc", "write")
   @ApiOperation({ summary: "Update AMC" })
   async update(
     @Param("id") id: string,
@@ -114,8 +131,19 @@ export class AmcController {
     return this.amcService.update(id, dto, user.id);
   }
 
+  @Delete(":id")
+  @RequirePermission("amc", "delete")
+  @ApiOperation({ summary: "Permanently delete AMC (super admin only)" })
+  async remove(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    const role = await this.casbinService.getPrimaryRoleForUser(user.id);
+    if (role !== "super_admin") {
+      throw new ForbiddenException("Only super admins can delete AMC records");
+    }
+    return this.amcService.remove(id, user.id);
+  }
+
   @Post(":id/cancel")
-  @RequirePermission("amc", "*")
+  @RequirePermission("amc", "write")
   @ApiOperation({ summary: "Cancel AMC" })
   async cancel(
     @Param("id") id: string,
@@ -126,7 +154,7 @@ export class AmcController {
   }
 
   @Post(":id/renewal-decision")
-  @RequirePermission("amc", "*")
+  @RequirePermission("amc", "write")
   @ApiOperation({ summary: "Mark AMC renewal as renewed or declined" })
   async renewalDecision(
     @Param("id") id: string,

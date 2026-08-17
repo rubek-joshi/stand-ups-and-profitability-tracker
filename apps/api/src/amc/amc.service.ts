@@ -43,17 +43,36 @@ export class AmcService {
   async findAll(filters: {
     q?: string;
     status?: string;
+    clientId?: string;
+    from?: string;
+    to?: string;
     page?: string;
     pageSize?: string;
   } = {}) {
     const q = filters.q?.trim();
+    const clientId = filters.clientId?.trim();
     const pagination = resolvePagination({
       page: filters.page,
       pageSize: filters.pageSize,
     });
+
+    const from = filters.from ? parseIsoDate(filters.from) : undefined;
+    const to = filters.to ? parseIsoDate(filters.to) : undefined;
+    if (from && to && to.getTime() < from.getTime()) {
+      throw new BadRequestException("`to` must be on or after `from`");
+    }
+
     const where = {
-      ...(filters.status
-        ? { status: filters.status as AmcStatus }
+      ...(filters.status ? { status: filters.status as AmcStatus } : {}),
+      ...(clientId ? { project: { clientId } } : {}),
+      ...(from || to
+        ? {
+            // Overlap: AMC window intersects [from, to]
+            AND: [
+              ...(to ? [{ startDate: { lte: to } }] : []),
+              ...(from ? [{ endDate: { gte: from } }] : []),
+            ],
+          }
         : {}),
       ...(q
         ? {
@@ -225,11 +244,33 @@ export class AmcService {
       throw new BadRequestException("Cannot update a cancelled AMC");
     }
 
-    let status = dto.status;
+    const startDate = dto.startDate
+      ? parseIsoDate(dto.startDate)
+      : before.startDate;
     const endDate = dto.endDate ? parseIsoDate(dto.endDate) : before.endDate;
-    if (!status && dto.endDate) {
-      const settings = await this.prismaService.orgSettings.findFirst();
-      status = this.deriveStatus(endDate, settings?.amcReminderLeadDays ?? 7);
+    if (endDate.getTime() < startDate.getTime()) {
+      throw new BadRequestException("endDate must be on or after startDate");
+    }
+
+    const nextType = dto.type ?? before.type;
+    if (nextType === AmcType.paid) {
+      const amount =
+        dto.amcAmountNpr === undefined
+          ? before.amcAmountPaisa
+          : nprToPaisa(dto.amcAmountNpr);
+      if (amount === null || amount === undefined) {
+        throw new BadRequestException("Paid AMC requires an amount");
+      }
+    }
+
+    let status = dto.status;
+    if (!status && (dto.endDate || dto.type)) {
+      if (nextType === AmcType.paid) {
+        status = AmcStatus.paid_pending;
+      } else {
+        const settings = await this.prismaService.orgSettings.findFirst();
+        status = this.deriveStatus(endDate, settings?.amcReminderLeadDays ?? 7);
+      }
     }
 
     const record = await this.prismaService.amcRecord.update({
@@ -237,13 +278,15 @@ export class AmcService {
       data: {
         status,
         type: dto.type,
-        startDate: dto.startDate ? parseIsoDate(dto.startDate) : undefined,
-        endDate: dto.endDate ? parseIsoDate(dto.endDate) : undefined,
+        startDate: dto.startDate ? startDate : undefined,
+        endDate: dto.endDate ? endDate : undefined,
         notes: dto.notes === undefined ? undefined : dto.notes.trim() || null,
         amcAmountPaisa:
-          dto.amcAmountNpr === undefined
-            ? undefined
-            : nprToPaisa(dto.amcAmountNpr),
+          dto.amcAmountNpr !== undefined
+            ? nprToPaisa(dto.amcAmountNpr)
+            : dto.type === AmcType.complimentary
+              ? null
+              : undefined,
         isVatApplicable: dto.isVatApplicable,
         renewalDecision: dto.renewalDecision,
       },
@@ -326,6 +369,35 @@ export class AmcService {
       throw new NotFoundException(`Running AMC for project ${projectId} not found`);
     }
     return this.cancel(running.id, dto, actorId);
+  }
+
+  async remove(id: string, actorId: string) {
+    const before = await this.getByIdOrThrow(id);
+    await this.prismaService.$transaction(async (tx) => {
+      await tx.amcRecord.delete({ where: { id } });
+      const stillRunning = await tx.amcRecord.findFirst({
+        where: this.runningWhere(before.projectId),
+      });
+      if (!stillRunning) {
+        const project = await tx.project.findUnique({
+          where: { id: before.projectId },
+        });
+        if (project?.status === ProjectStatus.under_amc) {
+          await tx.project.update({
+            where: { id: before.projectId },
+            data: { status: ProjectStatus.closed },
+          });
+        }
+      }
+    });
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.AMC_DELETED,
+      targetType: "AmcRecord",
+      targetId: id,
+      metadata: { before: this.serialize(before) },
+    });
+    return { id };
   }
 
   async setRenewalDecision(

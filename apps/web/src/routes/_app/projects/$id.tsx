@@ -27,6 +27,7 @@ import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import { AmcCard } from "@/components/amc/amc-card"
 import { CreateAmcDialog } from "@/components/amc/create-amc-dialog"
 import { DeclineAmcDialog } from "@/components/amc/decline-amc-dialog"
+import { EditAmcDialog } from "@/components/amc/edit-amc-dialog"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { CoreMemberLink, EmployeeLink } from "@/components/resource-link"
@@ -36,6 +37,7 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 import { formatNpr, parseNprInput } from "@/lib/money"
 import type {
   AmcRecord,
@@ -52,7 +54,9 @@ export const Route = createFileRoute("/_app/projects/$id")({
 
 function ProjectDetailPage() {
   const { id } = Route.useParams()
+  const { user } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
+  const canDeleteAmc = user?.role === "super_admin"
   const [project, setProject] = React.useState<Project | null>(null)
   const [assignments, setAssignments] = React.useState<{
     employees: ProjectAssignment[]
@@ -71,6 +75,7 @@ function ProjectDetailPage() {
   const [coreMemberId, setCoreMemberId] = React.useState("")
   const [amcCreateOpen, setAmcCreateOpen] = React.useState(false)
   const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
+  const [editAmc, setEditAmc] = React.useState<AmcRecord | null>(null)
   const initialLoad = React.useRef(true)
 
   const load = React.useCallback(async () => {
@@ -519,6 +524,30 @@ function ProjectDetailPage() {
                       clientName: project.client?.name,
                     })
                   }}
+                  onEdit={(record) => {
+                    setEditAmc({
+                      ...record,
+                      projectName: project.name,
+                      clientName: project.client?.name,
+                    })
+                  }}
+                  canDelete={canDeleteAmc}
+                  onDelete={async (record) => {
+                    const ok = await confirm({
+                      title: "Delete AMC permanently?",
+                      description:
+                        "This cannot be undone. Prefer decline/cancel when the contract simply ended.",
+                      confirmLabel: "Delete",
+                      destructive: true,
+                    })
+                    if (!ok) return
+                    try {
+                      await api(`/amc/${record.id}`, { method: "DELETE" })
+                      await load()
+                    } catch (e) {
+                      alert(e instanceof ApiError ? e.message : "Failed to delete AMC")
+                    }
+                  }}
                 />
               ))}
             </div>
@@ -529,6 +558,14 @@ function ProjectDetailPage() {
             presetProjectId={id}
             lockProject
             onCreated={() => void load()}
+          />
+          <EditAmcDialog
+            amc={editAmc}
+            open={Boolean(editAmc)}
+            onOpenChange={(open) => {
+              if (!open) setEditAmc(null)
+            }}
+            onUpdated={() => void load()}
           />
           <DeclineAmcDialog
             amc={declineAmc}
