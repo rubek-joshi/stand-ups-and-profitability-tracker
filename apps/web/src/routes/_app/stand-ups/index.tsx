@@ -27,9 +27,16 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
 import { StatusBadge } from "@/components/health-badge"
+import { StandupCalendar, utcIsoDate } from "@/components/standup/standup-calendar"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
   TableActionLink,
@@ -46,6 +53,7 @@ export const Route = createFileRoute("/_app/stand-ups/")({
   validateSearch: (search: Record<string, unknown>) => ({
     page: parsePage(search.page),
     pageSize: parsePageSize(search.pageSize),
+    view: search.view === "calendar" ? ("calendar" as const) : ("list" as const),
   }),
   component: StandupsPage,
 })
@@ -59,14 +67,9 @@ function formatStandupDate(value: string) {
   }
 }
 
-/** UTC calendar date as YYYY-MM-DD (matches API date parsing). */
-function utcIsoDate(date = new Date()) {
-  return date.toISOString().slice(0, 10)
-}
-
 function StandupsPage() {
   const navigate = Route.useNavigate()
-  const { page, pageSize } = Route.useSearch()
+  const { page, pageSize, view } = Route.useSearch()
   const { user, refreshUser } = useAuth()
   const [items, setItems] = React.useState<Standup[]>([])
   const [total, setTotal] = React.useState(0)
@@ -79,6 +82,7 @@ function StandupsPage() {
   const [groupId, setGroupId] = React.useState("")
   const [remember, setRemember] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
+  const [calendarRefreshKey, setCalendarRefreshKey] = React.useState(0)
 
   const preference = user?.standupScopePreference ?? "ask"
   const askEveryTime = preference === "ask"
@@ -99,11 +103,11 @@ function StandupsPage() {
   }, [page, pageSize])
 
   React.useEffect(() => {
-    void load()
-  }, [load])
+    if (view === "list") void load()
+  }, [load, view])
 
-  const openCreate = async () => {
-    setDate(utcIsoDate())
+  const openCreate = async (initialDate?: string) => {
+    setDate(initialDate ?? utcIsoDate())
     setRemember(false)
     if (preference === "group" && user?.standupPreferredGroupId) {
       setScope("group")
@@ -130,6 +134,17 @@ function StandupsPage() {
   const totalPages = totalPagesFor(total, pageSize)
   const groupItems = Object.fromEntries(groups.map((g) => [g.id, g.name]))
 
+  const afterCreate = async () => {
+    setOpen(false)
+    setCalendarRefreshKey((k) => k + 1)
+    if (view === "list") {
+      void navigate({
+        search: (prev) => ({ ...prev, page: 1 }),
+      })
+      await load()
+    }
+  }
+
   return (
     <div>
       <PageHeader
@@ -137,71 +152,101 @@ function StandupsPage() {
         description="Daily allocations and attendance"
         actions={<Button onClick={() => void openCreate()}>New stand-up</Button>}
       />
-      {loading ? <LoadingState /> : null}
-      {error ? <ErrorState message={error} onRetry={load} /> : null}
-      {!loading && items.length === 0 ? <EmptyState message="No stand-ups yet" /> : null}
-      {items.length > 0 ? (
-        <div className="space-y-4">
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Entries</TableHead>
-                  <TableHead>Created by</TableHead>
-                  <TableActionsHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell>
-                      <Link
-                        to="/stand-ups/$id"
-                        params={{ id: s.id }}
-                        className="font-medium hover:underline"
-                      >
-                        {formatStandupDate(String(s.date))}
-                      </Link>
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={s.status} />
-                    </TableCell>
-                    <TableCell>{s._count?.entries ?? "—"}</TableCell>
-                    <TableCell>{s.createdBy?.name ?? "—"}</TableCell>
-                    <TableActionsCell>
-                      <TableActionLink
-                        label="Open"
-                        to="/stand-ups/$id"
-                        params={{ id: s.id }}
-                      >
-                        <IconEye className="size-3.5" />
-                      </TableActionLink>
-                    </TableActionsCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <PaginationBar
-            page={page}
-            totalPages={totalPages}
-            total={total}
-            pageSize={pageSize}
-            onPageChange={(nextPage) => {
-              void navigate({
-                search: (prev) => ({ ...prev, page: nextPage }),
-              })
-            }}
-            onPageSizeChange={(size) => {
-              void navigate({
-                search: (prev) => ({ ...prev, pageSize: size, page: 1 }),
-              })
-            }}
+
+      <Tabs
+        value={view}
+        onValueChange={(next) => {
+          void navigate({
+            search: (prev) => ({
+              ...prev,
+              view: next as "list" | "calendar",
+            }),
+          })
+        }}
+        className="mb-6"
+      >
+        <TabsList>
+          <TabsTrigger value="list">List</TabsTrigger>
+          <TabsTrigger value="calendar">Calendar</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="list" className="mt-4">
+          {loading ? <LoadingState /> : null}
+          {error ? <ErrorState message={error} onRetry={load} /> : null}
+          {!loading && items.length === 0 ? (
+            <EmptyState message="No stand-ups yet" />
+          ) : null}
+          {items.length > 0 ? (
+            <div className="space-y-4">
+              <div className="overflow-x-auto rounded-lg border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Entries</TableHead>
+                      <TableHead>Created by</TableHead>
+                      <TableActionsHead />
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.map((s) => (
+                      <TableRow key={s.id}>
+                        <TableCell>
+                          <Link
+                            to="/stand-ups/$id"
+                            params={{ id: s.id }}
+                            className="font-medium hover:underline"
+                          >
+                            {formatStandupDate(String(s.date))}
+                          </Link>
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={s.status} />
+                        </TableCell>
+                        <TableCell>{s._count?.entries ?? "—"}</TableCell>
+                        <TableCell>{s.createdBy?.name ?? "—"}</TableCell>
+                        <TableActionsCell>
+                          <TableActionLink
+                            label="Open"
+                            to="/stand-ups/$id"
+                            params={{ id: s.id }}
+                          >
+                            <IconEye className="size-3.5" />
+                          </TableActionLink>
+                        </TableActionsCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <PaginationBar
+                page={page}
+                totalPages={totalPages}
+                total={total}
+                pageSize={pageSize}
+                onPageChange={(nextPage) => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, page: nextPage }),
+                  })
+                }}
+                onPageSizeChange={(size) => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, pageSize: size, page: 1 }),
+                  })
+                }}
+              />
+            </div>
+          ) : null}
+        </TabsContent>
+
+        <TabsContent value="calendar" className="mt-4">
+          <StandupCalendar
+            refreshKey={calendarRefreshKey}
+            onMissingDayClick={(day) => void openCreate(day)}
           />
-        </div>
-      ) : null}
+        </TabsContent>
+      </Tabs>
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
@@ -255,11 +300,7 @@ function StandupsPage() {
                       : {}),
                   },
                 })
-                setOpen(false)
-                void navigate({
-                  search: (prev) => ({ ...prev, page: 1 }),
-                })
-                await load()
+                await afterCreate()
               } catch (err) {
                 alert(err instanceof ApiError ? err.message : "Failed")
               } finally {

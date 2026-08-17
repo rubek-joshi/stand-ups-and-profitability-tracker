@@ -17,6 +17,7 @@ import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import {
   CreateStandupDto,
   BatchUpdateStandupEntriesDto,
+  StandupCalendarQueryDto,
   UpdateStandupEntryDto,
 } from "./dto/standup.dto";
 import { StandupsService } from "./standups.service";
@@ -46,6 +47,13 @@ export class StandupsController {
     @Query("pageSize") pageSize?: string,
   ) {
     return this.standupsService.findAll({ page, pageSize });
+  }
+
+  @Get("calendar")
+  @RequirePermission("standups", "read")
+  @ApiOperation({ summary: "Stand-up dates in a range for calendar view" })
+  async findCalendar(@Query() query: StandupCalendarQueryDto) {
+    return this.standupsService.findCalendar(query.from, query.to);
   }
 
   @Get(":id")

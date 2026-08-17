@@ -207,6 +207,13 @@ export type SalaryEntry = {
 }
 
 export type StandupStatus = "draft" | "in_progress" | "completed"
+
+export type StandupCalendarDay = {
+  id: string
+  date: string
+  status: StandupStatus
+}
+
 export type AttendanceStatus =
   | "present"
   | "first_half_leave"

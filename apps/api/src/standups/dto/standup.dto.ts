@@ -80,3 +80,13 @@ export class BatchUpdateStandupEntriesDto {
   @Type(() => BatchUpdateStandupEntryItemDto)
   entries!: BatchUpdateStandupEntryItemDto[];
 }
+
+export class StandupCalendarQueryDto {
+  @ApiProperty({ example: "2026-08-01" })
+  @IsDateString()
+  from!: string;
+
+  @ApiProperty({ example: "2026-08-31" })
+  @IsDateString()
+  to!: string;
+}

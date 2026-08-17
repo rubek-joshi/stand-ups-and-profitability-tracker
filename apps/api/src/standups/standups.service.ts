@@ -132,6 +132,40 @@ export class StandupsService {
     return paginatedResult(data, total, pagination);
   }
 
+  async findCalendar(from: string, to: string) {
+    const fromDate = parseIsoDate(from);
+    const toDate = parseIsoDate(to);
+    if (fromDate.getTime() > toDate.getTime()) {
+      throw new BadRequestException("'from' must be on or before 'to'");
+    }
+    const maxDays = 366;
+    const spanDays =
+      Math.floor((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1;
+    if (spanDays > maxDays) {
+      throw new BadRequestException(
+        `Date range cannot exceed ${maxDays} days`,
+      );
+    }
+
+    const standups = await this.prismaService.standup.findMany({
+      where: {
+        date: { gte: fromDate, lte: toDate },
+      },
+      select: {
+        id: true,
+        date: true,
+        status: true,
+      },
+      orderBy: { date: "asc" },
+    });
+
+    return standups.map((standup) => ({
+      id: standup.id,
+      date: toIsoDate(standup.date),
+      status: standup.status,
+    }));
+  }
+
   async findOne(id: string) {
     const existing = await this.loadStandupOrThrow(id);
     if (existing.status !== StandupStatus.completed) {
