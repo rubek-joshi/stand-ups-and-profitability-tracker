@@ -227,12 +227,27 @@ export type VatAccumulated = {
   accruedPaisa: string
   clearedPaisa: string
   unpaidPaisa: string
+  period?: {
+    accruedPaisa: string
+    clearedPaisa: string
+    unpaidPaisa: string
+  } | null
+}
+
+export type VatAccrualEntry = {
+  id: string
+  description: string
+  amountPaisa: string
+  occurredAt: string
+  sourceType: "project" | "extension" | "amc"
+  sourceId: string
 }
 
 export type VatClearance = {
   id: string
   amountPaisa: string
   note: string | null
+  clearedAt?: string
   createdAt: string
   clearedBy?: { id: string; name: string; email: string }
 }
