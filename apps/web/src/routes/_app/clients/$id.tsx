@@ -9,6 +9,12 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@workspace/ui/components/collapsible"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
 import { PageHeader } from "@/components/page-header"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
@@ -26,6 +32,8 @@ function isClosedProject(project: Project) {
   return project.status === "closed"
 }
 
+type InvolvedPerson = { id: string; name: string }
+
 function ClientDetailPage() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
@@ -35,6 +43,12 @@ function ClientDetailPage() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [createOpen, setCreateOpen] = React.useState(false)
+  const [peopleModal, setPeopleModal] = React.useState<{
+    title: string
+    people: InvolvedPerson[]
+    emptyLabel: string
+    href: "/employees/$id" | "/core-members/$id"
+  } | null>(null)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -67,6 +81,9 @@ function ClientDetailPage() {
   const closedProjects = projects.filter(isClosedProject)
   const stats = client.stats
   const totalPl = paisaToNpr(stats?.profitLossPaisa)
+  const employees = Array.isArray(stats?.employeesInvolved)
+    ? stats.employeesInvolved
+    : []
   const coreMembers = Array.isArray(stats?.coreMembersInvolved)
     ? stats.coreMembersInvolved
     : []
@@ -144,30 +161,30 @@ function ClientDetailPage() {
         />
         <StatCard
           title="Employees involved"
-          value={String(stats?.employeesInvolved ?? 0)}
+          value={String(employees.length)}
+          interactive
+          onClick={() =>
+            setPeopleModal({
+              title: "Employees involved",
+              people: employees,
+              emptyLabel: "No employees assigned to this client's projects.",
+              href: "/employees/$id",
+            })
+          }
         />
         <StatCard
           title="Core members involved"
           value={String(coreMembers.length)}
-        >
-          {coreMembers.length > 0 ? (
-            <ul className="mt-2 space-y-1">
-              {coreMembers.map((member) => (
-                <li key={member.id} className="truncate text-sm font-medium">
-                  <Link
-                    to="/core-members/$id"
-                    params={{ id: member.id }}
-                    className="hover:underline"
-                  >
-                    {member.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="mt-2 text-sm text-muted-foreground">None assigned</p>
-          )}
-        </StatCard>
+          interactive
+          onClick={() =>
+            setPeopleModal({
+              title: "Core members involved",
+              people: coreMembers,
+              emptyLabel: "No core members assigned to this client's projects.",
+              href: "/core-members/$id",
+            })
+          }
+        />
         <StatCard
           title="Standups mentioned"
           value={String(stats?.standupsMentioned ?? 0)}
@@ -242,6 +259,38 @@ function ClientDetailPage() {
         lockClient
         onCreated={() => load()}
       />
+      <Dialog
+        open={Boolean(peopleModal)}
+        onOpenChange={(open) => {
+          if (!open) setPeopleModal(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{peopleModal?.title}</DialogTitle>
+          </DialogHeader>
+          {peopleModal ? (
+            peopleModal.people.length === 0 ? (
+              <p className="text-sm text-muted-foreground">{peopleModal.emptyLabel}</p>
+            ) : (
+              <ul className="max-h-80 space-y-1 overflow-y-auto">
+                {peopleModal.people.map((person) => (
+                  <li key={person.id}>
+                    <Link
+                      to={peopleModal.href}
+                      params={{ id: person.id }}
+                      className="block rounded-md px-2 py-2 text-sm font-medium hover:bg-muted"
+                      onClick={() => setPeopleModal(null)}
+                    >
+                      {person.name}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : null}
+        </DialogContent>
+      </Dialog>
       {dialog}
     </div>
   )
@@ -375,15 +424,32 @@ function StatCard({
   title,
   value,
   valueClassName,
-  children,
+  interactive,
+  onClick,
 }: {
   title: string
   value: string
   valueClassName?: string
-  children?: React.ReactNode
+  interactive?: boolean
+  onClick?: () => void
 }) {
   return (
-    <Card>
+    <Card
+      className={interactive ? "cursor-pointer transition-colors hover:bg-muted/40" : undefined}
+      onClick={interactive ? onClick : undefined}
+      role={interactive ? "button" : undefined}
+      tabIndex={interactive ? 0 : undefined}
+      onKeyDown={
+        interactive
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault()
+                onClick?.()
+              }
+            }
+          : undefined
+      }
+    >
       <CardHeader className="pb-2">
         <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
       </CardHeader>
@@ -391,7 +457,9 @@ function StatCard({
         <p className={`text-xl font-semibold tabular-nums ${valueClassName ?? ""}`}>
           {value}
         </p>
-        {children}
+        {interactive ? (
+          <p className="mt-1 text-xs text-muted-foreground">Click to view</p>
+        ) : null}
       </CardContent>
     </Card>
   )

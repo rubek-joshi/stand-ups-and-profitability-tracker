@@ -156,34 +156,43 @@ export class ClientsService {
     if (projectIds.length === 0) {
       return {
         profitLossPaisa: "0",
-        employeesInvolved: 0,
+        employeesInvolved: [] as Array<{ id: string; name: string }>,
         coreMembersInvolved: [] as Array<{ id: string; name: string }>,
         standupsMentioned: 0,
       };
     }
 
-    const [employees, coreMemberAssignments, allocations] = await Promise.all([
-      this.prismaService.projectAssignment.findMany({
-        where: { projectId: { in: projectIds } },
-        distinct: ["employeeId"],
-        select: { employeeId: true },
-      }),
-      this.prismaService.coreMemberAssignment.findMany({
-        where: { projectId: { in: projectIds } },
-        select: {
-          coreMemberId: true,
-          coreMember: { select: { id: true, name: true } },
-        },
-      }),
-      this.prismaService.projectAllocation.findMany({
-        where: { projectId: { in: projectIds } },
-        select: { standupEntry: { select: { standupId: true } } },
-      }),
-    ]);
+    const [employeeAssignments, coreMemberAssignments, allocations] =
+      await Promise.all([
+        this.prismaService.projectAssignment.findMany({
+          where: { projectId: { in: projectIds } },
+          distinct: ["employeeId"],
+          select: {
+            employeeId: true,
+            employee: { select: { id: true, name: true } },
+          },
+        }),
+        this.prismaService.coreMemberAssignment.findMany({
+          where: { projectId: { in: projectIds } },
+          select: {
+            coreMemberId: true,
+            coreMember: { select: { id: true, name: true } },
+          },
+        }),
+        this.prismaService.projectAllocation.findMany({
+          where: { projectId: { in: projectIds } },
+          select: { standupEntry: { select: { standupId: true } } },
+        }),
+      ]);
 
     const standupIds = new Set(
       allocations.map((row) => row.standupEntry.standupId),
     );
+
+    const employeesById = new Map<string, { id: string; name: string }>();
+    for (const row of employeeAssignments) {
+      employeesById.set(row.employee.id, row.employee);
+    }
 
     const coreMembersById = new Map<string, { id: string; name: string }>();
     for (const row of coreMemberAssignments) {
@@ -192,7 +201,9 @@ export class ClientsService {
 
     return {
       profitLossPaisa: String(totalProfitLossPaisa),
-      employeesInvolved: employees.length,
+      employeesInvolved: [...employeesById.values()].sort((a, b) =>
+        a.name.localeCompare(b.name),
+      ),
       coreMembersInvolved: [...coreMembersById.values()].sort((a, b) =>
         a.name.localeCompare(b.name),
       ),

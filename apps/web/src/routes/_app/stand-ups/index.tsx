@@ -55,13 +55,6 @@ function utcIsoDate(date = new Date()) {
   return date.toISOString().slice(0, 10)
 }
 
-/** Yesterday UTC (stand-ups cannot be today or future). */
-function maxStandupDate() {
-  const d = new Date(`${utcIsoDate()}T00:00:00.000Z`)
-  d.setUTCDate(d.getUTCDate() - 1)
-  return d.toISOString().slice(0, 10)
-}
-
 function StandupsPage() {
   const navigate = Route.useNavigate()
   const { page, pageSize } = Route.useSearch()
@@ -70,7 +63,7 @@ function StandupsPage() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [open, setOpen] = React.useState(false)
-  const [date, setDate] = React.useState(maxStandupDate)
+  const [date, setDate] = React.useState(() => utcIsoDate())
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -91,7 +84,7 @@ function StandupsPage() {
     void load()
   }, [load])
 
-  const maxDate = maxStandupDate()
+  const maxDate = utcIsoDate()
   const totalPages = totalPagesFor(total, pageSize)
 
   return (
@@ -102,7 +95,7 @@ function StandupsPage() {
         actions={
           <Button
             onClick={() => {
-              setDate(maxStandupDate())
+              setDate(utcIsoDate())
               setOpen(true)
             }}
           >
@@ -185,8 +178,8 @@ function StandupsPage() {
             className="space-y-3"
             onSubmit={async (e) => {
               e.preventDefault()
-              if (date >= utcIsoDate()) {
-                alert("Stand-ups can only be created for past dates.")
+              if (date > utcIsoDate()) {
+                alert("Stand-ups cannot be created for a future date.")
                 return
               }
               try {
@@ -211,7 +204,7 @@ function StandupsPage() {
                 onChange={(e) => setDate(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Past dates only — not today or future. One stand-up per day.
+                Today or a past date. One stand-up per day.
               </p>
             </div>
             <DialogFooter>

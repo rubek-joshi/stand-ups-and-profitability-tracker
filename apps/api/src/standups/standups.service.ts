@@ -45,11 +45,6 @@ export class StandupsService {
         "Cannot create a stand-up for a future date",
       );
     }
-    if (date.getTime() === today.getTime()) {
-      throw new BadRequestException(
-        "Cannot create a stand-up for today; use a past date",
-      );
-    }
 
     const existing = await this.prismaService.standup.findFirst({
       where: { date },

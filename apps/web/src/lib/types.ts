@@ -1,6 +1,6 @@
 export type ClientStats = {
   profitLossPaisa: string
-  employeesInvolved: number
+  employeesInvolved: Array<{ id: string; name: string }>
   coreMembersInvolved: Array<{ id: string; name: string }>
   standupsMentioned: number
 }
