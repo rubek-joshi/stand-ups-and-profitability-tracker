@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/componen
 import { PageHeader } from "@/components/page-header"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import type { Client } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/clients/$id_/edit")({
@@ -52,6 +53,11 @@ function ClientEditPage() {
       <PageHeader
         title={`Edit ${client.name}`}
         description="Update client details"
+        breadcrumbs={[
+          { label: "Clients", to: "/clients", search: DEFAULT_LIST_SEARCH },
+          { label: client.name, to: "/clients/$id", params: { id } },
+          { label: "Edit" },
+        ]}
         actions={
           <Link
             to="/clients/$id"

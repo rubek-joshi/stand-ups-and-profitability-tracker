@@ -43,6 +43,8 @@ export function parseListSearch(search: Record<string, unknown>): ListSearch {
   }
 }
 
+export const DEFAULT_LIST_SEARCH: ListSearch = { page: 1, pageSize: 25 }
+
 export function clampPage(page: number, totalPages: number) {
   return Math.min(Math.max(1, page), Math.max(1, totalPages))
 }

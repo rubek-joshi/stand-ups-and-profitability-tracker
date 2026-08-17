@@ -95,6 +95,10 @@ export class EmployeesService {
         orderBy: { name: "asc" },
         include: {
           salaryEntries: { orderBy: { effectiveDate: "desc" }, take: 1 },
+          groupMemberships: {
+            include: { group: { select: { id: true, name: true } } },
+            orderBy: { group: { name: "asc" } },
+          },
         },
         ...(pagination
           ? { skip: pagination.skip, take: pagination.take }
@@ -103,7 +107,13 @@ export class EmployeesService {
       this.prismaService.employee.count({ where }),
     ]);
     return paginatedResult(
-      employees.map((employee) => this.serializeEmployee(employee)),
+      employees.map((employee) => {
+        const serialized = this.serializeEmployee(employee);
+        return {
+          ...serialized,
+          groups: employee.groupMemberships.map((m) => m.group),
+        };
+      }),
       total,
       pagination,
     );

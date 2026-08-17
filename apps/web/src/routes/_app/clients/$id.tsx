@@ -21,6 +21,7 @@ import { CreateProjectDialog } from "@/components/create-project-dialog"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import { formatNpr, paisaToNpr } from "@/lib/money"
 import type { Client, OrgSettings, Project } from "@/lib/types"
 
@@ -93,6 +94,10 @@ function ClientDetailPage() {
       <PageHeader
         title={client.name}
         description="Client detail"
+        breadcrumbs={[
+          { label: "Clients", to: "/clients", search: DEFAULT_LIST_SEARCH },
+          { label: client.name },
+        ]}
         actions={
           <>
             <StatusBadge status={client.status} />

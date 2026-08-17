@@ -31,6 +31,7 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import type { Employee, EmployeeGroup } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/employee-groups/$id")({
@@ -85,6 +86,10 @@ function EmployeeGroupDetailPage() {
       <PageHeader
         title={group.name}
         description="Manage group details and members"
+        breadcrumbs={[
+          { label: "Groups", to: "/employee-groups", search: DEFAULT_LIST_SEARCH },
+          { label: group.name },
+        ]}
         actions={
           <>
             <Button

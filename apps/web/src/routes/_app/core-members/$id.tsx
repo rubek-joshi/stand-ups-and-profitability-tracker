@@ -66,6 +66,10 @@ function CoreMemberDetailPage() {
       <PageHeader
         title={member.name}
         description={member.email}
+        breadcrumbs={[
+          { label: "Core Members", to: "/core-members" },
+          { label: member.name },
+        ]}
         actions={
           <>
             <StatusBadge status={member.status} />

@@ -59,6 +59,7 @@ import {
   type InvolvementEntry,
 } from "@/components/employee/involvement-chart"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import { formatNpr, paisaToNpr } from "@/lib/money"
 import type { Employee } from "@/lib/types"
 
@@ -284,6 +285,10 @@ function EmployeeDetailPage() {
       <PageHeader
         title={employee.name}
         description={employee.email}
+        breadcrumbs={[
+          { label: "Employees", to: "/employees", search: DEFAULT_LIST_SEARCH },
+          { label: employee.name },
+        ]}
         actions={
           <>
             <StatusBadge status={employee.status} />

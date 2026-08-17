@@ -29,6 +29,7 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import { formatNpr, parseNprInput, paisaToNpr } from "@/lib/money"
 import type { Employee, SalaryEntry } from "@/lib/types"
 
@@ -114,6 +115,11 @@ function EmployeeEditPage() {
       <PageHeader
         title={`Edit ${employee.name}`}
         description="Update profile and salary entries"
+        breadcrumbs={[
+          { label: "Employees", to: "/employees", search: DEFAULT_LIST_SEARCH },
+          { label: employee.name, to: "/employees/$id", params: { id } },
+          { label: "Edit" },
+        ]}
         actions={
           <Link
             to="/employees/$id"

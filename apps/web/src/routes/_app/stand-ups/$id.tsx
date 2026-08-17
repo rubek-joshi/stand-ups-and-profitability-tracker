@@ -371,6 +371,10 @@ function StandupDetailPage() {
       <PageHeader
         title={`Stand-up · ${dateLabel}`}
         description="Attendance, notes, and project allocations"
+        breadcrumbs={[
+          { label: "Stand-ups", to: "/stand-ups", search: { page: 1, pageSize: 25 } },
+          { label: dateLabel },
+        ]}
         actions={
           <>
             <StatusBadge status={standup.status} />

@@ -5,7 +5,10 @@ import {
   IconCalendarClock,
   IconShieldCheck,
   IconWallet,
+  IconX,
 } from "@tabler/icons-react"
+import { format, parseISO } from "date-fns"
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent } from "@workspace/ui/components/card"
 import { Input } from "@workspace/ui/components/input"
@@ -70,6 +73,36 @@ function StatCard({
   )
 }
 
+function formatFilterDate(value: string) {
+  try {
+    return format(parseISO(value.slice(0, 10)), "d MMM yyyy")
+  } catch {
+    return value
+  }
+}
+
+function FilterChip({
+  label,
+  onRemove,
+}: {
+  label: string
+  onRemove: () => void
+}) {
+  return (
+    <Badge variant="secondary" className="h-7 gap-1 pr-1">
+      <span>{label}</span>
+      <button
+        type="button"
+        className="rounded-full p-0.5 hover:bg-muted"
+        aria-label={`Remove ${label} filter`}
+        onClick={onRemove}
+      >
+        <IconX className="size-3" />
+      </button>
+    </Badge>
+  )
+}
+
 function AmcPage() {
   const navigate = Route.useNavigate()
   const { clientId, from, to } = Route.useSearch()
@@ -131,6 +164,9 @@ function AmcPage() {
   )
 
   const hasFilters = Boolean(clientId || from || to)
+  const selectedClientName = clientId
+    ? clients.find((c) => c.id === clientId)?.name
+    : undefined
 
   const groups = React.useMemo(() => {
     const withStatus = amcs.map((a) => ({ amc: a, status: amcDisplayStatus(a) }))
@@ -242,76 +278,113 @@ function AmcPage() {
         }
       />
 
-      <div className="mb-6 flex flex-wrap items-end gap-3">
-        <div className="grid gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Client</span>
-          <Select
-            value={clientId || null}
-            onValueChange={(v) => {
-              void navigate({
-                search: (prev) => ({
-                  ...prev,
-                  clientId: v || undefined,
-                }),
-              })
-            }}
-            items={clientItems}
-          >
-            <SelectTrigger className="w-52">
-              <SelectValue placeholder="All clients" />
-            </SelectTrigger>
-            <SelectContent>
-              {clients.map((c) => (
-                <SelectItem key={c.id} value={c.id}>
-                  {c.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="mb-6 space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="grid gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Client</span>
+            <Select
+              value={clientId || null}
+              onValueChange={(v) => {
+                void navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    clientId: v || undefined,
+                  }),
+                })
+              }}
+              items={clientItems}
+            >
+              <SelectTrigger className="w-52">
+                <SelectValue placeholder="All clients" />
+              </SelectTrigger>
+              <SelectContent>
+                {clients.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">From</span>
+            <Input
+              type="date"
+              className="w-40"
+              value={from ?? ""}
+              onChange={(e) => {
+                const next = e.target.value || undefined
+                void navigate({
+                  search: (prev) => ({ ...prev, from: next }),
+                })
+              }}
+            />
+          </div>
+          <div className="grid gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">To</span>
+            <Input
+              type="date"
+              className="w-40"
+              value={to ?? ""}
+              onChange={(e) => {
+                const next = e.target.value || undefined
+                void navigate({
+                  search: (prev) => ({ ...prev, to: next }),
+                })
+              }}
+            />
+          </div>
+          {hasFilters ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                void navigate({
+                  search: {
+                    clientId: undefined,
+                    from: undefined,
+                    to: undefined,
+                  },
+                })
+              }}
+            >
+              Clear filters
+            </Button>
+          ) : null}
         </div>
-        <div className="grid gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">From</span>
-          <Input
-            type="date"
-            className="w-40"
-            value={from ?? ""}
-            onChange={(e) => {
-              const next = e.target.value || undefined
-              void navigate({
-                search: (prev) => ({ ...prev, from: next }),
-              })
-            }}
-          />
-        </div>
-        <div className="grid gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">To</span>
-          <Input
-            type="date"
-            className="w-40"
-            value={to ?? ""}
-            onChange={(e) => {
-              const next = e.target.value || undefined
-              void navigate({
-                search: (prev) => ({ ...prev, to: next }),
-              })
-            }}
-          />
-        </div>
+
         {hasFilters ? (
-          <Button
-            variant="outline"
-            onClick={() => {
-              void navigate({
-                search: {
-                  clientId: undefined,
-                  from: undefined,
-                  to: undefined,
-                },
-              })
-            }}
-          >
-            Clear filters
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            {clientId ? (
+              <FilterChip
+                label={`Client: ${selectedClientName ?? "Unknown"}`}
+                onRemove={() => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, clientId: undefined }),
+                  })
+                }}
+              />
+            ) : null}
+            {from ? (
+              <FilterChip
+                label={`From: ${formatFilterDate(from)}`}
+                onRemove={() => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, from: undefined }),
+                  })
+                }}
+              />
+            ) : null}
+            {to ? (
+              <FilterChip
+                label={`To: ${formatFilterDate(to)}`}
+                onRemove={() => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, to: undefined }),
+                  })
+                }}
+              />
+            ) : null}
+          </div>
         ) : null}
       </div>
 

@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
 import { IconEye, IconPencil, IconSearch } from "@tabler/icons-react"
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import {
   Dialog,
@@ -125,6 +126,7 @@ function EmployeesPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Groups</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Joined</TableHead>
                   <TableActionsHead />
@@ -143,6 +145,23 @@ function EmployeesPage() {
                       </Link>
                     </TableCell>
                     <TableCell>{e.email}</TableCell>
+                    <TableCell>
+                      {(e.groups ?? []).length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {(e.groups ?? []).map((g) => (
+                            <Link
+                              key={g.id}
+                              to="/employee-groups/$id"
+                              params={{ id: g.id }}
+                            >
+                              <Badge variant="secondary">{g.name}</Badge>
+                            </Link>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       <StatusBadge status={e.status} />
                     </TableCell>

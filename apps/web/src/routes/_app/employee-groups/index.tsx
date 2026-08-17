@@ -122,72 +122,74 @@ function EmployeeGroupsPage() {
       ) : null}
 
       {groups.length > 0 ? (
-        <div className="overflow-x-auto rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Members</TableHead>
-                <TableHead>Description</TableHead>
-                <TableActionsHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {groups.map((g) => (
-                <TableRow key={g.id}>
-                  <TableCell>
-                    <Link
-                      to="/employee-groups/$id"
-                      params={{ id: g.id }}
-                      className="font-medium hover:underline"
-                    >
-                      {g.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="tabular-nums">{g.memberCount ?? 0}</TableCell>
-                  <TableCell className="max-w-xs truncate text-muted-foreground">
-                    {g.description || "—"}
-                  </TableCell>
-                  <TableActionsCell>
-                    <TableActionLink
-                      label="View"
-                      to="/employee-groups/$id"
-                      params={{ id: g.id }}
-                    >
-                      <IconEye className="size-3.5" />
-                    </TableActionLink>
-                    <TableActionButton
-                      label="Delete"
-                      variant="destructive"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          title: "Delete group?",
-                          description: `Delete “${g.name}”? Members are unlinked; stand-ups that used this group block deletion.`,
-                          confirmLabel: "Delete",
-                          destructive: true,
-                        })
-                        if (!ok) return
-                        try {
-                          await api(`/employee-groups/${g.id}`, {
-                            method: "DELETE",
-                          })
-                          await load()
-                        } catch (e) {
-                          alert(
-                            e instanceof ApiError
-                              ? e.message
-                              : "Failed to delete group",
-                          )
-                        }
-                      }}
-                    >
-                      <IconTrash className="size-3.5" />
-                    </TableActionButton>
-                  </TableActionsCell>
+        <div className="space-y-4">
+          <div className="overflow-x-auto rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Members</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableActionsHead />
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {groups.map((g) => (
+                  <TableRow key={g.id}>
+                    <TableCell>
+                      <Link
+                        to="/employee-groups/$id"
+                        params={{ id: g.id }}
+                        className="font-medium hover:underline"
+                      >
+                        {g.name}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="tabular-nums">{g.memberCount ?? 0}</TableCell>
+                    <TableCell className="max-w-xs truncate text-muted-foreground">
+                      {g.description || "—"}
+                    </TableCell>
+                    <TableActionsCell>
+                      <TableActionLink
+                        label="View"
+                        to="/employee-groups/$id"
+                        params={{ id: g.id }}
+                      >
+                        <IconEye className="size-3.5" />
+                      </TableActionLink>
+                      <TableActionButton
+                        label="Delete"
+                        variant="destructive"
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: "Delete group?",
+                            description: `Delete “${g.name}”? Members are unlinked; stand-ups that used this group block deletion.`,
+                            confirmLabel: "Delete",
+                            destructive: true,
+                          })
+                          if (!ok) return
+                          try {
+                            await api(`/employee-groups/${g.id}`, {
+                              method: "DELETE",
+                            })
+                            await load()
+                          } catch (e) {
+                            alert(
+                              e instanceof ApiError
+                                ? e.message
+                                : "Failed to delete group",
+                            )
+                          }
+                        }}
+                      >
+                        <IconTrash className="size-3.5" />
+                      </TableActionButton>
+                    </TableActionsCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
           <PaginationBar
             page={page}
             totalPages={totalPages}

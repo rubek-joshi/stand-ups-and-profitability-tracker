@@ -13,6 +13,7 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import { parseNprInput, paisaToNpr } from "@/lib/money"
 import type { Category, Project } from "@/lib/types"
 import { Switch } from "@workspace/ui/components/switch"
@@ -77,6 +78,11 @@ function ProjectEditPage() {
       <PageHeader
         title={`Edit ${project.name}`}
         description="Update project details"
+        breadcrumbs={[
+          { label: "Projects", to: "/projects", search: DEFAULT_LIST_SEARCH },
+          { label: project.name, to: "/projects/$id", params: { id } },
+          { label: "Edit" },
+        ]}
         actions={
           <Link
             to="/projects/$id"

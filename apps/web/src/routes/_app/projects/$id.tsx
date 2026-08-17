@@ -37,6 +37,7 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import { useAuth } from "@/lib/auth"
 import { formatNpr, parseNprInput } from "@/lib/money"
 import type {
@@ -132,6 +133,10 @@ function ProjectDetailPage() {
       <PageHeader
         title={project.name}
         description={`${project.client?.name ?? "Client"} · ${(project.categories ?? []).map((c) => c.name).join(", ") || "No categories"}`}
+        breadcrumbs={[
+          { label: "Projects", to: "/projects", search: DEFAULT_LIST_SEARCH },
+          { label: project.name },
+        ]}
         actions={
           <>
             <StatusBadge status={project.status} />

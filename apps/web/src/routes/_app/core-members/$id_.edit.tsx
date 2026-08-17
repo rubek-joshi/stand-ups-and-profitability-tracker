@@ -110,6 +110,11 @@ function CoreMemberEditPage() {
       <PageHeader
         title={`Edit ${member.name}`}
         description="Update profile and salary entries"
+        breadcrumbs={[
+          { label: "Core Members", to: "/core-members" },
+          { label: member.name, to: "/core-members/$id", params: { id } },
+          { label: "Edit" },
+        ]}
         actions={
           <Link
             to="/core-members/$id"
