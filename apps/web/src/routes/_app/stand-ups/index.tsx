@@ -37,6 +37,7 @@ import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
 import { StatusBadge } from "@/components/health-badge"
 import { StandupCalendar, utcIsoDate } from "@/components/standup/standup-calendar"
+import { StandupHistoryView } from "@/components/standup/standup-history-view"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
   TableActionLink,
@@ -53,7 +54,13 @@ export const Route = createFileRoute("/_app/stand-ups/")({
   validateSearch: (search: Record<string, unknown>) => ({
     page: parsePage(search.page),
     pageSize: parsePageSize(search.pageSize),
-    view: search.view === "calendar" ? ("calendar" as const) : ("list" as const),
+    view:
+      search.view === "calendar"
+        ? ("calendar" as const)
+        : search.view === "history"
+          ? ("history" as const)
+          : ("list" as const),
+    q: typeof search.q === "string" ? search.q : "",
   }),
   component: StandupsPage,
 })
@@ -69,7 +76,7 @@ function formatStandupDate(value: string) {
 
 function StandupsPage() {
   const navigate = Route.useNavigate()
-  const { page, pageSize, view } = Route.useSearch()
+  const { page, pageSize, view, q } = Route.useSearch()
   const { user, refreshUser } = useAuth()
   const [items, setItems] = React.useState<Standup[]>([])
   const [total, setTotal] = React.useState(0)
@@ -83,6 +90,8 @@ function StandupsPage() {
   const [remember, setRemember] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
   const [calendarRefreshKey, setCalendarRefreshKey] = React.useState(0)
+
+  const [historyRefreshKey, setHistoryRefreshKey] = React.useState(0)
 
   const preference = user?.standupScopePreference ?? "ask"
   const askEveryTime = preference === "ask"
@@ -137,6 +146,7 @@ function StandupsPage() {
   const afterCreate = async () => {
     setOpen(false)
     setCalendarRefreshKey((k) => k + 1)
+    setHistoryRefreshKey((k) => k + 1)
     if (view === "list") {
       void navigate({
         search: (prev) => ({ ...prev, page: 1 }),
@@ -159,7 +169,7 @@ function StandupsPage() {
           void navigate({
             search: (prev) => ({
               ...prev,
-              view: next as "list" | "calendar",
+              view: next as "list" | "calendar" | "history",
             }),
           })
         }}
@@ -168,6 +178,7 @@ function StandupsPage() {
         <TabsList>
           <TabsTrigger value="list">List</TabsTrigger>
           <TabsTrigger value="calendar">Calendar</TabsTrigger>
+          <TabsTrigger value="history">History</TabsTrigger>
         </TabsList>
 
         <TabsContent value="list" className="mt-4">
@@ -244,6 +255,21 @@ function StandupsPage() {
           <StandupCalendar
             refreshKey={calendarRefreshKey}
             onMissingDayClick={(day) => void openCreate(day)}
+          />
+        </TabsContent>
+
+        <TabsContent value="history" className="mt-4">
+          <StandupHistoryView
+            q={q}
+            refreshKey={historyRefreshKey}
+            onSearchChange={(value) => {
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  q: value,
+                }),
+              })
+            }}
           />
         </TabsContent>
       </Tabs>

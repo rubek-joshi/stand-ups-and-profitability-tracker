@@ -18,6 +18,7 @@ import {
   CreateStandupDto,
   BatchUpdateStandupEntriesDto,
   StandupCalendarQueryDto,
+  StandupHistoryQueryDto,
   UpdateStandupEntryDto,
 } from "./dto/standup.dto";
 import { StandupsService } from "./standups.service";
@@ -54,6 +55,15 @@ export class StandupsController {
   @ApiOperation({ summary: "Stand-up dates in a range for calendar view" })
   async findCalendar(@Query() query: StandupCalendarQueryDto) {
     return this.standupsService.findCalendar(query.from, query.to);
+  }
+
+  @Get("history")
+  @RequirePermission("standups", "read")
+  @ApiOperation({
+    summary: "Stand-up history with cursor pagination and full-text search",
+  })
+  async findHistory(@Query() query: StandupHistoryQueryDto) {
+    return this.standupsService.findHistory(query);
   }
 
   @Get(":id")

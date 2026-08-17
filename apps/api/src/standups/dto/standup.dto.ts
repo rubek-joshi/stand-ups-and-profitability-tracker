@@ -90,3 +90,27 @@ export class StandupCalendarQueryDto {
   @IsDateString()
   to!: string;
 }
+
+export class StandupHistoryQueryDto {
+  @ApiPropertyOptional({
+    description: "Full-text search across employee name, project name, and notes",
+  })
+  @IsOptional()
+  @IsString()
+  q?: string;
+
+  @ApiPropertyOptional({
+    description: "Opaque cursor from a previous history response",
+  })
+  @IsOptional()
+  @IsString()
+  cursor?: string;
+
+  @ApiPropertyOptional({ default: 10, minimum: 1, maximum: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(50)
+  limit?: number;
+}
