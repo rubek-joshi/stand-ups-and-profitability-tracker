@@ -16,6 +16,7 @@ import { RequirePermission } from "../casbin/decorators/require-permission.decor
 import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import {
   CreateStandupDto,
+  BatchUpdateStandupEntriesDto,
   UpdateStandupEntryDto,
 } from "./dto/standup.dto";
 import { StandupsService } from "./standups.service";
@@ -52,6 +53,17 @@ export class StandupsController {
   @ApiOperation({ summary: "Get standup with entries and allocations" })
   async findOne(@Param("id") id: string) {
     return this.standupsService.findOne(id);
+  }
+
+  @Patch(":id/entries")
+  @RequirePermission("standups", "*")
+  @ApiOperation({ summary: "Batch update standup entries" })
+  async updateEntries(
+    @Param("id") id: string,
+    @Body() dto: BatchUpdateStandupEntriesDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.standupsService.updateEntries(id, dto, user.id);
   }
 
   @Patch(":id/entries/:entryId")

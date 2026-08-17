@@ -197,7 +197,12 @@ function EmployeeDetailPage() {
   )
 
   const standupsInRange = React.useMemo(
-    () => (employee?.standupEntries ?? []).filter((e) => inRange(toDateKey(e.standup.date))),
+    () =>
+      (employee?.standupEntries ?? []).filter(
+        (e) =>
+          e.attendanceStatus !== "absent" &&
+          inRange(toDateKey(e.standup.date)),
+      ),
     [employee, inRange],
   )
 

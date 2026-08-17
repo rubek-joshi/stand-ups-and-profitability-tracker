@@ -2,14 +2,12 @@ import {
   IconCircleCheck,
   IconCircleDashed,
 } from "@tabler/icons-react"
-import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent } from "@workspace/ui/components/card"
 import { cn } from "@workspace/ui/lib/utils"
 import type { AttendanceStatus, Project, StandupEntry } from "@/lib/types"
 import { MarkdownNotes } from "./markdown-notes"
 import {
   ProjectAllocations,
-  totalPercent,
   type DraftAlloc,
 } from "./project-allocations"
 
@@ -45,10 +43,8 @@ export function isWorking(status: AttendanceStatus) {
 
 export function isEntryComplete(draft: EntryDraft) {
   if (!isWorking(draft.attendanceStatus)) return true
-  return (
-    draft.notesMarkdown.trim().length > 0 &&
-    totalPercent(draft.allocations) === 100
-  )
+  // Notes are required; allocation may be under 100% (under-utilized).
+  return draft.notesMarkdown.trim().length > 0
 }
 
 type Props = {
@@ -56,10 +52,8 @@ type Props = {
   draft: EntryDraft
   projects: Project[]
   readonly?: boolean
-  saving?: boolean
   onChange: (draft: EntryDraft) => void
   onNotesChange: (notes: string) => void
-  onSave: () => void
 }
 
 export function EmployeeStandupCard({
@@ -67,10 +61,8 @@ export function EmployeeStandupCard({
   draft,
   projects,
   readonly,
-  saving,
   onChange,
   onNotesChange,
-  onSave,
 }: Props) {
   const working = isWorking(draft.attendanceStatus)
   const complete = isEntryComplete(draft)
@@ -136,17 +128,6 @@ export function EmployeeStandupCard({
               )
             })}
           </div>
-
-          {!readonly ? (
-            <Button
-              size="sm"
-              disabled={saving}
-              onClick={onSave}
-              className="shrink-0"
-            >
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          ) : null}
         </header>
 
         {working ? (

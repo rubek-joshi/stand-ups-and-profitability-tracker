@@ -57,3 +57,18 @@ export class UpdateStandupEntryDto {
   @Type(() => AllocationDto)
   allocations?: AllocationDto[];
 }
+
+export class BatchUpdateStandupEntryItemDto extends UpdateStandupEntryDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  id!: string;
+}
+
+export class BatchUpdateStandupEntriesDto {
+  @ApiProperty({ type: [BatchUpdateStandupEntryItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => BatchUpdateStandupEntryItemDto)
+  entries!: BatchUpdateStandupEntryItemDto[];
+}

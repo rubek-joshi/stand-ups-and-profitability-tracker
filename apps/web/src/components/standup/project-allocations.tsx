@@ -62,11 +62,15 @@ export function setAllocationPercent(
   projectId: string,
   percent: number,
 ): DraftAlloc[] {
-  const clamped = Math.max(0, Math.min(100, Math.round(percent)))
-  const next = allocations.map((a) =>
+  const othersTotal = allocations
+    .filter((a) => a.projectId !== projectId)
+    .reduce((sum, a) => sum + (Number(a.percentage) || 0), 0)
+  const maxAllowed = Math.max(0, 100 - othersTotal)
+  const clamped = Math.max(0, Math.min(maxAllowed, Math.round(percent)))
+  // Do not auto-fill remaining % — under 100% is allowed (under-utilized).
+  return allocations.map((a) =>
     a.projectId === projectId ? { ...a, percentage: clamped, locked: true } : a,
   )
-  return rebalance(next)
 }
 
 export function ProjectAllocations({
@@ -104,10 +108,18 @@ export function ProjectAllocations({
               ? "text-muted-foreground"
               : total === 100
                 ? "border-emerald-600/30 text-emerald-700 dark:text-emerald-400"
-                : "border-destructive/40 text-destructive",
+                : total > 100
+                  ? "border-destructive/40 text-destructive"
+                  : "border-amber-600/30 text-amber-700 dark:text-amber-400",
           )}
         >
-          {allocations.length === 0 ? "none selected" : `${total}% allocated`}
+          {allocations.length === 0
+            ? "none selected"
+            : total > 100
+              ? `${total}% (over)`
+              : total < 100
+                ? `${total}% · ${100 - total}% unallocated`
+                : `${total}% allocated`}
         </Badge>
         {allocations.some((a) => a.locked) ? (
           <Button
@@ -237,12 +249,10 @@ export function ProjectAllocations({
                     className={cn(a.locked && "text-primary")}
                     onClick={() =>
                       onChange(
-                        rebalance(
-                          allocations.map((x) =>
-                            x.projectId === a.projectId
-                              ? { ...x, locked: !x.locked }
-                              : x,
-                          ),
+                        allocations.map((x) =>
+                          x.projectId === a.projectId
+                            ? { ...x, locked: !x.locked }
+                            : x,
                         ),
                       )
                     }

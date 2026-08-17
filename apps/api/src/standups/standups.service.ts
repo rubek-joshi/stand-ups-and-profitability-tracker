@@ -26,6 +26,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { ProfitabilityService } from "../profitability/profitability.service";
 import {
+  BatchUpdateStandupEntriesDto,
   CreateStandupDto,
   UpdateStandupEntryDto,
 } from "./dto/standup.dto";
@@ -119,69 +120,112 @@ export class StandupsService {
     dto: UpdateStandupEntryDto,
     actorId: string,
   ) {
+    const result = await this.updateEntries(
+      standupId,
+      { entries: [{ id: entryId, ...dto }] },
+      actorId,
+    );
+    const updated = result.entries.find((item) => item.id === entryId);
+    if (!updated) {
+      throw new NotFoundException(`Standup entry ${entryId} not found`);
+    }
+    return updated;
+  }
+
+  async updateEntries(
+    standupId: string,
+    dto: BatchUpdateStandupEntriesDto,
+    actorId: string,
+  ) {
+    if (!dto.entries?.length) {
+      throw new BadRequestException("At least one entry is required");
+    }
     const standup = await this.findOne(standupId);
     if (standup.status === StandupStatus.completed) {
       throw new BadRequestException(
         "Cannot edit entries on a completed standup; reopen first",
       );
     }
-    const entry = standup.entries.find((item) => item.id === entryId);
-    if (!entry) {
-      throw new NotFoundException(`Standup entry ${entryId} not found`);
-    }
-    const attendanceStatus = dto.attendanceStatus ?? entry.attendanceStatus;
-    if (dto.allocations) {
-      this.validateAllocations(attendanceStatus, dto.allocations);
-      await this.validateAllocationProjects(
-        entry.employeeId,
-        dto.allocations.map((a) => a.projectId),
-      );
-    }
-    const updated = await this.prismaService.$transaction(async (tx) => {
-      if (dto.allocations) {
-        await tx.projectAllocation.deleteMany({
-          where: { standupEntryId: entryId },
-        });
-        if (
-          attendanceStatus !== AttendanceStatus.absent &&
-          dto.allocations.length > 0
-        ) {
-          await tx.projectAllocation.createMany({
-            data: dto.allocations.map((allocation) => ({
-              standupEntryId: entryId,
-              projectId: allocation.projectId,
-              percentage: allocation.percentage,
-              isNonBillable: allocation.isNonBillable ?? false,
-            })),
-          });
-        }
+
+    const entryById = new Map(standup.entries.map((item) => [item.id, item]));
+    for (const item of dto.entries) {
+      const entry = entryById.get(item.id);
+      if (!entry) {
+        throw new NotFoundException(`Standup entry ${item.id} not found`);
       }
-      return tx.standupEntry.update({
-        where: { id: entryId },
-        data: {
-          attendanceStatus: dto.attendanceStatus,
-          notesMarkdown: dto.notesMarkdown,
-        },
-        include: {
-          employee: true,
-          allocations: { include: { project: true } },
-        },
-      });
-    });
-    if (standup.status === StandupStatus.draft) {
-      await this.prismaService.standup.update({
-        where: { id: standupId },
-        data: { status: StandupStatus.in_progress },
-      });
+      const attendanceStatus = item.attendanceStatus ?? entry.attendanceStatus;
+      if (item.allocations) {
+        this.validateAllocations(attendanceStatus, item.allocations);
+        await this.validateAllocationProjects(
+          entry.employeeId,
+          item.allocations.map((a) => a.projectId),
+        );
+      }
     }
+
+    const updatedEntries = await this.prismaService.$transaction(async (tx) => {
+      const results = [];
+      for (const item of dto.entries) {
+        const entry = entryById.get(item.id)!;
+        const attendanceStatus =
+          item.attendanceStatus ?? entry.attendanceStatus;
+        if (item.allocations) {
+          await tx.projectAllocation.deleteMany({
+            where: { standupEntryId: item.id },
+          });
+          if (
+            attendanceStatus !== AttendanceStatus.absent &&
+            item.allocations.length > 0
+          ) {
+            await tx.projectAllocation.createMany({
+              data: item.allocations.map((allocation) => ({
+                standupEntryId: item.id,
+                projectId: allocation.projectId,
+                percentage: allocation.percentage,
+                isNonBillable: allocation.isNonBillable ?? false,
+              })),
+            });
+          }
+        }
+        results.push(
+          await tx.standupEntry.update({
+            where: { id: item.id },
+            data: {
+              attendanceStatus: item.attendanceStatus,
+              notesMarkdown: item.notesMarkdown,
+            },
+            include: {
+              employee: true,
+              allocations: { include: { project: true } },
+            },
+          }),
+        );
+      }
+      if (standup.status === StandupStatus.draft) {
+        await tx.standup.update({
+          where: { id: standupId },
+          data: { status: StandupStatus.in_progress },
+        });
+      }
+      return results;
+    });
+
     await this.auditService.write({
       actorId,
       action: AuditAction.STANDUP_UPDATED,
-      targetType: "StandupEntry",
-      targetId: entryId,
-      metadata: { standupId, after: updated },
+      targetType: "Standup",
+      targetId: standupId,
+      metadata: {
+        entryIds: dto.entries.map((item) => item.id),
+        count: dto.entries.length,
+      },
     });
-    return updated;
+
+    return this.findOne(standupId).then((full) => ({
+      ...full,
+      entries: full.entries,
+      updatedEntryIds: updatedEntries.map((item) => item.id),
+    }));
   }
 
   async complete(standupId: string, actorId: string) {
@@ -334,9 +378,9 @@ export class StandupsService {
       return;
     }
     const total = allocations.reduce((sum, item) => sum + item.percentage, 0);
-    if (total !== 100) {
+    if (total > 100) {
       throw new BadRequestException(
-        `Allocations must sum to 100% (got ${total}%)`,
+        `Allocations cannot exceed 100% (got ${total}%)`,
       );
     }
   }
