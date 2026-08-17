@@ -54,6 +54,17 @@ enum AmcStatus {
   cancelled
 }
 
+enum AmcType {
+  complimentary
+  paid
+}
+
+enum AmcRenewalDecision {
+  pending
+  renewed
+  declined
+}
+
 enum AuditAction {
   CLIENT_CREATED
   CLIENT_UPDATED
@@ -196,7 +207,7 @@ model Project {
   coreMemberAssignments CoreMemberAssignment[]
   extensions            ProjectExtension[]
   allocations           ProjectAllocation[]
-  amcRecord             AmcRecord?
+  amcRecords            AmcRecord[]
 
   @@index([clientId])
   @@index([status])
@@ -399,21 +410,27 @@ model AttendanceRecord {
 }
 
 model AmcRecord {
-  id              String    @id @default(cuid())
-  projectId       String    @unique
-  setDate         DateTime  @db.Date
-  freeUntilDate   DateTime  @db.Date
+  id              String               @id @default(cuid())
+  projectId       String
+  type            AmcType              @default(complimentary)
+  startDate       DateTime             @db.Date
+  endDate         DateTime             @db.Date
+  notes           String?
+  renewalDecision AmcRenewalDecision?
   reminderSentAt  DateTime?
-  status          AmcStatus @default(free_period)
+  status          AmcStatus            @default(free_period)
   cancelledAt     DateTime?
   cancelledRemark String?
   amcAmountPaisa  BigInt?
-  isVatApplicable Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  isVatApplicable Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   project Project @relation(fields: [projectId], references: [id])
 
+  @@index([projectId])
+  @@index([status])
+  @@index([endDate])
   @@map("amc_records")
 }
 

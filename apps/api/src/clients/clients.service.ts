@@ -86,7 +86,7 @@ export class ClientsService {
         projects: {
           include: {
             projectCategories: { include: { category: true } },
-            amcRecord: true,
+            amcRecords: { orderBy: { endDate: "desc" } },
             _count: { select: { extensions: true } },
           },
           orderBy: { createdAt: "desc" },
@@ -101,7 +101,7 @@ export class ClientsService {
       client.projects.map(async (project) => {
         const {
           projectCategories,
-          amcRecord,
+          amcRecords,
           _count,
           ...projectFields
         } = project;
@@ -109,14 +109,24 @@ export class ClientsService {
           await this.profitabilityService.calculateProjectProfitLoss(project.id);
         const categories =
           projectCategories?.map((row) => row.category) ?? [];
+        const currentAmc =
+          amcRecords.find(
+            (row) =>
+              row.status !== "cancelled" &&
+              row.renewalDecision !== "declined" &&
+              row.renewalDecision !== "renewed",
+          ) ?? null;
         return {
           ...serializeMoneyFields(projectFields, ["budgetPaisa"] as const),
           categories,
           categoryIds: categories.map((category) => category.id),
           extensionCount: _count.extensions,
-          amcRecord: amcRecord
-            ? serializeMoneyFields(amcRecord, AMC_MONEY_FIELDS)
+          amcRecord: currentAmc
+            ? serializeMoneyFields(currentAmc, AMC_MONEY_FIELDS)
             : null,
+          amcRecords: amcRecords.map((row) =>
+            serializeMoneyFields(row, AMC_MONEY_FIELDS),
+          ),
           profitability: {
             ...serializeMoneyFields(profitability, PROFIT_MONEY_FIELDS),
             projectId: profitability.projectId,

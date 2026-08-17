@@ -5,7 +5,6 @@ import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
-import { Switch } from "@workspace/ui/components/switch"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import {
@@ -25,6 +24,9 @@ import {
 } from "@workspace/ui/components/table"
 import { PageHeader } from "@/components/page-header"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
+import { AmcCard } from "@/components/amc/amc-card"
+import { CreateAmcDialog } from "@/components/amc/create-amc-dialog"
+import { DeclineAmcDialog } from "@/components/amc/decline-amc-dialog"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { CoreMemberLink, EmployeeLink } from "@/components/resource-link"
@@ -58,7 +60,7 @@ function ProjectDetailPage() {
   }>({ employees: [], coreMembers: [] })
   const [employees, setEmployees] = React.useState<Employee[]>([])
   const [coreMembers, setCoreMembers] = React.useState<CoreMember[]>([])
-  const [amc, setAmc] = React.useState<AmcRecord | null>(null)
+  const [amcs, setAmcs] = React.useState<AmcRecord[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [tab, setTab] = React.useState("overview")
@@ -67,12 +69,8 @@ function ProjectDetailPage() {
   const [extEndDate, setExtEndDate] = React.useState("")
   const [employeeId, setEmployeeId] = React.useState("")
   const [coreMemberId, setCoreMemberId] = React.useState("")
-  const [amcForm, setAmcForm] = React.useState({
-    setDate: new Date().toISOString().slice(0, 10),
-    freeUntilDate: "",
-    amcAmountNpr: "",
-    isVatApplicable: true,
-  })
+  const [amcCreateOpen, setAmcCreateOpen] = React.useState(false)
+  const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
   const initialLoad = React.useRef(true)
 
   const load = React.useCallback(async () => {
@@ -92,10 +90,10 @@ function ProjectDetailPage() {
       setEmployees(emps.data.filter((e) => e.status === "active"))
       setCoreMembers(cores.data.filter((m) => m.status === "active"))
       try {
-        const amcRes = await api<Envelope<AmcRecord>>(`/amc/projects/${id}`)
-        setAmc(amcRes.data)
+        const amcRes = await api<Envelope<AmcRecord[]>>(`/amc/projects/${id}`)
+        setAmcs(amcRes.data)
       } catch {
-        setAmc(null)
+        setAmcs([])
       }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load project")
@@ -473,111 +471,84 @@ function ProjectDetailPage() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="amc" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">AMC</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {project.status !== "closed" && project.status !== "under_amc" ? (
-                <p className="text-sm text-muted-foreground">
-                  Close the project before setting AMC.
-                </p>
-              ) : null}
-              {amc ? (
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2">
-                    Status: <StatusBadge status={amc.status} />
-                  </div>
-                  <p>Free until: {String(amc.freeUntilDate).slice(0, 10)}</p>
-                  <p>Amount: {amc.amcAmountPaisa ? formatNpr(amc.amcAmountPaisa) : "—"}</p>
-                  {amc.status !== "cancelled" ? (
-                    <Button
-                      variant="destructive"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          title: "Cancel AMC?",
-                          description: "Reminders will stop for this project.",
-                          confirmLabel: "Cancel AMC",
-                          destructive: true,
-                        })
-                        if (!ok) return
-                        const remark = window.prompt("Optional remark") ?? undefined
-                        await api(`/amc/projects/${id}/cancel`, {
-                          method: "POST",
-                          body: { remark },
-                        })
-                        await load()
-                      }}
-                    >
-                      Cancel AMC
-                    </Button>
-                  ) : null}
-                </div>
-              ) : project.status === "closed" ? (
-                <form
-                  className="grid max-w-md gap-3"
-                  onSubmit={async (e) => {
-                    e.preventDefault()
-                    await api(`/amc/projects/${id}`, {
+        <TabsContent value="amc" className="mt-4 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-medium text-muted-foreground">
+              Maintenance contracts
+            </h2>
+            {project.status === "closed" || project.status === "under_amc" ? (
+              <Button size="sm" variant="outline" onClick={() => setAmcCreateOpen(true)}>
+                New AMC
+              </Button>
+            ) : null}
+          </div>
+          {project.status !== "closed" && project.status !== "under_amc" ? (
+            <Card>
+              <CardContent className="py-6 text-sm text-muted-foreground">
+                Close the project before setting AMC.
+              </CardContent>
+            </Card>
+          ) : amcs.length === 0 ? (
+            <Card>
+              <CardContent className="py-6 text-sm text-muted-foreground">
+                No AMC records yet.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {amcs.map((amc) => (
+                <AmcCard
+                  key={amc.id}
+                  amc={{
+                    ...amc,
+                    projectName: project.name,
+                    clientName: project.client?.name,
+                  }}
+                  onRenew={async (record) => {
+                    await api(`/amc/${record.id}/renewal-decision`, {
                       method: "POST",
-                      body: {
-                        setDate: amcForm.setDate,
-                        freeUntilDate: amcForm.freeUntilDate,
-                        isVatApplicable: amcForm.isVatApplicable,
-                        amcAmountNpr: amcForm.amcAmountNpr
-                          ? parseNprInput(amcForm.amcAmountNpr)
-                          : undefined,
-                      },
+                      body: { decision: "renewed" },
                     })
+                    setAmcCreateOpen(true)
                     await load()
                   }}
-                >
-                  <div className="space-y-2">
-                    <Label>Set date</Label>
-                    <Input
-                      type="date"
-                      required
-                      value={amcForm.setDate}
-                      onChange={(e) => setAmcForm((f) => ({ ...f, setDate: e.target.value }))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Free until</Label>
-                    <Input
-                      type="date"
-                      required
-                      value={amcForm.freeUntilDate}
-                      onChange={(e) =>
-                        setAmcForm((f) => ({ ...f, freeUntilDate: e.target.value }))
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>AMC amount (NPR)</Label>
-                    <Input
-                      value={amcForm.amcAmountNpr}
-                      onChange={(e) => setAmcForm((f) => ({ ...f, amcAmountNpr: e.target.value }))}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between rounded-md border px-3 py-2">
-                    <Label>VAT applicable</Label>
-                    <Switch
-                      checked={amcForm.isVatApplicable}
-                      onCheckedChange={(c) =>
-                        setAmcForm((f) => ({ ...f, isVatApplicable: Boolean(c) }))
-                      }
-                    />
-                  </div>
-                  <Button type="submit" className="w-fit">
-                    Set AMC
-                  </Button>
-                </form>
-              ) : (
-                <p className="text-sm text-muted-foreground">No AMC record.</p>
-              )}
-            </CardContent>
-          </Card>
+                  onDecline={(record) => {
+                    setDeclineAmc({
+                      ...record,
+                      projectName: project.name,
+                      clientName: project.client?.name,
+                    })
+                  }}
+                />
+              ))}
+            </div>
+          )}
+          <CreateAmcDialog
+            open={amcCreateOpen}
+            onOpenChange={setAmcCreateOpen}
+            presetProjectId={id}
+            lockProject
+            onCreated={() => void load()}
+          />
+          <DeclineAmcDialog
+            amc={declineAmc}
+            open={Boolean(declineAmc)}
+            onOpenChange={(open) => {
+              if (!open) setDeclineAmc(null)
+            }}
+            onConfirm={async (remark) => {
+              if (!declineAmc) return
+              await api(`/amc/${declineAmc.id}/renewal-decision`, {
+                method: "POST",
+                body: {
+                  decision: "declined",
+                  ...(remark ? { remark } : {}),
+                },
+              })
+              setDeclineAmc(null)
+              await load()
+            }}
+          />
         </TabsContent>
       </Tabs>
       {dialog}

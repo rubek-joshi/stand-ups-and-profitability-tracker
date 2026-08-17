@@ -104,7 +104,7 @@ export class JobsService {
       where: { isActive: true },
     });
     for (const record of records) {
-      const freeUntil = new Date(record.freeUntilDate);
+      const freeUntil = new Date(record.endDate);
       freeUntil.setUTCHours(0, 0, 0, 0);
       const reminderStart = new Date(freeUntil);
       reminderStart.setUTCDate(reminderStart.getUTCDate() - leadDays);
@@ -119,7 +119,13 @@ export class JobsService {
       if (nextStatus !== record.status) {
         await this.prismaService.amcRecord.update({
           where: { id: record.id },
-          data: { status: nextStatus },
+          data: {
+            status: nextStatus,
+            ...(nextStatus === AmcStatus.overdue ||
+            nextStatus === AmcStatus.reminder_due
+              ? { renewalDecision: record.renewalDecision ?? "pending" }
+              : {}),
+          },
         });
       }
       const shouldEmail =

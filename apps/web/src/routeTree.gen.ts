@@ -23,6 +23,7 @@ import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/ind
 import { Route as AppEmployeesIndexRouteImport } from './routes/_app/employees/index'
 import { Route as AppCoreMembersIndexRouteImport } from './routes/_app/core-members/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
+import { Route as AppAmcIndexRouteImport } from './routes/_app/amc/index'
 import { Route as AppStandUpsIdRouteImport } from './routes/_app/stand-ups/$id'
 import { Route as AppProjectsIdRouteImport } from './routes/_app/projects/$id'
 import { Route as AppEmployeesIdRouteImport } from './routes/_app/employees/$id'
@@ -102,6 +103,11 @@ const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
   path: '/clients/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppAmcIndexRoute = AppAmcIndexRouteImport.update({
+  id: '/amc/',
+  path: '/amc/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppStandUpsIdRoute = AppStandUpsIdRouteImport.update({
   id: '/stand-ups/$id',
   path: '/stand-ups/$id',
@@ -161,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/employees/$id': typeof AppEmployeesIdRoute
   '/projects/$id': typeof AppProjectsIdRoute
   '/stand-ups/$id': typeof AppStandUpsIdRoute
+  '/amc/': typeof AppAmcIndexRoute
   '/clients/': typeof AppClientsIndexRoute
   '/core-members/': typeof AppCoreMembersIndexRoute
   '/employees/': typeof AppEmployeesIndexRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByTo {
   '/employees/$id': typeof AppEmployeesIdRoute
   '/projects/$id': typeof AppProjectsIdRoute
   '/stand-ups/$id': typeof AppStandUpsIdRoute
+  '/amc': typeof AppAmcIndexRoute
   '/clients': typeof AppClientsIndexRoute
   '/core-members': typeof AppCoreMembersIndexRoute
   '/employees': typeof AppEmployeesIndexRoute
@@ -211,6 +219,7 @@ export interface FileRoutesById {
   '/_app/employees/$id': typeof AppEmployeesIdRoute
   '/_app/projects/$id': typeof AppProjectsIdRoute
   '/_app/stand-ups/$id': typeof AppStandUpsIdRoute
+  '/_app/amc/': typeof AppAmcIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/core-members/': typeof AppCoreMembersIndexRoute
   '/_app/employees/': typeof AppEmployeesIndexRoute
@@ -237,6 +246,7 @@ export interface FileRouteTypes {
     | '/employees/$id'
     | '/projects/$id'
     | '/stand-ups/$id'
+    | '/amc/'
     | '/clients/'
     | '/core-members/'
     | '/employees/'
@@ -261,6 +271,7 @@ export interface FileRouteTypes {
     | '/employees/$id'
     | '/projects/$id'
     | '/stand-ups/$id'
+    | '/amc'
     | '/clients'
     | '/core-members'
     | '/employees'
@@ -286,6 +297,7 @@ export interface FileRouteTypes {
     | '/_app/employees/$id'
     | '/_app/projects/$id'
     | '/_app/stand-ups/$id'
+    | '/_app/amc/'
     | '/_app/clients/'
     | '/_app/core-members/'
     | '/_app/employees/'
@@ -404,6 +416,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/amc/': {
+      id: '/_app/amc/'
+      path: '/amc'
+      fullPath: '/amc/'
+      preLoaderRoute: typeof AppAmcIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/stand-ups/$id': {
       id: '/_app/stand-ups/$id'
       path: '/stand-ups/$id'
@@ -481,6 +500,7 @@ interface AppRouteChildren {
   AppEmployeesIdRoute: typeof AppEmployeesIdRoute
   AppProjectsIdRoute: typeof AppProjectsIdRoute
   AppStandUpsIdRoute: typeof AppStandUpsIdRoute
+  AppAmcIndexRoute: typeof AppAmcIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppCoreMembersIndexRoute: typeof AppCoreMembersIndexRoute
   AppEmployeesIndexRoute: typeof AppEmployeesIndexRoute
@@ -504,6 +524,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppEmployeesIdRoute: AppEmployeesIdRoute,
   AppProjectsIdRoute: AppProjectsIdRoute,
   AppStandUpsIdRoute: AppStandUpsIdRoute,
+  AppAmcIndexRoute: AppAmcIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppCoreMembersIndexRoute: AppCoreMembersIndexRoute,
   AppEmployeesIndexRoute: AppEmployeesIndexRoute,

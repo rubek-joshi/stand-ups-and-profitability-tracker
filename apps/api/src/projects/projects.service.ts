@@ -5,6 +5,8 @@ import {
 } from "@nestjs/common";
 import {
   AuditAction,
+  AmcRenewalDecision,
+  AmcStatus,
   ProjectStatus,
 } from "@workspace/database";
 import { AuditService } from "../audit/audit.service";
@@ -414,7 +416,9 @@ export class ProjectsService {
     extensions: true,
     employeeAssignments: { include: { employee: true } },
     coreMemberAssignments: { include: { coreMember: true } },
-    amcRecord: true,
+    amcRecords: {
+      orderBy: { endDate: "desc" as const },
+    },
   } as const;
 
   private async getProjectOrThrow(id: string) {
@@ -459,7 +463,12 @@ export class ProjectsService {
       budgetPaisa: bigint;
       projectCategories?: Array<{ category: { id: string; name: string } }>;
       extensions?: Array<{ amountPaisa: bigint }>;
-      amcRecord?: { amcAmountPaisa: bigint | null } | null;
+      amcRecords?: Array<{
+        amcAmountPaisa: bigint | null;
+        status: AmcStatus;
+        renewalDecision: AmcRenewalDecision | null;
+        endDate: Date;
+      }>;
     },
   >(project: T) {
     const serialized = serializeMoneyFields(project, PROJECT_MONEY_FIELDS) as T & {
@@ -467,9 +476,20 @@ export class ProjectsService {
       categoryIds?: string[];
       extensions?: ReturnType<typeof serializeMoneyList>;
       amcRecord?: ReturnType<typeof serializeMoneyFields> | null;
+      amcRecords?: ReturnType<typeof serializeMoneyFields>[];
     };
     const categories =
       project.projectCategories?.map((row) => row.category) ?? [];
+    const amcRecords = (project.amcRecords ?? []).map((row) =>
+      serializeMoneyFields(row, ["amcAmountPaisa"] as const),
+    );
+    const currentAmc =
+      (project.amcRecords ?? []).find(
+        (row) =>
+          row.status !== AmcStatus.cancelled &&
+          row.renewalDecision !== AmcRenewalDecision.declined &&
+          row.renewalDecision !== AmcRenewalDecision.renewed,
+      ) ?? null;
     return {
       ...serialized,
       categories,
@@ -477,9 +497,10 @@ export class ProjectsService {
       extensions: project.extensions
         ? serializeMoneyList(project.extensions, EXTENSION_MONEY_FIELDS)
         : project.extensions,
-      amcRecord: project.amcRecord
-        ? serializeMoneyFields(project.amcRecord, ["amcAmountPaisa"] as const)
-        : project.amcRecord,
+      amcRecords,
+      amcRecord: currentAmc
+        ? serializeMoneyFields(currentAmc, ["amcAmountPaisa"] as const)
+        : null,
     };
   }
 }

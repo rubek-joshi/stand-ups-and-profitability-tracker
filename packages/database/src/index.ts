@@ -33,5 +33,7 @@ export {
   StandupStatus,
   AttendanceStatus,
   AmcStatus,
+  AmcType,
+  AmcRenewalDecision,
   AuditAction,
 } from "./generated/prisma/client";

@@ -88,14 +88,35 @@ export type CoreMemberAssignment = {
   coreMember?: { id: string; name: string; email: string; status: string }
 }
 
+export type AmcType = "complimentary" | "paid"
+export type AmcRenewalDecision = "pending" | "renewed" | "declined"
+export type AmcStatus =
+  | "free_period"
+  | "reminder_due"
+  | "paid_pending"
+  | "overdue"
+  | "cancelled"
+
 export type AmcRecord = {
   id: string
   projectId: string
-  setDate: string
-  freeUntilDate: string
-  status: string
+  type: AmcType
+  startDate: string
+  endDate: string
+  notes?: string | null
+  renewalDecision?: AmcRenewalDecision | null
+  status: AmcStatus | string
   isVatApplicable: boolean
   amcAmountPaisa: string | null
+  cancelledAt?: string | null
+  cancelledRemark?: string | null
+  projectName?: string | null
+  clientName?: string | null
+  clientId?: string | null
+  /** @deprecated use startDate */
+  setDate?: string
+  /** @deprecated use endDate */
+  freeUntilDate?: string
   remark?: string | null
 }
 

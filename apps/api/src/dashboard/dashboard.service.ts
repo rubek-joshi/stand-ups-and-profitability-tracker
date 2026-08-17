@@ -88,7 +88,7 @@ export class DashboardService {
         },
       },
       include: { project: { include: { client: true } } },
-      orderBy: { freeUntilDate: "asc" },
+      orderBy: { endDate: "asc" },
     });
     const overallMarginPercent =
       revenueSum === 0n
@@ -118,7 +118,8 @@ export class DashboardService {
         projectName: item.project.name,
         clientName: item.project.client.name,
         status: item.status,
-        freeUntilDate: item.freeUntilDate,
+        endDate: item.endDate,
+        freeUntilDate: item.endDate,
         amcAmountPaisa:
           item.amcAmountPaisa === null ? null : String(item.amcAmountPaisa),
       })),

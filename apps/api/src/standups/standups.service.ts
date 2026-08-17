@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
+  AmcRenewalDecision,
   AmcStatus,
   AttendanceStatus,
   AttendanceType,
@@ -355,16 +356,32 @@ export class StandupsService {
       }
       const project = await this.prismaService.project.findUnique({
         where: { id: projectId },
-        include: { amcRecord: true },
+        include: {
+          amcRecords: {
+            where: {
+              status: { not: AmcStatus.cancelled },
+              NOT: {
+                renewalDecision: {
+                  in: [
+                    AmcRenewalDecision.declined,
+                    AmcRenewalDecision.renewed,
+                  ],
+                },
+              },
+            },
+            orderBy: { endDate: "desc" },
+            take: 1,
+          },
+        },
       });
       if (!project) {
         throw new NotFoundException(`Project ${projectId} not found`);
       }
+      const currentAmc = project.amcRecords[0] ?? null;
       const blocked =
         (project.status === ProjectStatus.closed ||
           project.status === ProjectStatus.under_amc) &&
-        (project.amcRecord === null ||
-          project.amcRecord.status === AmcStatus.cancelled);
+        currentAmc === null;
       if (blocked) {
         throw new BadRequestException(
           `Project ${project.name} is closed or cancelled and cannot be allocated`,

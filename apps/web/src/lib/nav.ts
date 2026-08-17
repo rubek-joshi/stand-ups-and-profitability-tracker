@@ -10,6 +10,7 @@ import {
   IconUserCog,
   IconUserStar,
   IconBriefcase,
+  IconShieldCheck,
 } from "@tabler/icons-react"
 import type { ComponentType } from "react"
 
@@ -25,6 +26,7 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Stand-ups", to: "/stand-ups", icon: IconClipboardList, keywords: ["standup"] },
   { title: "Clients", to: "/clients", icon: IconBuilding },
   { title: "Projects", to: "/projects", icon: IconBriefcase },
+  { title: "AMC", to: "/amc", icon: IconShieldCheck, keywords: ["maintenance", "renewal"] },
   { title: "Employees", to: "/employees", icon: IconUsers },
   { title: "Core Members", to: "/core-members", icon: IconUserStar, keywords: ["core"] },
   { title: "Categories", to: "/categories", icon: IconCategory },
