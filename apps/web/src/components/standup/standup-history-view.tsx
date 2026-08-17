@@ -65,10 +65,6 @@ function formatHistoryDay(value: string) {
   }
 }
 
-function escapeRegExp(value: string) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-}
-
 function parseSearchTerms(query: string): string[] {
   const terms: string[] = []
   const re = /"([^"]+)"|(\S+)/g
@@ -77,6 +73,77 @@ function parseSearchTerms(query: string): string[] {
     terms.push(match[1] ?? match[2] ?? "")
   }
   return [...new Set(terms.filter(Boolean))]
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0
+  if (a.length === 0) return b.length
+  if (b.length === 0) return a.length
+
+  const row = Array.from({ length: b.length + 1 }, (_, index) => index)
+  for (let i = 1; i <= a.length; i += 1) {
+    let prev = row[0] ?? 0
+    row[0] = i
+    for (let j = 1; j <= b.length; j += 1) {
+      const temp = row[j] ?? 0
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      row[j] = Math.min(
+        (row[j] ?? 0) + 1,
+        (row[j - 1] ?? 0) + 1,
+        prev + cost,
+      )
+      prev = temp
+    }
+  }
+  return row[b.length] ?? 0
+}
+
+function fuzzyTermMatchesWord(term: string, word: string): boolean {
+  const lowerTerm = term.toLowerCase()
+  const lowerWord = word.toLowerCase()
+  if (lowerWord.includes(lowerTerm) || lowerTerm.includes(lowerWord)) return true
+
+  const maxDistance =
+    lowerTerm.length <= 3 ? 0 : lowerTerm.length <= 5 ? 1 : 2
+  if (maxDistance === 0) return false
+
+  return levenshtein(lowerWord, lowerTerm) <= maxDistance
+}
+
+function collectHighlightRanges(text: string, terms: string[]): Array<[number, number]> {
+  const ranges: Array<[number, number]> = []
+  const lowerText = text.toLowerCase()
+
+  for (const term of terms) {
+    const lowerTerm = term.toLowerCase()
+    let start = 0
+    while ((start = lowerText.indexOf(lowerTerm, start)) !== -1) {
+      ranges.push([start, start + term.length])
+      start += 1
+    }
+
+    const wordPattern = /\S+/g
+    let match: RegExpExecArray | null
+    while ((match = wordPattern.exec(text)) !== null) {
+      const word = match[0]
+      const index = match.index
+      if (fuzzyTermMatchesWord(term, word)) {
+        ranges.push([index, index + word.length])
+      }
+    }
+  }
+
+  ranges.sort((a, b) => a[0] - b[0])
+  const merged: Array<[number, number]> = []
+  for (const range of ranges) {
+    const last = merged[merged.length - 1]
+    if (!last || range[0] > last[1]) {
+      merged.push(range)
+    } else {
+      last[1] = Math.max(last[1], range[1])
+    }
+  }
+  return merged
 }
 
 function HighlightText({
@@ -89,31 +156,38 @@ function HighlightText({
   className?: string
 }) {
   const terms = React.useMemo(() => parseSearchTerms(query), [query])
+  const ranges = React.useMemo(
+    () => (terms.length ? collectHighlightRanges(text, terms) : []),
+    [text, terms],
+  )
 
-  if (!terms.length) {
+  if (!ranges.length) {
     return <span className={className}>{text}</span>
   }
 
-  const pattern = terms.map(escapeRegExp).join("|")
-  const parts = text.split(new RegExp(`(${pattern})`, "gi"))
-  const lowerTerms = new Set(terms.map((term) => term.toLowerCase()))
+  const nodes: React.ReactNode[] = []
+  let cursor = 0
+  ranges.forEach(([start, end], index) => {
+    if (start > cursor) {
+      nodes.push(
+        <React.Fragment key={`text-${index}`}>{text.slice(cursor, start)}</React.Fragment>,
+      )
+    }
+    nodes.push(
+      <mark
+        key={`mark-${index}`}
+        className="rounded-sm bg-primary/25 px-0.5 text-foreground"
+      >
+        {text.slice(start, end)}
+      </mark>,
+    )
+    cursor = end
+  })
+  if (cursor < text.length) {
+    nodes.push(<React.Fragment key="tail">{text.slice(cursor)}</React.Fragment>)
+  }
 
-  return (
-    <span className={className}>
-      {parts.map((part, index) =>
-        lowerTerms.has(part.toLowerCase()) ? (
-          <mark
-            key={index}
-            className="rounded-sm bg-primary/25 px-0.5 text-foreground"
-          >
-            {part}
-          </mark>
-        ) : (
-          <React.Fragment key={index}>{part}</React.Fragment>
-        ),
-      )}
-    </span>
-  )
+  return <span className={className}>{nodes}</span>
 }
 
 type Props = {
@@ -214,7 +288,7 @@ export function StandupHistoryView({ q, refreshKey = 0, onSearchChange }: Props)
         <Input
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search by name, project, or notes…"
+          placeholder="Search by name, project, or notes (fuzzy)…"
           className="pl-9"
           aria-label="Search stand-up history"
         />

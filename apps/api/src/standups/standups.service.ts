@@ -277,7 +277,7 @@ export class StandupsService {
           AND EXISTS (
             SELECT 1 FROM standup_entries se
             WHERE se."standupId" = s.id
-            AND se.search_vector @@ websearch_to_tsquery('simple', ${q})
+            AND standup_entry_matches_search(se.search_text, se.search_vector, ${q})
           )
           ORDER BY s.date DESC, s.id DESC
           LIMIT ${limit}
@@ -289,7 +289,7 @@ export class StandupsService {
         WHERE EXISTS (
           SELECT 1 FROM standup_entries se
           WHERE se."standupId" = s.id
-          AND se.search_vector @@ websearch_to_tsquery('simple', ${q})
+          AND standup_entry_matches_search(se.search_text, se.search_vector, ${q})
         )
         ORDER BY s.date DESC, s.id DESC
         LIMIT ${limit}
