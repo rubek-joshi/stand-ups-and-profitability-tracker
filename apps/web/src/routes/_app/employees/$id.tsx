@@ -50,6 +50,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/componen
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
+import { MarkLeftDialog } from "@/components/mark-left-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import {
   ProjectAllocationChart,
@@ -130,6 +131,7 @@ function EmployeeDetailPage() {
   const { id } = Route.useParams()
   const navigate = useNavigate()
   const { confirm, dialog } = useConfirmDialog()
+  const [markLeftOpen, setMarkLeftOpen] = React.useState(false)
   const [employee, setEmployee] = React.useState<Employee | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
@@ -302,21 +304,7 @@ function EmployeeDetailPage() {
               Edit
             </Link>
             {employee.status === "active" ? (
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  const dateLeft = window.prompt(
-                    "Date left (YYYY-MM-DD)",
-                    new Date().toISOString().slice(0, 10),
-                  )
-                  if (!dateLeft) return
-                  await api(`/employees/${id}/mark-left`, {
-                    method: "POST",
-                    body: { dateLeft },
-                  })
-                  await load()
-                }}
-              >
+              <Button variant="outline" onClick={() => setMarkLeftOpen(true)}>
                 Mark left
               </Button>
             ) : null}
@@ -670,6 +658,23 @@ function EmployeeDetailPage() {
         </aside>
       </div>
       {dialog}
+      <MarkLeftDialog
+        open={markLeftOpen}
+        onOpenChange={setMarkLeftOpen}
+        personName={employee?.name}
+        onConfirm={async (dateLeft) => {
+          try {
+            await api(`/employees/${id}/mark-left`, {
+              method: "POST",
+              body: { dateLeft },
+            })
+            await load()
+          } catch (e) {
+            alert(e instanceof ApiError ? e.message : "Failed to mark left")
+            throw e
+          }
+        }}
+      />
     </div>
   )
 }
