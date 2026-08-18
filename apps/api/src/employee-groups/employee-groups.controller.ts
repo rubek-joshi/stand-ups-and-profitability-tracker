@@ -17,6 +17,7 @@ import { RequirePermission } from "../casbin/decorators/require-permission.decor
 import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import {
   AddEmployeeGroupMemberDto,
+  AddEmployeeGroupMembersBulkDto,
   CreateEmployeeGroupDto,
   UpdateEmployeeGroupDto,
 } from "./dto/employee-group.dto";
@@ -73,6 +74,17 @@ export class EmployeeGroupsController {
   @ApiOperation({ summary: "Delete employee group" })
   async remove(@Param("id") id: string, @CurrentUser() user: AuthUser) {
     return this.employeeGroupsService.remove(id, user.id);
+  }
+
+  @Post(":id/members/bulk")
+  @RequirePermission("employee-groups", "*")
+  @ApiOperation({ summary: "Add multiple employees to group" })
+  async addMembersBulk(
+    @Param("id") id: string,
+    @Body() dto: AddEmployeeGroupMembersBulkDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.employeeGroupsService.addMembersBulk(id, dto, user.id);
   }
 
   @Post(":id/members")

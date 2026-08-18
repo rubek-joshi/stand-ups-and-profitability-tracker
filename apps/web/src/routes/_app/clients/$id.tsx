@@ -140,7 +140,7 @@ function ClientDetailPage() {
                 if (!ok) return
                 try {
                   await api(`/clients/${id}`, { method: "DELETE" })
-                  void navigate({ to: "/clients" })
+                  void navigate({ to: "/clients", search: DEFAULT_LIST_SEARCH })
                 } catch (e) {
                   alert(e instanceof ApiError ? e.message : "Delete failed")
                 }
@@ -152,52 +152,52 @@ function ClientDetailPage() {
         }
       />
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title="Project profit / loss"
-          value={formatNpr(stats?.profitLossPaisa ?? "0", { signed: true })}
-          valueClassName={
-            totalPl > 0
-              ? "text-emerald-600 dark:text-emerald-400"
-              : totalPl < 0
-                ? "text-red-600 dark:text-red-400"
-                : undefined
-          }
-        />
-        <StatCard
-          title="Employees involved"
-          value={String(employees.length)}
-          interactive
-          onClick={() =>
-            setPeopleModal({
-              title: "Employees involved",
-              people: employees,
-              emptyLabel: "No employees assigned to this client's projects.",
-              href: "/employees/$id",
-            })
-          }
-        />
-        <StatCard
-          title="Core members involved"
-          value={String(coreMembers.length)}
-          interactive
-          onClick={() =>
-            setPeopleModal({
-              title: "Core members involved",
-              people: coreMembers,
-              emptyLabel: "No core members assigned to this client's projects.",
-              href: "/core-members/$id",
-            })
-          }
-        />
-        <StatCard
-          title="Standups mentioned"
-          value={String(stats?.standupsMentioned ?? 0)}
-        />
-      </div>
-
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <section className="min-w-0 space-y-4">
+        <section className="min-w-0 space-y-6">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              title="Project profit / loss"
+              value={formatNpr(stats?.profitLossPaisa ?? "0", { signed: true })}
+              valueClassName={
+                totalPl > 0
+                  ? "text-emerald-600 dark:text-emerald-400"
+                  : totalPl < 0
+                    ? "text-red-600 dark:text-red-400"
+                    : undefined
+              }
+            />
+            <StatCard
+              title="Employees involved"
+              value={String(employees.length)}
+              interactive
+              onClick={() =>
+                setPeopleModal({
+                  title: "Employees involved",
+                  people: employees,
+                  emptyLabel: "No employees assigned to this client's projects.",
+                  href: "/employees/$id",
+                })
+              }
+            />
+            <StatCard
+              title="Core members involved"
+              value={String(coreMembers.length)}
+              interactive
+              onClick={() =>
+                setPeopleModal({
+                  title: "Core members involved",
+                  people: coreMembers,
+                  emptyLabel: "No core members assigned to this client's projects.",
+                  href: "/core-members/$id",
+                })
+              }
+            />
+            <StatCard
+              title="Stand-ups mentioned"
+              value={String(stats?.standupsMentioned ?? 0)}
+            />
+          </div>
+
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium text-muted-foreground">Projects</h2>
             <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
@@ -335,7 +335,7 @@ function ProjectSection({
         {projects.length === 0 ? (
           <p className="px-1 py-2 text-sm text-muted-foreground">{emptyLabel}</p>
         ) : (
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-4 xl:grid-cols-1 2xl:grid-cols-2 3xl:grid-cols-3">
             {projects.map((project) => (
               <ProjectCard key={project.id} project={project} settings={settings} />
             ))}

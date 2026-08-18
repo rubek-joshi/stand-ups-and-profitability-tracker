@@ -124,7 +124,7 @@ function EmployeeEditPage() {
           <Link
             to="/employees/$id"
             params={{ id }}
-            className={buttonVariants({ variant: "outline" })}
+            className={buttonVariants({ variant: "secondary" })}
           >
             Cancel
           </Link>

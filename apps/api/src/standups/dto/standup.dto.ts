@@ -100,6 +100,14 @@ export class StandupHistoryQueryDto {
   q?: string;
 
   @ApiPropertyOptional({
+    description: "Limit history to this employee's entries",
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  employeeId?: string;
+
+  @ApiPropertyOptional({
     description: "Opaque cursor from a previous history response",
   })
   @IsOptional()

@@ -44,7 +44,9 @@ export const Route = createFileRoute("/_app/audit")({
       page: parsePage(search.page),
       pageSize: parsePageSize(search.pageSize),
       action:
-        action && ACTIONS.includes(action) ? action : undefined,
+        action && (ACTIONS as readonly string[]).includes(action)
+          ? action
+          : undefined,
       actorId: parseOptionalString(search.actorId),
     }
   },
@@ -58,28 +60,60 @@ type AuditActor = {
 }
 
 const ACTIONS = [
+  "AMC_CANCELLED",
+  "AMC_DELETED",
+  "AMC_SET",
+  "AMC_UPDATED",
+  "CATEGORY_CREATED",
+  "CATEGORY_DEACTIVATED",
+  "CATEGORY_UPDATED",
   "CLIENT_CREATED",
-  "CLIENT_UPDATED",
   "CLIENT_DEACTIVATED",
   "CLIENT_DELETED",
-  "PROJECT_CREATED",
-  "PROJECT_UPDATED",
-  "PROJECT_CLOSED",
-  "PROJECT_EXTENDED",
+  "CLIENT_UPDATED",
+  "CORE_MEMBER_ASSIGNED",
+  "CORE_MEMBER_CREATED",
+  "CORE_MEMBER_DELETED",
+  "CORE_MEMBER_MARKED_LEFT",
+  "CORE_MEMBER_SALARY_CREATED",
+  "CORE_MEMBER_SALARY_DELETED",
+  "CORE_MEMBER_SALARY_UPDATED",
+  "CORE_MEMBER_UNASSIGNED",
+  "CORE_MEMBER_UPDATED",
+  "DB_SNAPSHOT_DOWNLOADED",
   "EMPLOYEE_CREATED",
+  "EMPLOYEE_DELETED",
+  "EMPLOYEE_GROUP_CREATED",
+  "EMPLOYEE_GROUP_DELETED",
+  "EMPLOYEE_GROUP_MEMBER_ADDED",
+  "EMPLOYEE_GROUP_MEMBER_REMOVED",
+  "EMPLOYEE_GROUP_UPDATED",
+  "EMPLOYEE_MARKED_LEFT",
+  "EMPLOYEE_SALARY_CREATED",
+  "EMPLOYEE_SALARY_DELETED",
   "EMPLOYEE_SALARY_UPDATED",
-  "STANDUP_COMPLETED",
-  "VAT_CLEARED",
+  "EMPLOYEE_UPDATED",
+  "PROJECT_ASSIGNMENT_CREATED",
+  "PROJECT_ASSIGNMENT_ENDED",
+  "PROJECT_AUTO_EXTENDED",
+  "PROJECT_CLOSED",
+  "PROJECT_CREATED",
+  "PROJECT_EXTENDED",
+  "PROJECT_UPDATED",
   "SETTINGS_UPDATED",
-  "AMC_SET",
-  "AMC_CANCELLED",
-  "USER_LOGIN",
+  "STANDUP_COMPLETED",
+  "STANDUP_CREATED",
+  "STANDUP_OVERRIDE_GRANTED",
+  "STANDUP_REOPENED",
+  "STANDUP_UPDATED",
   "USER_CREATED",
-  "USER_UPDATED",
   "USER_DEACTIVATED",
-  "USER_REACTIVATED",
+  "USER_LOGIN",
   "USER_PASSWORD_CHANGED",
-]
+  "USER_REACTIVATED",
+  "USER_UPDATED",
+  "VAT_CLEARED",
+] as const
 
 const ENTITY_ROUTES: Record<string, string> = {
   Client: "/clients/$id",
@@ -101,9 +135,12 @@ function AuditPage() {
   const actorItems = React.useMemo(
     () =>
       Object.fromEntries(
-        actors.map((a) => [a.id, a.name?.trim() ? `${a.name} (${a.email})` : a.email]),
+        actors.map((a) => [
+          a.id,
+          a.name?.trim() ? `${a.name} (${a.email})` : a.email,
+        ])
       ),
-    [actors],
+    [actors]
   )
 
   const loadActors = React.useCallback(async () => {
@@ -136,7 +173,7 @@ function AuditPage() {
           ? e.status === 403
             ? "Audit logs are available to super admins only."
             : e.message
-          : "Failed to load audit logs",
+          : "Failed to load audit logs"
       )
     } finally {
       setLoading(false)
@@ -173,12 +210,18 @@ function AuditPage() {
                 }}
                 items={Object.fromEntries(ACTIONS.map((a) => [a, a]))}
               >
-                <SelectTrigger className="w-56">
+                <SelectTrigger
+                  className="w-80 max-w-full **:data-[slot=select-value]:line-clamp-none **:data-[slot=select-value]:whitespace-normal"
+                >
                   <SelectValue placeholder="All actions" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="max-h-72 min-w-80 overflow-y-auto">
                   {ACTIONS.map((a) => (
-                    <SelectItem key={a} value={a}>
+                    <SelectItem
+                      key={a}
+                      value={a}
+                      className="[&>span]:whitespace-normal [&>span]:wrap-break-word"
+                    >
                       {a}
                     </SelectItem>
                   ))}
@@ -212,26 +255,28 @@ function AuditPage() {
                 </SelectContent>
               </Select>
             </div>
-            {action || actorId ? (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  void navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      action: undefined,
-                      actorId: undefined,
-                      page: 1,
-                    }),
-                  })
-                }}
-              >
-                Clear
+            <div className="flex gap-1 mb-1">
+              {action || actorId ? (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    void navigate({
+                      search: (prev) => ({
+                        ...prev,
+                        action: undefined,
+                        actorId: undefined,
+                        page: 1,
+                      }),
+                    })
+                  }}
+                >
+                  Clear
+                </Button>
+              ) : null}
+              <Button variant="outline" onClick={() => void load()}>
+                Refresh
               </Button>
-            ) : null}
-            <Button variant="outline" onClick={() => void load()}>
-              Refresh
-            </Button>
+            </div>
           </div>
         }
       />
@@ -264,11 +309,15 @@ function AuditPage() {
 
                   return (
                     <TableRow key={log.id}>
-                      <TableCell className="whitespace-nowrap text-sm">
+                      <TableCell className="text-sm whitespace-nowrap">
                         {new Date(log.createdAt).toLocaleString()}
                       </TableCell>
-                      <TableCell className="font-mono text-xs">{log.action}</TableCell>
-                      <TableCell>{log.actor?.name ?? log.actor?.email ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {log.action}
+                      </TableCell>
+                      <TableCell>
+                        {log.actor?.name ?? log.actor?.email ?? "—"}
+                      </TableCell>
                       <TableCell className="text-sm">
                         {entityId ? (
                           <EntityLink type={type} id={entityId}>

@@ -61,6 +61,8 @@ export const Route = createFileRoute("/_app/stand-ups/")({
           ? ("history" as const)
           : ("list" as const),
     q: typeof search.q === "string" ? search.q : "",
+    employeeId:
+      typeof search.employeeId === "string" ? search.employeeId : "",
   }),
   component: StandupsPage,
 })
@@ -76,7 +78,7 @@ function formatStandupDate(value: string) {
 
 function StandupsPage() {
   const navigate = Route.useNavigate()
-  const { page, pageSize, view, q } = Route.useSearch()
+  const { page, pageSize, view, q, employeeId } = Route.useSearch()
   const { user, refreshUser } = useAuth()
   const [items, setItems] = React.useState<Standup[]>([])
   const [total, setTotal] = React.useState(0)
@@ -261,12 +263,21 @@ function StandupsPage() {
         <TabsContent value="history" className="mt-4">
           <StandupHistoryView
             q={q}
+            employeeId={employeeId}
             refreshKey={historyRefreshKey}
             onSearchChange={(value) => {
               void navigate({
                 search: (prev) => ({
                   ...prev,
                   q: value,
+                }),
+              })
+            }}
+            onEmployeeChange={(value) => {
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  employeeId: value,
                 }),
               })
             }}

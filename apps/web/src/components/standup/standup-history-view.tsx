@@ -9,10 +9,17 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Spinner } from "@workspace/ui/components/spinner"
 import { cn } from "@workspace/ui/lib/utils"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@workspace/ui/components/select"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import { isWorking } from "@/components/standup/employee-standup-card"
-import { api, ApiError, type Envelope } from "@/lib/api"
-import type { AttendanceStatus } from "@/lib/types"
+import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
+import type { AttendanceStatus, Employee } from "@/lib/types"
 import { format, parseISO } from "date-fns"
 
 export type StandupHistoryRecord = {
@@ -192,12 +199,23 @@ function HighlightText({
 
 type Props = {
   q: string
+  employeeId: string
   refreshKey?: number
   onSearchChange: (value: string) => void
+  onEmployeeChange: (value: string) => void
 }
 
-export function StandupHistoryView({ q, refreshKey = 0, onSearchChange }: Props) {
+const ALL_EMPLOYEES = "__all__"
+
+export function StandupHistoryView({
+  q,
+  employeeId,
+  refreshKey = 0,
+  onSearchChange,
+  onEmployeeChange,
+}: Props) {
   const [searchInput, setSearchInput] = React.useState(q)
+  const [employees, setEmployees] = React.useState<Employee[]>([])
   const [days, setDays] = React.useState<StandupHistoryDay[]>([])
   const [cursor, setCursor] = React.useState<string | null>(null)
   const [hasMore, setHasMore] = React.useState(false)
@@ -218,6 +236,40 @@ export function StandupHistoryView({ q, refreshKey = 0, onSearchChange }: Props)
     return () => window.clearTimeout(timer)
   }, [searchInput, q, onSearchChange])
 
+  React.useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const res = await api<PaginatedEnvelope<Employee[]> | Envelope<Employee[]>>(
+          "/employees",
+        )
+        if (cancelled) return
+        setEmployees(
+          [...res.data].sort((a, b) => a.name.localeCompare(b.name)),
+        )
+      } catch {
+        if (!cancelled) setEmployees([])
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const employeeItems = React.useMemo(
+    () =>
+      Object.fromEntries([
+        [ALL_EMPLOYEES, "All employees"],
+        ...employees.map((employee) => [
+          employee.id,
+          employee.status === "left"
+            ? `${employee.name} (left)`
+            : employee.name,
+        ]),
+      ]),
+    [employees],
+  )
+
   const loadPage = React.useCallback(
     async (opts: { reset: boolean; cursorOverride?: string | null }) => {
       const requestId = ++requestIdRef.current
@@ -231,6 +283,7 @@ export function StandupHistoryView({ q, refreshKey = 0, onSearchChange }: Props)
       try {
         const params = new URLSearchParams()
         if (q.trim()) params.set("q", q.trim())
+        if (employeeId.trim()) params.set("employeeId", employeeId.trim())
         const nextCursor = opts.reset ? null : (opts.cursorOverride ?? cursor)
         if (nextCursor) params.set("cursor", nextCursor)
         params.set("limit", "10")
@@ -255,13 +308,13 @@ export function StandupHistoryView({ q, refreshKey = 0, onSearchChange }: Props)
         }
       }
     },
-    [q, cursor],
+    [q, employeeId, cursor],
   )
 
   React.useEffect(() => {
     setCursor(null)
     void loadPage({ reset: true })
-  }, [q, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [q, employeeId, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     const el = sentinelRef.current
@@ -283,15 +336,38 @@ export function StandupHistoryView({ q, refreshKey = 0, onSearchChange }: Props)
 
   return (
     <div className="space-y-4">
-      <div className="relative max-w-md">
-        <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          placeholder="Search by name, project, or notes (fuzzy)…"
-          className="pl-9"
-          aria-label="Search stand-up history"
-        />
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[16rem] flex-1 max-w-md">
+          <IconSearch className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search by name, project, or notes (fuzzy)…"
+            className="pl-9"
+            aria-label="Search stand-up history"
+          />
+        </div>
+        <Select
+          value={employeeId || ALL_EMPLOYEES}
+          onValueChange={(value) => {
+            onEmployeeChange(value === ALL_EMPLOYEES || !value ? "" : value)
+          }}
+          items={employeeItems}
+        >
+          <SelectTrigger className="w-64" aria-label="Filter by employee">
+            <SelectValue placeholder="All employees" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_EMPLOYEES}>All employees</SelectItem>
+            {employees.map((employee) => (
+              <SelectItem key={employee.id} value={employee.id}>
+                {employee.status === "left"
+                  ? `${employee.name} (left)`
+                  : employee.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {loading ? <LoadingState label="Loading history…" /> : null}
@@ -302,9 +378,13 @@ export function StandupHistoryView({ q, refreshKey = 0, onSearchChange }: Props)
       {!loading && !error && days.length === 0 ? (
         <EmptyState
           message={
-            q.trim()
-              ? "No stand-ups match your search."
-              : "No stand-up history yet."
+            q.trim() && employeeId
+              ? "No stand-ups match this employee and search."
+              : q.trim()
+                ? "No stand-ups match your search."
+                : employeeId
+                  ? "No stand-up history for this employee."
+                  : "No stand-up history yet."
           }
         />
       ) : null}
@@ -383,12 +463,21 @@ export function StandupHistoryView({ q, refreshKey = 0, onSearchChange }: Props)
         })}
       </div>
 
-      <div ref={sentinelRef} className="flex justify-center py-4">
+      <div ref={sentinelRef} className="flex justify-center py-6">
         {loadingMore ? (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Spinner />
             Loading more…
           </div>
+        ) : null}
+        {!loading && !loadingMore && !error && days.length > 0 && !hasMore ? (
+          <p className="flex items-center gap-3 text-sm text-muted-foreground">
+            <span className="h-px w-8 bg-border" aria-hidden />
+            {q.trim()
+              ? "You've reached the end — no more matching stand-ups."
+              : "You've reached the end — no more stand-ups."}
+            <span className="h-px w-8 bg-border" aria-hidden />
+          </p>
         ) : null}
       </div>
     </div>

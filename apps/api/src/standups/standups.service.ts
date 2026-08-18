@@ -170,6 +170,17 @@ export class StandupsService {
   async findHistory(query: StandupHistoryQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 10, 1), 50);
     const q = query.q?.trim() ?? "";
+    const employeeId = query.employeeId?.trim() || null;
+
+    if (employeeId) {
+      const employee = await this.prismaService.employee.findUnique({
+        where: { id: employeeId },
+        select: { id: true },
+      });
+      if (!employee) {
+        throw new NotFoundException(`Employee ${employeeId} not found`);
+      }
+    }
 
     let cursorDate: Date | null = null;
     let cursorId: string | null = null;
@@ -179,9 +190,13 @@ export class StandupsService {
       cursorId = decoded.id;
     }
 
-    const rows = q
-      ? await this.queryHistoryStandupIds(q, cursorDate, cursorId, limit + 1)
-      : await this.queryHistoryStandupIds(null, cursorDate, cursorId, limit + 1);
+    const rows = await this.queryHistoryStandupIds(
+      q || null,
+      employeeId,
+      cursorDate,
+      cursorId,
+      limit + 1,
+    );
 
     const hasMore = rows.length > limit;
     const pageRows = hasMore ? rows.slice(0, limit) : rows;
@@ -198,6 +213,7 @@ export class StandupsService {
       where: { id: { in: pageIds } },
       include: {
         entries: {
+          where: employeeId ? { employeeId } : undefined,
           include: {
             employee: { select: { id: true, name: true } },
             allocations: {
@@ -264,11 +280,12 @@ export class StandupsService {
 
   private queryHistoryStandupIds(
     q: string | null,
+    employeeId: string | null,
     cursorDate: Date | null,
     cursorId: string | null,
     limit: number,
   ) {
-    if (q) {
+    if (q || employeeId) {
       if (cursorDate && cursorId) {
         return this.prismaService.$queryRaw<Array<{ id: string; date: Date }>>`
           SELECT s.id, s.date
@@ -277,7 +294,11 @@ export class StandupsService {
           AND EXISTS (
             SELECT 1 FROM standup_entries se
             WHERE se."standupId" = s.id
-            AND standup_entry_matches_search(se.search_text, se.search_vector, ${q})
+            AND (${employeeId}::text IS NULL OR se."employeeId" = ${employeeId})
+            AND (
+              ${q}::text IS NULL
+              OR standup_entry_matches_search(se.search_text, se.search_vector, ${q})
+            )
           )
           ORDER BY s.date DESC, s.id DESC
           LIMIT ${limit}
@@ -289,7 +310,11 @@ export class StandupsService {
         WHERE EXISTS (
           SELECT 1 FROM standup_entries se
           WHERE se."standupId" = s.id
-          AND standup_entry_matches_search(se.search_text, se.search_vector, ${q})
+          AND (${employeeId}::text IS NULL OR se."employeeId" = ${employeeId})
+          AND (
+            ${q}::text IS NULL
+            OR standup_entry_matches_search(se.search_text, se.search_vector, ${q})
+          )
         )
         ORDER BY s.date DESC, s.id DESC
         LIMIT ${limit}

@@ -119,7 +119,7 @@ function CoreMemberEditPage() {
           <Link
             to="/core-members/$id"
             params={{ id }}
-            className={buttonVariants({ variant: "outline" })}
+            className={buttonVariants({ variant: "secondary" })}
           >
             Cancel
           </Link>

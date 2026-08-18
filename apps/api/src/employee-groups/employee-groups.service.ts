@@ -13,6 +13,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import {
   AddEmployeeGroupMemberDto,
+  AddEmployeeGroupMembersBulkDto,
   CreateEmployeeGroupDto,
   UpdateEmployeeGroupDto,
 } from "./dto/employee-group.dto";
@@ -184,6 +185,69 @@ export class EmployeeGroupsService {
       targetId: groupId,
       metadata: { employeeId: dto.employeeId },
     });
+    return this.findOne(groupId);
+  }
+
+  async addMembersBulk(
+    groupId: string,
+    dto: AddEmployeeGroupMembersBulkDto,
+    actorId: string,
+  ) {
+    await this.getOrThrow(groupId);
+    const uniqueIds = [...new Set(dto.employeeIds.map((id) => id.trim()))].filter(
+      Boolean,
+    );
+    if (uniqueIds.length === 0) {
+      throw new BadRequestException("At least one employee is required");
+    }
+
+    const employees = await this.prismaService.employee.findMany({
+      where: { id: { in: uniqueIds } },
+    });
+    if (employees.length !== uniqueIds.length) {
+      const found = new Set(employees.map((employee) => employee.id));
+      const missing = uniqueIds.filter((id) => !found.has(id));
+      throw new NotFoundException(
+        `Employees not found: ${missing.join(", ")}`,
+      );
+    }
+
+    const inactive = employees.filter(
+      (employee) => employee.status !== PersonStatus.active,
+    );
+    if (inactive.length > 0) {
+      throw new BadRequestException(
+        `Only active employees can be added: ${inactive.map((employee) => employee.name).join(", ")}`,
+      );
+    }
+
+    const existing = await this.prismaService.employeeGroupMember.findMany({
+      where: { groupId, employeeId: { in: uniqueIds } },
+      select: { employeeId: true },
+    });
+    const existingIds = new Set(existing.map((member) => member.employeeId));
+    const toAdd = uniqueIds.filter((id) => !existingIds.has(id));
+
+    if (toAdd.length === 0) {
+      return this.findOne(groupId);
+    }
+
+    await this.prismaService.employeeGroupMember.createMany({
+      data: toAdd.map((employeeId) => ({ groupId, employeeId })),
+    });
+
+    await Promise.all(
+      toAdd.map((employeeId) =>
+        this.auditService.write({
+          actorId,
+          action: AuditAction.EMPLOYEE_GROUP_MEMBER_ADDED,
+          targetType: "EmployeeGroup",
+          targetId: groupId,
+          metadata: { employeeId },
+        }),
+      ),
+    );
+
     return this.findOne(groupId);
   }
 

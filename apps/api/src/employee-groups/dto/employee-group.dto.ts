@@ -1,5 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from "class-validator";
+import {
+  ArrayNotEmpty,
+  IsArray,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from "class-validator";
 
 export class CreateEmployeeGroupDto {
   @ApiProperty()
@@ -35,4 +42,13 @@ export class AddEmployeeGroupMemberDto {
   @IsString()
   @IsNotEmpty()
   employeeId!: string;
+}
+
+export class AddEmployeeGroupMembersBulkDto {
+  @ApiProperty({ type: [String] })
+  @IsArray()
+  @ArrayNotEmpty()
+  @IsString({ each: true })
+  @IsNotEmpty({ each: true })
+  employeeIds!: string[];
 }

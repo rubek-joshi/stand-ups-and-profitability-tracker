@@ -1,18 +1,19 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
-import { IconTrash, IconUserMinus } from "@tabler/icons-react"
+import { IconTrash, IconUserMinus, IconUserPlus } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
+import { Checkbox } from "@workspace/ui/components/checkbox"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
 import {
   Table,
   TableBody,
@@ -44,7 +45,10 @@ function EmployeeGroupDetailPage() {
   const { confirm, dialog } = useConfirmDialog()
   const [group, setGroup] = React.useState<EmployeeGroup | null>(null)
   const [employees, setEmployees] = React.useState<Employee[]>([])
-  const [employeeId, setEmployeeId] = React.useState("")
+  const [addOpen, setAddOpen] = React.useState(false)
+  const [addQuery, setAddQuery] = React.useState("")
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = React.useState<string[]>([])
+  const [addingMembers, setAddingMembers] = React.useState(false)
   const [name, setName] = React.useState("")
   const [description, setDescription] = React.useState("")
   const [loading, setLoading] = React.useState(true)
@@ -80,6 +84,65 @@ function EmployeeGroupDetailPage() {
 
   const memberIds = new Set((group.members ?? []).map((m) => m.employeeId))
   const available = employees.filter((e) => !memberIds.has(e.id))
+  const filteredAvailable = available.filter((employee) => {
+    const query = addQuery.trim().toLowerCase()
+    if (!query) return true
+    return (
+      employee.name.toLowerCase().includes(query) ||
+      employee.email.toLowerCase().includes(query)
+    )
+  })
+  const allFilteredSelected =
+    filteredAvailable.length > 0 &&
+    filteredAvailable.every((employee) => selectedEmployeeIds.includes(employee.id))
+
+  const openAddMembers = () => {
+    setAddQuery("")
+    setSelectedEmployeeIds([])
+    setAddOpen(true)
+  }
+
+  const toggleEmployee = (employeeId: string, checked: boolean) => {
+    setSelectedEmployeeIds((prev) =>
+      checked ? [...prev, employeeId] : prev.filter((id) => id !== employeeId),
+    )
+  }
+
+  const toggleAllFiltered = (checked: boolean) => {
+    if (!checked) {
+      const filteredIds = new Set(filteredAvailable.map((employee) => employee.id))
+      setSelectedEmployeeIds((prev) => prev.filter((id) => !filteredIds.has(id)))
+      return
+    }
+    setSelectedEmployeeIds((prev) => [
+      ...prev,
+      ...filteredAvailable
+        .map((employee) => employee.id)
+        .filter((id) => !prev.includes(id)),
+    ])
+  }
+
+  const addSelectedMembers = async () => {
+    if (selectedEmployeeIds.length === 0) return
+    setAddingMembers(true)
+    try {
+      const res = await api<Envelope<EmployeeGroup>>(
+        `/employee-groups/${id}/members/bulk`,
+        {
+          method: "POST",
+          body: { employeeIds: selectedEmployeeIds },
+        },
+      )
+      setGroup(res.data)
+      setAddOpen(false)
+      setSelectedEmployeeIds([])
+      setAddQuery("")
+    } catch (e) {
+      alert(e instanceof ApiError ? e.message : "Failed to add members")
+    } finally {
+      setAddingMembers(false)
+    }
+  }
 
   return (
     <div>
@@ -191,49 +254,89 @@ function EmployeeGroupDetailPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex flex-wrap gap-2">
-              <Select
-                value={employeeId || null}
-                onValueChange={(v) => setEmployeeId(v ?? "")}
-                items={Object.fromEntries(
-                  available.map((e) => [e.id, `${e.name} · ${e.email}`]),
-                )}
-                disabled={available.length === 0}
-              >
-                <SelectTrigger className="w-72">
-                  <SelectValue
-                    placeholder={
-                      available.length === 0
-                        ? "All active employees added"
-                        : "Add employee"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {available.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      {e.name} · {e.email}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Button
-                disabled={!employeeId}
-                onClick={async () => {
-                  try {
-                    const res = await api<Envelope<EmployeeGroup>>(
-                      `/employee-groups/${id}/members`,
-                      { method: "POST", body: { employeeId } },
-                    )
-                    setGroup(res.data)
-                    setEmployeeId("")
-                  } catch (e) {
-                    alert(e instanceof ApiError ? e.message : "Failed to add")
-                  }
-                }}
+                disabled={available.length === 0}
+                onClick={openAddMembers}
               >
-                Add
+                <IconUserPlus className="size-3.5" />
+                Add members
               </Button>
             </div>
+
+            <Dialog open={addOpen} onOpenChange={setAddOpen}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Add members</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-3">
+                  <Input
+                    value={addQuery}
+                    onChange={(e) => setAddQuery(e.target.value)}
+                    placeholder="Search by name or email…"
+                    aria-label="Search employees to add"
+                  />
+                  {filteredAvailable.length > 0 ? (
+                    <label className="flex items-center gap-2 border-b pb-2 text-sm">
+                      <Checkbox
+                        checked={allFilteredSelected}
+                        onCheckedChange={(checked) =>
+                          toggleAllFiltered(Boolean(checked))
+                        }
+                      />
+                      Select all shown ({filteredAvailable.length})
+                    </label>
+                  ) : null}
+                  <div className="max-h-72 space-y-1 overflow-y-auto">
+                    {filteredAvailable.length === 0 ? (
+                      <p className="py-6 text-center text-sm text-muted-foreground">
+                        {available.length === 0
+                          ? "All active employees are already in this group."
+                          : "No employees match your search."}
+                      </p>
+                    ) : (
+                      filteredAvailable.map((employee) => (
+                        <label
+                          key={employee.id}
+                          className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-muted/60"
+                        >
+                          <Checkbox
+                            checked={selectedEmployeeIds.includes(employee.id)}
+                            onCheckedChange={(checked) =>
+                              toggleEmployee(employee.id, Boolean(checked))
+                            }
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">
+                              {employee.name}
+                            </span>
+                            <span className="block text-xs text-muted-foreground">
+                              {employee.email}
+                            </span>
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button
+                    variant="outline"
+                    onClick={() => setAddOpen(false)}
+                    disabled={addingMembers}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    disabled={selectedEmployeeIds.length === 0 || addingMembers}
+                    onClick={() => void addSelectedMembers()}
+                  >
+                    {addingMembers
+                      ? "Adding…"
+                      : `Add ${selectedEmployeeIds.length || ""} member${selectedEmployeeIds.length === 1 ? "" : "s"}`.trim()}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             <Table>
               <TableHeader>
