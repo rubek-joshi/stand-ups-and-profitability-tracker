@@ -9,6 +9,7 @@ import {
   IconMail,
   IconMessage,
   IconMoon,
+  IconPencil,
   IconSun,
   IconTrendingUp,
   IconUser,
@@ -52,6 +53,9 @@ import { StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { MarkLeftDialog } from "@/components/mark-left-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
+import {
+  TableActionLink,
+} from "@/components/table-row-actions"
 import {
   ProjectAllocationChart,
   ProjectTimelineChart,
@@ -301,13 +305,6 @@ function EmployeeDetailPage() {
                 <Badge variant="secondary">{g.name}</Badge>
               </Link>
             ))}
-            <Link
-              to="/employees/$id/edit"
-              params={{ id }}
-              className={buttonVariants()}
-            >
-              Edit
-            </Link>
             {employee.status === "active" ? (
               <Button variant="outline" onClick={() => setMarkLeftOpen(true)}>
                 Mark left
@@ -325,7 +322,7 @@ function EmployeeDetailPage() {
                 if (!ok) return
                 try {
                   await api(`/employees/${id}`, { method: "DELETE" })
-                  void navigate({ to: "/employees" })
+                  void navigate({ to: "/employees", search: DEFAULT_LIST_SEARCH })
                 } catch (e) {
                   alert(e instanceof ApiError ? e.message : "Delete failed")
                 }
@@ -454,14 +451,23 @@ function EmployeeDetailPage() {
           </div>
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Salary history</CardTitle>
-              {currentSalary ? (
-                <Badge variant="secondary" className="gap-1">
-                  <IconTrendingUp className="size-3" />
-                  {formatNpr(currentSalary.salaryPaisa)}
-                </Badge>
-              ) : null}
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-base">Salary history</CardTitle>
+                {currentSalary ? (
+                  <Badge variant="secondary" className="gap-1">
+                    <IconTrendingUp className="size-3" />
+                    {formatNpr(currentSalary.salaryPaisa)}
+                  </Badge>
+                ) : null}
+              </div>
+              <TableActionLink
+                label="Edit salary"
+                to="/employees/$id/salary/edit"
+                params={{ id }}
+              >
+                <IconPencil className="size-3.5" />
+              </TableActionLink>
             </CardHeader>
             <CardContent>
               {salaryEntries.length === 0 ? (
@@ -579,8 +585,15 @@ function EmployeeDetailPage() {
 
         <aside className="lg:sticky lg:top-4 space-y-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">Employee details</CardTitle>
+              <TableActionLink
+                label="Edit details"
+                to="/employees/$id/edit"
+                params={{ id }}
+              >
+                <IconPencil className="size-3.5" />
+              </TableActionLink>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <Detail icon={IconUser} label="Name" value={employee.name} />
