@@ -360,29 +360,89 @@ export type AuditLog = {
 export type DashboardSummary = {
   totalProfitPaisa: string
   totalLossPaisa: string
+  netProfitLossPaisa: string
+  totalRevenuePaisa: string
   overallMarginPercent: number
+  activeClients: number
+  clientsWithActiveProjects: number
   activeCount: number
   closedCount: number
+  closedFreeAmcCount: number
+  closedPaidAmcCount: number
+  totalEmployees: number
+  totalStandups: number
+  amcValuePaisa: string
+  activeAmcs: number
+  canViewAudit: boolean
   top5Profitable: Array<{
     id: string
     name: string
+    clientName: string
     profitLossPaisa: string
     marginPercent: number
   }>
   top5LossMaking: Array<{
     id: string
     name: string
+    clientName: string
     profitLossPaisa: string
     marginPercent: number
   }>
-  trendingOverBudget: Array<{ id: string; name: string }>
+  trendingOverBudget: Array<{
+    id: string
+    name: string
+    clientName: string
+    marginPercent: number
+  }>
   accumulatedVat: { unpaidPaisa: string }
-  amcReminders: Array<{ projectId: string; projectName: string; status: string }>
+  amcReminders: Array<{
+    id: string
+    projectId: string
+    projectName: string
+    clientName: string
+    status: string
+    endDate: string
+    amcAmountPaisa: string | null
+  }>
+  amcContracts: Array<{
+    id: string
+    projectId: string
+    projectName: string
+    clientName: string
+    status: string
+    endDate: string
+    amcAmountPaisa: string | null
+  }>
   categoryBreakdown: Array<{
     categoryId: string
     categoryName: string
     profitLossPaisa: string
-    marginPercent: number
+  }>
+  groupCounts: Array<{
+    groupId: string
+    groupName: string
+    count: number
+  }>
+  profitTrend: Array<{
+    label: string
+    month: string
+    revenuePaisa: string
+    profitLossPaisa: string
+  }>
+  recentStandups: Array<{
+    id: string
+    date: string
+    authorName: string
+    groupName: string
+    entryCount: number
+  }>
+  recentAudit: Array<{
+    id: string
+    action: string
+    targetType: string
+    targetId: string
+    createdAt: string
+    actorName: string
   }>
 }
 

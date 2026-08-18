@@ -1,6 +1,9 @@
 import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { CurrentUser } from "../_shared/decorators/current-user.decorator";
+import { AuthUser } from "../auth/types/auth-user.type";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { CasbinService } from "../casbin/casbin.service";
 import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
 import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import { DashboardService } from "./dashboard.service";
@@ -10,7 +13,10 @@ import { DashboardService } from "./dashboard.service";
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 @Controller("dashboard")
 export class DashboardController {
-  constructor(private readonly dashboardService: DashboardService) {}
+  constructor(
+    private readonly dashboardService: DashboardService,
+    private readonly casbinService: CasbinService,
+  ) {}
 
   @Get("summary")
   @RequirePermission("dashboard", "read")
@@ -18,7 +24,15 @@ export class DashboardController {
   async getSummary(
     @Query("from") from?: string,
     @Query("to") to?: string,
+    @CurrentUser() user?: AuthUser,
   ) {
-    return this.dashboardService.getSummary(from, to);
+    const includeAudit = user
+      ? await this.casbinService.enforce(
+          this.casbinService.subjectForUser(user.id),
+          "audit",
+          "read",
+        )
+      : false;
+    return this.dashboardService.getSummary(from, to, { includeAudit });
   }
 }
