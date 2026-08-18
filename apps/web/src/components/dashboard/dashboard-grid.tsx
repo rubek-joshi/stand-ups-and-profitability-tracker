@@ -141,9 +141,10 @@ export function DashboardGrid({
               <p className="mt-0.5 truncate text-xs text-muted-foreground">{def.subtitle}</p>
             ) : null}
           </div>
-          {editing ? (
-            <div className="flex items-center gap-1">
-              {!hiddenSection ? (
+          <div className="flex shrink-0 items-center gap-1">
+            {!editing && def.viewAll ? def.viewAll : null}
+            {editing ? (
+              !hiddenSection ? (
                 <>
                   <Button
                     variant="ghost"
@@ -184,9 +185,9 @@ export function DashboardGrid({
                 >
                   <IconEye className="size-3.5" />
                 </Button>
-              )}
-            </div>
-          ) : null}
+              )
+            ) : null}
+          </div>
         </CardHeader>
         <CardContent className={cn(editing && "pointer-events-none select-none")}>
           {def.render(data)}

@@ -44,6 +44,7 @@ import {
 } from "@/components/table-row-actions"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { GeneratePasswordButton, PasswordInput } from "@/components/password-input"
 import { buildListQuery, parseListSearch, totalPagesFor } from "@/lib/list-query"
 import type { SystemUser, UserRole } from "@/lib/types"
 
@@ -360,17 +361,26 @@ function UsersPage() {
                 onChange={(e) => setCreateForm((f) => ({ ...f, email: e.target.value }))}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="user-password">Password</Label>
-              <Input
-                id="user-password"
-                type="password"
-                required
-                minLength={8}
-                autoComplete="new-password"
-                value={createForm.password}
-                onChange={(e) => setCreateForm((f) => ({ ...f, password: e.target.value }))}
-              />
+              <div className="flex items-center gap-2">
+                <PasswordInput
+                  id="user-password"
+                  className="min-w-0 flex-1"
+                  required
+                  minLength={8}
+                  autoComplete="new-password"
+                  value={createForm.password}
+                  onChange={(e) =>
+                    setCreateForm((f) => ({ ...f, password: e.target.value }))
+                  }
+                />
+                <GeneratePasswordButton
+                  onGenerate={(password) =>
+                    setCreateForm((f) => ({ ...f, password }))
+                  }
+                />
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Role</Label>

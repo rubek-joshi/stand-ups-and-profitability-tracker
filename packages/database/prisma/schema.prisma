@@ -180,13 +180,15 @@ model OrgSettings {
 }
 
 model Client {
-  id          String       @id @default(cuid())
-  name        String
-  contactInfo String?
-  status      ClientStatus @default(active)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  projects    Project[]
+  id             String       @id @default(cuid())
+  name           String
+  email          String?
+  phone          String?
+  additionalInfo String?
+  status         ClientStatus @default(active)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  projects       Project[]
 
   @@map("clients")
 }
@@ -292,15 +294,16 @@ model ProjectExtension {
 }
 
 model Employee {
-  id          String       @id @default(cuid())
-  name        String
-  email       String       @unique
-  status      PersonStatus @default(active)
-  dateJoined  DateTime     @db.Date
-  dateOfBirth DateTime?    @db.Date
-  dateLeft    DateTime?    @db.Date
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id            String       @id @default(cuid())
+  name          String
+  email         String       @unique
+  contactNumber String?
+  status        PersonStatus @default(active)
+  dateJoined    DateTime     @db.Date
+  dateOfBirth   DateTime?    @db.Date
+  dateLeft      DateTime?    @db.Date
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   salaryEntries     EmployeeSalaryEntry[]
   assignments       ProjectAssignment[]
@@ -356,14 +359,15 @@ model EmployeeSalaryEntry {
 }
 
 model CoreMember {
-  id         String       @id @default(cuid())
-  name       String
-  email      String       @unique
-  status     PersonStatus @default(active)
-  dateJoined DateTime     @db.Date
-  dateLeft   DateTime?    @db.Date
-  createdAt  DateTime     @default(now())
-  updatedAt  DateTime     @updatedAt
+  id            String       @id @default(cuid())
+  name          String
+  email         String       @unique
+  contactNumber String?
+  status        PersonStatus @default(active)
+  dateJoined    DateTime     @db.Date
+  dateLeft      DateTime?    @db.Date
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
 
   salaryEntries CoreMemberSalaryEntry[]
   assignments   CoreMemberAssignment[]

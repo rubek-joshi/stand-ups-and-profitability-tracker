@@ -13,6 +13,7 @@ import {
 } from "@workspace/ui/components/table"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
+import { MailLink, TelLink } from "@/components/contact-link"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { MarkLeftDialog } from "@/components/mark-left-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
@@ -114,9 +115,20 @@ function CoreMemberDetailPage() {
           <CardHeader>
             <CardTitle className="text-base">Profile</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3 text-sm">
+          <CardContent className="flex flex-col gap-3 text-sm">
             <DetailRow label="Name" value={member.name} />
-            <DetailRow label="Email" value={member.email} />
+            <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
+              <span className="text-muted-foreground">Email</span>
+              <MailLink value={member.email} withCopy />
+            </div>
+            <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
+              <span className="text-muted-foreground">Contact number</span>
+              {member.contactNumber ? (
+                <TelLink value={member.contactNumber} withCopy />
+              ) : (
+                <span>—</span>
+              )}
+            </div>
             <DetailRow label="Joined" value={String(member.dateJoined).slice(0, 10)} />
             <DetailRow
               label="Left"

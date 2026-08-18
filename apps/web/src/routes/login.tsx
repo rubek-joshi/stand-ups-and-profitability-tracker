@@ -7,6 +7,7 @@ import { Label } from "@workspace/ui/components/label"
 import { getToken } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { ApiError } from "@/lib/api"
+import { PasswordInput } from "@/components/password-input"
 
 export const Route = createFileRoute("/login")({
   ssr: false,
@@ -63,11 +64,10 @@ function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="password">Password</Label>
-              <Input
+              <PasswordInput
                 id="password"
-                type="password"
                 autoComplete="current-password"
                 required
                 minLength={8}

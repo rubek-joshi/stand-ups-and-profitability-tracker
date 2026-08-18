@@ -21,6 +21,7 @@ import {
 } from "@workspace/ui/components/table"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
+import { MailLink, TelLink } from "@/components/contact-link"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
   TableActionLink,
@@ -39,6 +40,7 @@ function emptyForm() {
   return {
     name: "",
     email: "",
+    contactNumber: "",
     dateJoined: new Date().toISOString().slice(0, 10),
     initialSalaryNpr: "",
   }
@@ -90,6 +92,7 @@ function CoreMembersPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Contact</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Joined</TableHead>
                 <TableActionsHead />
@@ -107,7 +110,12 @@ function CoreMembersPage() {
                       {m.name}
                     </Link>
                   </TableCell>
-                  <TableCell>{m.email}</TableCell>
+                  <TableCell>
+                    <MailLink value={m.email} />
+                  </TableCell>
+                  <TableCell>
+                    {m.contactNumber ? <TelLink value={m.contactNumber} /> : "—"}
+                  </TableCell>
                   <TableCell>
                     <StatusBadge status={m.status} />
                   </TableCell>
@@ -150,6 +158,7 @@ function CoreMembersPage() {
                   body: {
                     name: form.name.trim(),
                     email: form.email.trim(),
+                    contactNumber: form.contactNumber.trim() || undefined,
                     dateJoined: form.dateJoined,
                     initialSalaryNpr: form.initialSalaryNpr
                       ? parseNprInput(form.initialSalaryNpr)
@@ -179,6 +188,14 @@ function CoreMembersPage() {
                 required
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Contact number (optional)</Label>
+              <Input
+                type="tel"
+                value={form.contactNumber}
+                onChange={(e) => setForm((f) => ({ ...f, contactNumber: e.target.value }))}
               />
             </div>
             <div className="space-y-2">

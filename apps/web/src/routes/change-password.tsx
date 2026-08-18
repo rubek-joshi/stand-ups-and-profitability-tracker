@@ -2,10 +2,10 @@ import * as React from "react"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
-import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { ApiError, getToken } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { PasswordInput } from "@/components/password-input"
 import { LoadingState } from "@/components/ui-states"
 
 export const Route = createFileRoute("/change-password")({
@@ -79,11 +79,10 @@ function ChangePasswordPage() {
               }
             }}
           >
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="current-password">Current password</Label>
-              <Input
+              <PasswordInput
                 id="current-password"
-                type="password"
                 autoComplete="current-password"
                 required
                 minLength={8}
@@ -91,11 +90,10 @@ function ChangePasswordPage() {
                 onChange={(e) => setCurrentPassword(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="new-password">New password</Label>
-              <Input
+              <PasswordInput
                 id="new-password"
-                type="password"
                 autoComplete="new-password"
                 required
                 minLength={8}
@@ -103,11 +101,10 @@ function ChangePasswordPage() {
                 onChange={(e) => setNewPassword(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="confirm-password">Confirm new password</Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 autoComplete="new-password"
                 required
                 minLength={8}

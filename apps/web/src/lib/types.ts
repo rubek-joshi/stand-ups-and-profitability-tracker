@@ -8,7 +8,11 @@ export type ClientStats = {
 export type Client = {
   id: string
   name: string
-  contactInfo: string | null
+  email: string | null
+  phone: string | null
+  additionalInfo: string | null
+  /** @deprecated Use additionalInfo */
+  contactInfo?: string | null
   status: "active" | "inactive"
   createdAt: string
   updatedAt?: string
@@ -149,6 +153,7 @@ export type Employee = {
   id: string
   name: string
   email: string
+  contactNumber?: string | null
   status: PersonStatus
   dateJoined: string
   dateOfBirth?: string | null
@@ -215,6 +220,7 @@ export type CoreMember = {
   id: string
   name: string
   email: string
+  contactNumber?: string | null
   status: PersonStatus
   dateJoined: string
   dateLeft: string | null

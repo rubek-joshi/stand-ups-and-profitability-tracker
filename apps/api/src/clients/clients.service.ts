@@ -38,7 +38,9 @@ export class ClientsService {
     const client = await this.prismaService.client.create({
       data: {
         name: dto.name,
-        contactInfo: dto.contactInfo,
+        email: dto.email?.trim() || null,
+        phone: dto.phone?.trim() || null,
+        additionalInfo: dto.additionalInfo?.trim() || null,
       },
     });
     await this.auditService.write({
@@ -57,7 +59,9 @@ export class ClientsService {
       ? {
           OR: [
             { name: { contains: q, mode: "insensitive" as const } },
-            { contactInfo: { contains: q, mode: "insensitive" as const } },
+            { email: { contains: q, mode: "insensitive" as const } },
+            { phone: { contains: q, mode: "insensitive" as const } },
+            { additionalInfo: { contains: q, mode: "insensitive" as const } },
           ],
         }
       : {};
@@ -225,7 +229,18 @@ export class ClientsService {
     const before = await this.findOne(id);
     const client = await this.prismaService.client.update({
       where: { id },
-      data: dto,
+      data: {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.email !== undefined
+          ? { email: dto.email?.trim() || null }
+          : {}),
+        ...(dto.phone !== undefined
+          ? { phone: dto.phone?.trim() || null }
+          : {}),
+        ...(dto.additionalInfo !== undefined
+          ? { additionalInfo: dto.additionalInfo?.trim() || null }
+          : {}),
+      },
     });
     await this.auditService.write({
       actorId,

@@ -20,7 +20,9 @@ function ClientEditPage() {
   const navigate = useNavigate()
   const [client, setClient] = React.useState<Client | null>(null)
   const [name, setName] = React.useState("")
-  const [contactInfo, setContactInfo] = React.useState("")
+  const [email, setEmail] = React.useState("")
+  const [phone, setPhone] = React.useState("")
+  const [additionalInfo, setAdditionalInfo] = React.useState("")
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [saving, setSaving] = React.useState(false)
@@ -32,7 +34,9 @@ function ClientEditPage() {
       const res = await api<Envelope<Client>>(`/clients/${id}`)
       setClient(res.data)
       setName(res.data.name)
-      setContactInfo(res.data.contactInfo ?? "")
+      setEmail(res.data.email ?? "")
+      setPhone(res.data.phone ?? "")
+      setAdditionalInfo(res.data.additionalInfo ?? res.data.contactInfo ?? "")
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load client")
     } finally {
@@ -82,7 +86,12 @@ function ClientEditPage() {
               try {
                 await api(`/clients/${id}`, {
                   method: "PATCH",
-                  body: { name: name.trim(), contactInfo: contactInfo.trim() || null },
+                  body: {
+                    name: name.trim(),
+                    email: email.trim() || null,
+                    phone: phone.trim() || null,
+                    additionalInfo: additionalInfo.trim() || null,
+                  },
                 })
                 void navigate({ to: "/clients/$id", params: { id } })
               } catch (err) {
@@ -97,11 +106,29 @@ function ClientEditPage() {
               <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="contact">Contact info</Label>
+              <Label htmlFor="email">Email (optional)</Label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone (optional)</Label>
+              <Input
+                id="phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact">Additional info (optional)</Label>
               <Textarea
                 id="contact"
-                value={contactInfo}
-                onChange={(e) => setContactInfo(e.target.value)}
+                value={additionalInfo}
+                onChange={(e) => setAdditionalInfo(e.target.value)}
               />
             </div>
             <Button type="submit" disabled={saving}>

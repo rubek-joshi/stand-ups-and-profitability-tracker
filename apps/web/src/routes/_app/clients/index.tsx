@@ -23,6 +23,7 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
 import { StatusBadge } from "@/components/health-badge"
+import { MailLink, TelLink } from "@/components/contact-link"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
   TableActionLink,
@@ -47,7 +48,9 @@ function ClientsPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [open, setOpen] = React.useState(false)
   const [name, setName] = React.useState("")
-  const [contactInfo, setContactInfo] = React.useState("")
+  const [email, setEmail] = React.useState("")
+  const [phone, setPhone] = React.useState("")
+  const [additionalInfo, setAdditionalInfo] = React.useState("")
   const [saving, setSaving] = React.useState(false)
   const [searchInput, setSearchInput] = React.useState(q ?? "")
 
@@ -122,7 +125,8 @@ function ClientsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Projects</TableHead>
-                  <TableHead>Contact</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableActionsHead />
                 </TableRow>
               </TableHeader>
@@ -142,8 +146,11 @@ function ClientsPage() {
                       <StatusBadge status={c.status} />
                     </TableCell>
                     <TableCell>{c._count?.projects ?? "—"}</TableCell>
-                    <TableCell className="max-w-xs truncate text-muted-foreground">
-                      {c.contactInfo || "—"}
+                    <TableCell>
+                      {c.phone ? <TelLink value={c.phone} /> : "—"}
+                    </TableCell>
+                    <TableCell>
+                      {c.email ? <MailLink value={c.email} /> : "—"}
                     </TableCell>
                     <TableActionsCell>
                       <TableActionLink
@@ -198,11 +205,18 @@ function ClientsPage() {
               try {
                 await api("/clients", {
                   method: "POST",
-                  body: { name: name.trim(), contactInfo: contactInfo.trim() || undefined },
+                  body: {
+                    name: name.trim(),
+                    email: email.trim() || undefined,
+                    phone: phone.trim() || undefined,
+                    additionalInfo: additionalInfo.trim() || undefined,
+                  },
                 })
                 setOpen(false)
                 setName("")
-                setContactInfo("")
+                setEmail("")
+                setPhone("")
+                setAdditionalInfo("")
                 await load()
               } catch (err) {
                 alert(err instanceof ApiError ? err.message : "Failed to create")
@@ -216,11 +230,29 @@ function ClientsPage() {
               <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="contact">Contact info</Label>
+              <Label htmlFor="client-email">Email (optional)</Label>
+              <Input
+                id="client-email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="client-phone">Phone (optional)</Label>
+              <Input
+                id="client-phone"
+                type="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact">Additional info (optional)</Label>
               <Textarea
                 id="contact"
-                value={contactInfo}
-                onChange={(e) => setContactInfo(e.target.value)}
+                value={additionalInfo}
+                onChange={(e) => setAdditionalInfo(e.target.value)}
               />
             </div>
             <DialogFooter>

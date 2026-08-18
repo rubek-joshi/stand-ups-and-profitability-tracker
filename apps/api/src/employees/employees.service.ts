@@ -40,6 +40,7 @@ export class EmployeesService {
       data: {
         name: dto.name,
         email: dto.email,
+        contactNumber: dto.contactNumber?.trim() || null,
         dateJoined: parseIsoDate(dto.dateJoined),
         ...(dto.dateOfBirth
           ? { dateOfBirth: parseIsoDate(dto.dateOfBirth) }
@@ -82,6 +83,7 @@ export class EmployeesService {
           OR: [
             { name: { contains: q, mode: "insensitive" as const } },
             { email: { contains: q, mode: "insensitive" as const } },
+            { contactNumber: { contains: q, mode: "insensitive" as const } },
           ],
         }
       : {};
@@ -184,6 +186,9 @@ export class EmployeesService {
       data: {
         name: dto.name,
         email: dto.email,
+        ...(dto.contactNumber !== undefined
+          ? { contactNumber: dto.contactNumber?.trim() || null }
+          : {}),
         dateJoined: dto.dateJoined
           ? parseIsoDate(dto.dateJoined)
           : undefined,

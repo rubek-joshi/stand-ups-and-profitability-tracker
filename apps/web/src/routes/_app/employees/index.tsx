@@ -23,6 +23,7 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
 import { StatusBadge } from "@/components/health-badge"
+import { MailLink, TelLink } from "@/components/contact-link"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
   TableActionLink,
@@ -50,6 +51,7 @@ function EmployeesPage() {
   const [form, setForm] = React.useState({
     name: "",
     email: "",
+    contactNumber: "",
     dateJoined: new Date().toISOString().slice(0, 10),
     dateOfBirth: "",
     initialSalaryNpr: "",
@@ -126,6 +128,7 @@ function EmployeesPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Contact</TableHead>
                   <TableHead>Groups</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Joined</TableHead>
@@ -144,7 +147,12 @@ function EmployeesPage() {
                         {e.name}
                       </Link>
                     </TableCell>
-                    <TableCell>{e.email}</TableCell>
+                    <TableCell>
+                      <MailLink value={e.email} />
+                    </TableCell>
+                    <TableCell>
+                      {e.contactNumber ? <TelLink value={e.contactNumber} /> : "—"}
+                    </TableCell>
                     <TableCell>
                       {(e.groups ?? []).length > 0 ? (
                         <div className="flex flex-wrap gap-1">
@@ -228,6 +236,7 @@ function EmployeesPage() {
                   body: {
                     name: form.name.trim(),
                     email: form.email.trim(),
+                    contactNumber: form.contactNumber.trim() || undefined,
                     dateJoined: form.dateJoined,
                     dateOfBirth: form.dateOfBirth || undefined,
                     initialSalaryNpr: form.initialSalaryNpr
@@ -239,6 +248,7 @@ function EmployeesPage() {
                 setForm({
                   name: "",
                   email: "",
+                  contactNumber: "",
                   dateJoined: new Date().toISOString().slice(0, 10),
                   dateOfBirth: "",
                   initialSalaryNpr: "",
@@ -264,6 +274,14 @@ function EmployeesPage() {
                 required
                 value={form.email}
                 onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Contact number (optional)</Label>
+              <Input
+                type="tel"
+                value={form.contactNumber}
+                onChange={(e) => setForm((f) => ({ ...f, contactNumber: e.target.value }))}
               />
             </div>
             <div className="space-y-2">

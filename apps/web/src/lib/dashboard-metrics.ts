@@ -75,6 +75,37 @@ export function toIsoDateInput(date: Date): string {
   return format(date, "yyyy-MM-dd")
 }
 
+export function parseLocalIsoDate(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim())
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(year, month - 1, day)
+  if (
+    date.getFullYear() !== year ||
+    date.getMonth() !== month - 1 ||
+    date.getDate() !== day
+  ) {
+    return null
+  }
+  return date
+}
+
+export function parseDashboardDateParam(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined
+  return parseLocalIsoDate(value) ? value : undefined
+}
+
+export function rangeFromIsoDates(from: string, to: string): DateRange | null {
+  const start = parseLocalIsoDate(from)
+  const end = parseLocalIsoDate(to)
+  if (!start || !end || start > end) return null
+  start.setHours(0, 0, 0, 0)
+  end.setHours(23, 59, 59, 999)
+  return { from: start, to: end }
+}
+
 export function formatAuditAction(action: string): string {
   return action
     .toLowerCase()

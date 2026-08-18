@@ -23,6 +23,7 @@ function EmployeeEditPage() {
   const [saving, setSaving] = React.useState(false)
   const [name, setName] = React.useState("")
   const [email, setEmail] = React.useState("")
+  const [contactNumber, setContactNumber] = React.useState("")
   const [dateJoined, setDateJoined] = React.useState("")
   const [dateOfBirth, setDateOfBirth] = React.useState("")
 
@@ -34,6 +35,7 @@ function EmployeeEditPage() {
       setEmployee(res.data)
       setName(res.data.name)
       setEmail(res.data.email)
+      setContactNumber(res.data.contactNumber ?? "")
       setDateJoined(String(res.data.dateJoined).slice(0, 10))
       setDateOfBirth(
         res.data.dateOfBirth ? String(res.data.dateOfBirth).slice(0, 10) : "",
@@ -95,6 +97,7 @@ function EmployeeEditPage() {
                   body: {
                     name: name.trim(),
                     email: email.trim(),
+                    contactNumber: contactNumber.trim() || null,
                     dateJoined,
                     dateOfBirth: dateOfBirth || null,
                   },
@@ -118,6 +121,14 @@ function EmployeeEditPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Contact number (optional)</Label>
+              <Input
+                type="tel"
+                value={contactNumber}
+                onChange={(e) => setContactNumber(e.target.value)}
               />
             </div>
             <div className="space-y-2">

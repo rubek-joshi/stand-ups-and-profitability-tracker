@@ -17,6 +17,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { PageHeader } from "@/components/page-header"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
+import { MailLink, TelLink } from "@/components/contact-link"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
@@ -237,16 +238,24 @@ function ClientDetailPage() {
             <CardHeader>
               <CardTitle className="text-base">Client details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
+            <CardContent className="flex flex-col gap-3 text-sm">
               <DetailRow label="Name" value={client.name} />
+              <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
+                <span className="text-muted-foreground">Email</span>
+                {client.email ? <MailLink value={client.email} withCopy /> : <span>—</span>}
+              </div>
+              <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
+                <span className="text-muted-foreground">Phone</span>
+                {client.phone ? <TelLink value={client.phone} withCopy /> : <span>—</span>}
+              </div>
               <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
                 <span className="text-muted-foreground">Status</span>
                 <StatusBadge status={client.status} />
               </div>
-              <div className="space-y-1 border-b py-2 last:border-0">
-                <span className="text-muted-foreground">Contact info</span>
+              <div className="flex flex-col gap-1 border-b py-2 last:border-0">
+                <span className="text-muted-foreground">Additional info</span>
                 <p className="whitespace-pre-wrap font-medium">
-                  {client.contactInfo?.trim() || "—"}
+                  {client.additionalInfo?.trim() || client.contactInfo?.trim() || "—"}
                 </p>
               </div>
               <DetailRow label="Projects" value={String(projects.length)} />

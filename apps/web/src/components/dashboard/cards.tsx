@@ -24,6 +24,7 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@workspace/ui/components/chart"
+import { buttonVariants } from "@workspace/ui/components/button"
 import { Progress } from "@workspace/ui/components/progress"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import type { DashboardData } from "@/lib/dashboard-metrics"
@@ -37,7 +38,30 @@ export interface CardDef {
   title: string
   subtitle?: string
   defaultWidth: CardWidth
+  viewAll?: React.ReactNode
   render: (d: DashboardData) => React.ReactNode
+}
+
+function ViewAll({
+  to,
+  search,
+}: {
+  to: string
+  search?: Record<string, unknown>
+}) {
+  return (
+    <Link
+      to={to as never}
+      search={search as never}
+      className={buttonVariants({
+        variant: "ghost",
+        size: "sm",
+        className: "h-7 shrink-0 px-2 text-xs",
+      })}
+    >
+      View all
+    </Link>
+  )
 }
 
 function Stat({
@@ -408,6 +432,7 @@ const allCardDefs: CardDef[] = [
     id: "categories",
     title: "Category breakdown",
     defaultWidth: "md",
+    viewAll: <ViewAll to="/categories" />,
     render: (d) => (
       <List>
         {d.categoryBreakdown.length === 0 ? (
@@ -431,6 +456,7 @@ const allCardDefs: CardDef[] = [
     id: "amc-followups",
     title: "AMCs needing follow-up",
     defaultWidth: "md",
+    viewAll: <ViewAll to="/amc" search={{ tab: "attention" }} />,
     render: (d) => (
       <List>
         {d.amcFollowUps.length === 0 ? (
@@ -457,6 +483,7 @@ const allCardDefs: CardDef[] = [
     title: "AMC contracts",
     subtitle: "All maintenance contracts by value",
     defaultWidth: "md",
+    viewAll: <ViewAll to="/amc" search={{ tab: "all" }} />,
     render: (d) => (
       <List>
         {d.amcList.length === 0 ? (
@@ -481,6 +508,12 @@ const allCardDefs: CardDef[] = [
     id: "standups",
     title: "Recent stand-ups",
     defaultWidth: "md",
+    viewAll: (
+      <ViewAll
+        to="/stand-ups"
+        search={{ page: 1, pageSize: 25, view: "list", q: "", employeeId: "" }}
+      />
+    ),
     render: (d) => (
       <List>
         {d.recentStandups.length === 0 ? (
@@ -505,6 +538,7 @@ const allCardDefs: CardDef[] = [
     id: "groups",
     title: "Employees per group",
     defaultWidth: "md",
+    viewAll: <ViewAll to="/employee-groups" search={{ page: 1, pageSize: 25 }} />,
     render: (d) =>
       d.groupCounts.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">No employee groups.</p>
@@ -528,6 +562,7 @@ const allCardDefs: CardDef[] = [
     id: "audit",
     title: "Recent audit logs",
     defaultWidth: "md",
+    viewAll: <ViewAll to="/audit" search={{ page: 1, pageSize: 25 }} />,
     render: (d) => (
       <List>
         {d.recentAudit.length === 0 ? (

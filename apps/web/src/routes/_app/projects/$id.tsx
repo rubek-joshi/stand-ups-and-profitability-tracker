@@ -885,11 +885,42 @@ function ProjectDetailPage() {
             <CardHeader>
               <CardTitle className="text-lg">Project details</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              <DetailRow label="Client" value={project.client?.name ?? "—"} />
+            <CardContent className="flex flex-col gap-3 text-sm">
+              <DetailRow
+                label="Client"
+                value={
+                  project.client ? (
+                    <Link
+                      to="/clients/$id"
+                      params={{ id: project.client.id }}
+                      className="text-primary underline-offset-4 hover:underline"
+                    >
+                      {project.client.name}
+                    </Link>
+                  ) : (
+                    "—"
+                  )
+                }
+              />
               <DetailRow
                 label="Categories"
-                value={(project.categories ?? []).map((category) => category.name).join(", ") || "—"}
+                value={
+                  (project.categories ?? []).length > 0 ? (
+                    <span className="flex flex-wrap justify-end gap-x-2 gap-y-1">
+                      {(project.categories ?? []).map((category) => (
+                        <Link
+                          key={category.id}
+                          to="/categories"
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          {category.name}
+                        </Link>
+                      ))}
+                    </span>
+                  ) : (
+                    "—"
+                  )
+                }
               />
               <DetailRow label="Base budget" value={formatNpr(project.budgetPaisa)} />
               <DetailRow
@@ -1145,7 +1176,7 @@ function DetailRow({
   capitalize,
 }: {
   label: string
-  value: string
+  value: React.ReactNode
   capitalize?: boolean
 }) {
   return (

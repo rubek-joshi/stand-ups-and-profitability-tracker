@@ -58,6 +58,7 @@ function CoreMemberEditPage() {
   const [saving, setSaving] = React.useState(false)
   const [name, setName] = React.useState("")
   const [email, setEmail] = React.useState("")
+  const [contactNumber, setContactNumber] = React.useState("")
   const [dateJoined, setDateJoined] = React.useState("")
   const [salaryOpen, setSalaryOpen] = React.useState(false)
   const [editingEntry, setEditingEntry] = React.useState<SalaryEntry | null>(null)
@@ -71,6 +72,7 @@ function CoreMemberEditPage() {
       setMember(res.data)
       setName(res.data.name)
       setEmail(res.data.email)
+      setContactNumber(res.data.contactNumber ?? "")
       setDateJoined(String(res.data.dateJoined).slice(0, 10))
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load")
@@ -143,6 +145,7 @@ function CoreMemberEditPage() {
                     body: {
                       name: name.trim(),
                       email: email.trim(),
+                      contactNumber: contactNumber.trim() || null,
                       dateJoined,
                     },
                   })
@@ -165,6 +168,14 @@ function CoreMemberEditPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Contact number (optional)</Label>
+                <Input
+                  type="tel"
+                  value={contactNumber}
+                  onChange={(e) => setContactNumber(e.target.value)}
                 />
               </div>
               <div className="space-y-2">

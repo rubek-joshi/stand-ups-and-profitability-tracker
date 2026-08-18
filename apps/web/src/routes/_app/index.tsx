@@ -3,37 +3,82 @@ import { createFileRoute } from "@tanstack/react-router"
 import { IconCheck, IconLayoutGrid } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { DashboardGrid } from "@/components/dashboard/dashboard-grid"
-import { DateRangeBar, rangeFromDays } from "@/components/dashboard/date-range-bar"
+import {
+  DateRangeBar,
+  DEFAULT_PRESET_DAYS,
+  activePresetFromRange,
+  rangeFromDays,
+} from "@/components/dashboard/date-range-bar"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import {
   buildDashboard,
+  parseDashboardDateParam,
+  rangeFromIsoDates,
   toIsoDateInput,
   type DateRange,
 } from "@/lib/dashboard-metrics"
 import type { DashboardSummary, OrgSettings } from "@/lib/types"
 
+type DashboardSearch = {
+  from?: string
+  to?: string
+}
+
 export const Route = createFileRoute("/_app/")({
+  validateSearch: (search: Record<string, unknown>): DashboardSearch => {
+    const from = parseDashboardDateParam(search.from)
+    const to = parseDashboardDateParam(search.to)
+    return {
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    }
+  },
   component: DashboardPage,
 })
 
 function DashboardPage() {
-  const [preset, setPreset] = React.useState<number | null>(90)
-  const [range, setRange] = React.useState<DateRange>(() => rangeFromDays(90))
+  const navigate = Route.useNavigate()
+  const { from, to } = Route.useSearch()
   const [editing, setEditing] = React.useState(false)
   const [data, setData] = React.useState<DashboardSummary | null>(null)
   const [settings, setSettings] = React.useState<OrgSettings | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(true)
 
+  const range = React.useMemo<DateRange>(() => {
+    if (from && to) {
+      return rangeFromIsoDates(from, to) ?? rangeFromDays(DEFAULT_PRESET_DAYS)
+    }
+    return rangeFromDays(DEFAULT_PRESET_DAYS)
+  }, [from, to])
+
+  const preset = activePresetFromRange(range)
+
+  const setRange = React.useCallback(
+    (next: DateRange) => {
+      void navigate({
+        search: {
+          from: toIsoDateInput(next.from),
+          to: toIsoDateInput(next.to),
+        },
+        replace: true,
+      })
+    },
+    [navigate],
+  )
+
+  React.useEffect(() => {
+    if (from && to && rangeFromIsoDates(from, to)) return
+    setRange(rangeFromDays(DEFAULT_PRESET_DAYS))
+  }, [from, to, setRange])
+
   const load = React.useCallback(async () => {
+    if (!from || !to) return
     setLoading(true)
     setError(null)
     try {
-      const params = new URLSearchParams({
-        from: toIsoDateInput(range.from),
-        to: toIsoDateInput(range.to),
-      })
+      const params = new URLSearchParams({ from, to })
       const [dash, sett] = await Promise.all([
         api<Envelope<DashboardSummary>>(`/dashboard/summary?${params}`),
         api<Envelope<OrgSettings>>("/settings").catch(() => null),
@@ -46,7 +91,7 @@ function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }, [range])
+  }, [from, to])
 
   React.useEffect(() => {
     void load()
@@ -58,7 +103,7 @@ function DashboardPage() {
   )
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">
@@ -73,14 +118,8 @@ function DashboardPage() {
           <DateRangeBar
             range={range}
             activePreset={preset}
-            onPreset={(days) => {
-              setPreset(days)
-              setRange(rangeFromDays(days))
-            }}
-            onChange={(r) => {
-              setPreset(null)
-              setRange(r)
-            }}
+            onPreset={(days) => setRange(rangeFromDays(days))}
+            onChange={setRange}
           />
           <Button
             variant={editing ? "default" : "outline"}

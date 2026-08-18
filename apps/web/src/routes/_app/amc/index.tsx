@@ -39,12 +39,33 @@ import { buildListQuery, parseOptionalString } from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
 import type { AmcRecord, Client } from "@/lib/types"
 
+const AMC_TABS = ["ongoing", "upcoming", "attention", "all"] as const
+type AmcTab = (typeof AMC_TABS)[number]
+
+function parseAmcTab(value: unknown): AmcTab {
+  return AMC_TABS.includes(value as AmcTab) ? (value as AmcTab) : "ongoing"
+}
+
+type AmcSearch = {
+  clientId?: string
+  from?: string
+  to?: string
+  tab?: AmcTab
+}
+
 export const Route = createFileRoute("/_app/amc/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    clientId: parseOptionalString(search.clientId),
-    from: parseOptionalString(search.from),
-    to: parseOptionalString(search.to),
-  }),
+  validateSearch: (search: Record<string, unknown>): AmcSearch => {
+    const clientId = parseOptionalString(search.clientId)
+    const from = parseOptionalString(search.from)
+    const to = parseOptionalString(search.to)
+    const tab = search.tab === undefined ? undefined : parseAmcTab(search.tab)
+    return {
+      ...(clientId ? { clientId } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+      ...(tab ? { tab } : {}),
+    }
+  },
   component: AmcPage,
 })
 
@@ -105,7 +126,7 @@ function FilterChip({
 
 function AmcPage() {
   const navigate = Route.useNavigate()
-  const { clientId, from, to } = Route.useSearch()
+  const { clientId, from, to, tab = "ongoing" } = Route.useSearch()
   const { user } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
   const canDelete = user?.role === "super_admin"
@@ -340,6 +361,7 @@ function AmcPage() {
               onClick={() => {
                 void navigate({
                   search: {
+                    tab,
                     clientId: undefined,
                     from: undefined,
                     to: undefined,
@@ -429,7 +451,17 @@ function AmcPage() {
               }
             />
           ) : (
-            <Tabs defaultValue="ongoing">
+            <Tabs
+              value={tab}
+              onValueChange={(next) => {
+                void navigate({
+                  search: (prev) => ({
+                    ...prev,
+                    tab: parseAmcTab(next),
+                  }),
+                })
+              }}
+            >
               <TabsList>
                 <TabsTrigger value="ongoing">
                   Ongoing ({groups.ongoing.length})

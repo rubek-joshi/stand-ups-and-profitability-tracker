@@ -9,7 +9,7 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
-import type { DateRange } from "@/lib/dashboard-metrics"
+import { toIsoDateInput, type DateRange } from "@/lib/dashboard-metrics"
 
 export const PRESETS = [
   { label: "7D", days: 7 },
@@ -18,6 +18,8 @@ export const PRESETS = [
   { label: "1Y", days: 365 },
 ] as const
 
+export const DEFAULT_PRESET_DAYS = 90
+
 export function rangeFromDays(days: number): DateRange {
   const to = new Date()
   const from = new Date(to)
@@ -25,6 +27,21 @@ export function rangeFromDays(days: number): DateRange {
   from.setHours(0, 0, 0, 0)
   to.setHours(23, 59, 59, 999)
   return { from, to }
+}
+
+export function activePresetFromRange(range: DateRange): number | null {
+  const fromKey = toIsoDateInput(range.from)
+  const toKey = toIsoDateInput(range.to)
+  for (const preset of PRESETS) {
+    const candidate = rangeFromDays(preset.days)
+    if (
+      toIsoDateInput(candidate.from) === fromKey &&
+      toIsoDateInput(candidate.to) === toKey
+    ) {
+      return preset.days
+    }
+  }
+  return null
 }
 
 export function DateRangeBar({

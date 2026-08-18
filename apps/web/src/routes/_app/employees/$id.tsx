@@ -10,6 +10,7 @@ import {
   IconMessage,
   IconMoon,
   IconPencil,
+  IconPhone,
   IconSun,
   IconTrendingUp,
   IconUser,
@@ -50,6 +51,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
+import { MailLink, TelLink } from "@/components/contact-link"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { MarkLeftDialog } from "@/components/mark-left-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
@@ -597,7 +599,22 @@ function EmployeeDetailPage() {
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <Detail icon={IconUser} label="Name" value={employee.name} />
-              <Detail icon={IconMail} label="Email" value={employee.email} />
+              <Detail
+                icon={IconMail}
+                label="Email"
+                value={<MailLink value={employee.email} withCopy />}
+              />
+              <Detail
+                icon={IconPhone}
+                label="Contact number"
+                value={
+                  employee.contactNumber ? (
+                    <TelLink value={employee.contactNumber} withCopy />
+                  ) : (
+                    "—"
+                  )
+                }
+              />
               <div className="flex gap-3">
                 <IconUser className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
                 <div className="min-w-0">
@@ -704,14 +721,14 @@ function Detail({
 }: {
   icon: React.ElementType
   label: string
-  value: string
+  value: React.ReactNode
 }) {
   return (
     <div className="flex gap-3">
       <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
       <div className="min-w-0">
         <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
-        <dd className="truncate text-sm font-medium">{value}</dd>
+        <dd className="text-sm font-medium">{value}</dd>
       </div>
     </div>
   )
