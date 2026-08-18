@@ -290,76 +290,39 @@ function ProjectDetailPage() {
         />
       </section>
 
-      <section className="mt-6 grid gap-6 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader className="space-y-1">
-            <CardTitle className="text-lg">Labor cost from stand-ups</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Monthly labor cost based on completed stand-up allocation percentages.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <ProjectLaborCostChart series={laborSeries} />
-            <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-              <Badge variant="outline">
-                {summary?.completedStandupCount ?? 0} completed stand-ups
-              </Badge>
-              <Badge variant="outline">
-                {summary?.standupEmployeeCount ?? 0} employees logged
-              </Badge>
-              <Badge variant="outline">
-                {summary?.allocationPercentTotal ?? 0}% total allocation
-              </Badge>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 space-y-6">
+          <Card>
+            <CardHeader className="space-y-1">
+              <CardTitle className="text-lg">Labor cost from stand-ups</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Monthly labor cost based on completed stand-up allocation percentages.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <ProjectLaborCostChart series={laborSeries} />
+              <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <Badge variant="outline">
+                  {summary?.completedStandupCount ?? 0} completed stand-ups
+                </Badge>
+                <Badge variant="outline">
+                  {summary?.standupEmployeeCount ?? 0} employees logged
+                </Badge>
+                <Badge variant="outline">
+                  {summary?.allocationPercentTotal ?? 0}% total allocation
+                </Badge>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Project details</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <DetailRow label="Client" value={project.client?.name ?? "—"} />
-            <DetailRow
-              label="Categories"
-              value={(project.categories ?? []).map((category) => category.name).join(", ") || "—"}
-            />
-            <DetailRow label="Base budget" value={formatNpr(project.budgetPaisa)} />
-            <DetailRow
-              label="VAT"
-              value={project.isVatApplicable ? `Yes (${project.vatRateApplied}%)` : "No"}
-            />
-            <DetailRow
-              label="Total incl. VAT"
-              value={
-                profit
-                  ? formatNpr(String(Number(profit.revenuePaisa) + vatAmountPaisa))
-                  : formatNpr(project.budgetPaisa)
-              }
-            />
-            <DetailRow label="Start date" value={String(project.startDate).slice(0, 10)} />
-            <DetailRow label="End date" value={String(project.endDate).slice(0, 10)} />
-            <DetailRow label="Status" value={project.status.replaceAll("_", " ")} capitalize />
-            <DetailRow
-              label="Core members"
-              value={String(summary?.activeCoreMemberCount ?? assignedCoreMemberIds.size)}
-            />
-            <DetailRow
-              label="Extensions"
-              value={`${summary?.extensionCount ?? project.extensions?.length ?? 0} total`}
-            />
-          </CardContent>
-        </Card>
-      </section>
+          <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>
+            <TabsList>
+              <TabsTrigger value="team">Team</TabsTrigger>
+              <TabsTrigger value="extensions">Extensions</TabsTrigger>
+              <TabsTrigger value="amc">AMC</TabsTrigger>
+            </TabsList>
 
-      <Tabs value={tab} onValueChange={(value) => setTab(String(value))} className="mt-6">
-        <TabsList>
-          <TabsTrigger value="team">Team</TabsTrigger>
-          <TabsTrigger value="extensions">Extensions</TabsTrigger>
-          <TabsTrigger value="amc">AMC</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="team" className="mt-4 space-y-4">
+            <TabsContent value="team" className="mt-4 space-y-4">
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
@@ -664,9 +627,9 @@ function ProjectDetailPage() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="extensions" className="mt-4 space-y-4">
+            <TabsContent value="extensions" className="mt-4 space-y-4">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Add extension</CardTitle>
@@ -765,9 +728,9 @@ function ProjectDetailPage() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="amc" className="mt-4 space-y-4">
+            <TabsContent value="amc" className="mt-4 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium text-muted-foreground">Maintenance contracts</h2>
             {project.status === "closed" || project.status === "under_amc" ? (
@@ -875,8 +838,49 @@ function ProjectDetailPage() {
               await load()
             }}
           />
-        </TabsContent>
-      </Tabs>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <aside className="xl:sticky xl:top-4 xl:self-start">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Project details</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <DetailRow label="Client" value={project.client?.name ?? "—"} />
+              <DetailRow
+                label="Categories"
+                value={(project.categories ?? []).map((category) => category.name).join(", ") || "—"}
+              />
+              <DetailRow label="Base budget" value={formatNpr(project.budgetPaisa)} />
+              <DetailRow
+                label="VAT"
+                value={project.isVatApplicable ? `Yes (${project.vatRateApplied}%)` : "No"}
+              />
+              <DetailRow
+                label="Total incl. VAT"
+                value={
+                  profit
+                    ? formatNpr(String(Number(profit.revenuePaisa) + vatAmountPaisa))
+                    : formatNpr(project.budgetPaisa)
+                }
+              />
+              <DetailRow label="Start date" value={String(project.startDate).slice(0, 10)} />
+              <DetailRow label="End date" value={String(project.endDate).slice(0, 10)} />
+              <DetailRow label="Status" value={project.status.replaceAll("_", " ")} capitalize />
+              <DetailRow
+                label="Core members"
+                value={String(summary?.activeCoreMemberCount ?? assignedCoreMemberIds.size)}
+              />
+              <DetailRow
+                label="Extensions"
+                value={`${summary?.extensionCount ?? project.extensions?.length ?? 0} total`}
+              />
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
       {dialog}
     </div>
   )

@@ -260,7 +260,18 @@ export type StandupEntry = {
   id: string
   attendanceStatus: AttendanceStatus
   notesMarkdown: string | null
-  employee: { id: string; name: string; email: string }
+  employee: {
+    id: string
+    name: string
+    email: string
+    assignments?: Array<{
+      id: string
+      projectId?: string
+      assignedAt: string
+      unassignedAt: string | null
+      project: { id: string; name: string; status: string }
+    }>
+  }
   allocations: Array<{
     id?: string
     projectId: string
@@ -268,6 +279,29 @@ export type StandupEntry = {
     isNonBillable?: boolean
     project?: { id: string; name: string; status: string }
   }>
+}
+
+export type MissingAssignmentAction =
+  | "backward_extend"
+  | "split"
+  | "create"
+  | "remove_allocation"
+
+export type MissingProjectAssignment = {
+  employeeId: string
+  employeeName: string
+  projectId: string
+  projectName: string
+  standupDate: string
+  standupEntryId: string
+  currentAssignedFrom?: string | null
+  availableActions?: MissingAssignmentAction[]
+}
+
+export type AssignmentResolution = {
+  employeeId: string
+  projectId: string
+  action: MissingAssignmentAction
 }
 
 export type OrgSettings = {

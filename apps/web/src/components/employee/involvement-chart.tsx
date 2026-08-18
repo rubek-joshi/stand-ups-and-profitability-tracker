@@ -37,7 +37,7 @@ function colorFor(_projectId: string, index: number) {
 
 function EmptyChart({ message }: { message: string }) {
   return (
-    <div className="flex h-[280px] items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+    <div className="flex h-70 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
       {message}
     </div>
   )
@@ -75,7 +75,7 @@ export function ProjectAllocationChart({ entries }: { entries: InvolvementEntry[
   }
 
   return (
-    <ChartContainer config={config} className="aspect-auto h-[280px] w-full">
+    <ChartContainer config={config} className="aspect-auto h-70 w-full">
       <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
         <CartesianGrid horizontal={false} />
         <XAxis
@@ -96,7 +96,7 @@ export function ProjectAllocationChart({ entries }: { entries: InvolvementEntry[
         <ChartTooltip
           content={
             <ChartTooltipContent
-              formatter={(value: number | string) => [`${String(value)}%`, "Allocated"]}
+              formatter={(value) => [`${String(value ?? 0)}%`, "Allocated"]}
               hideLabel
             />
           }
@@ -160,7 +160,7 @@ export function ProjectTimelineChart({
   }
 
   return (
-    <ChartContainer config={config} className="aspect-auto h-[280px] w-full">
+    <ChartContainer config={config} className="aspect-auto h-70 w-full">
       <BarChart data={data} margin={{ left: 0, right: 12, top: 8, bottom: 8 }}>
         <CartesianGrid vertical={false} />
         <XAxis

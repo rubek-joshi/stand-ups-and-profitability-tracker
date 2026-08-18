@@ -10,12 +10,15 @@ import {
   AttendanceType,
   AuditAction,
   PersonStatus,
+  Prisma,
   ProjectStatus,
   StandupStatus,
 } from "@workspace/database";
 import { AuditService } from "../audit/audit.service";
 import {
   parseIsoDate,
+  assignmentCoversDate,
+  dayBefore,
   toIsoDate,
   toMonthKey,
 } from "../_shared/utils/date.util";
@@ -26,11 +29,23 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { ProfitabilityService } from "../profitability/profitability.service";
 import {
+  AssignmentResolutionItemDto,
   BatchUpdateStandupEntriesDto,
   CreateStandupDto,
+  MissingAssignmentAction,
   StandupHistoryQueryDto,
   UpdateStandupEntryDto,
 } from "./dto/standup.dto";
+
+type MissingAssignmentFix = {
+  entryId: string;
+  employeeId: string;
+  employeeName: string;
+  projectId: string;
+  projectName: string;
+  currentAssignedFrom: string | null;
+  availableActions: MissingAssignmentAction[];
+};
 
 @Injectable()
 export class StandupsService {
@@ -59,25 +74,10 @@ export class StandupsService {
       );
     }
 
-    const employees = await this.findActiveEmployeesForDate(
-      date,
-      dto.employeeGroupId,
-    );
-    if (dto.employeeGroupId) {
-      const group = await this.prismaService.employeeGroup.findUnique({
-        where: { id: dto.employeeGroupId },
-      });
-      if (!group) {
-        throw new NotFoundException(
-          `Employee group ${dto.employeeGroupId} not found`,
-        );
-      }
-    }
+    const employees = await this.findActiveEmployeesForDate(date);
     if (employees.length === 0) {
       throw new BadRequestException(
-        dto.employeeGroupId
-          ? "No active employees in this group for the selected date"
-          : "No active employees available for the selected date",
+        "No active employees available for the selected date",
       );
     }
     const standup = await this.prismaService.standup.create({
@@ -85,7 +85,7 @@ export class StandupsService {
         date,
         status: StandupStatus.draft,
         createdById: actorId,
-        employeeGroupId: dto.employeeGroupId ?? null,
+        employeeGroupId: null,
         entries: {
           create: employees.map((employee) => ({
             employeeId: employee.id,
@@ -106,7 +106,6 @@ export class StandupsService {
       metadata: {
         date: dto.date,
         entryCount: employees.length,
-        employeeGroupId: dto.employeeGroupId ?? null,
       },
     });
     return standup;
@@ -380,8 +379,42 @@ export class StandupsService {
       );
     }
 
+    const assignmentFixes = await this.findMissingAllocationAssignments(
+      standup,
+      dto.entries,
+    );
+    let entriesToSave = dto.entries;
+    if (assignmentFixes.length > 0) {
+      if (!dto.assignmentResolutions?.length) {
+        throw new BadRequestException({
+          message:
+            "Some employees are allocated to projects they are not assigned to",
+          code: "MISSING_PROJECT_ASSIGNMENTS",
+          missingAssignments: assignmentFixes.map((item) => ({
+            employeeId: item.employeeId,
+            employeeName: item.employeeName,
+            projectId: item.projectId,
+            projectName: item.projectName,
+            standupDate: toIsoDate(standup.date),
+            standupEntryId: item.entryId,
+            currentAssignedFrom: item.currentAssignedFrom,
+            availableActions: item.availableActions,
+          })),
+        });
+      }
+      this.validateAssignmentResolutions(
+        assignmentFixes,
+        dto.assignmentResolutions,
+      );
+      entriesToSave = this.applyRemoveAllocationsToEntries(
+        dto.entries,
+        dto.assignmentResolutions,
+        assignmentFixes,
+      );
+    }
+
     const entryById = new Map(standup.entries.map((item) => [item.id, item]));
-    for (const item of dto.entries) {
+    for (const item of entriesToSave) {
       const entry = entryById.get(item.id);
       if (!entry) {
         throw new NotFoundException(`Standup entry ${item.id} not found`);
@@ -389,16 +422,33 @@ export class StandupsService {
       const attendanceStatus = item.attendanceStatus ?? entry.attendanceStatus;
       if (item.allocations) {
         this.validateAllocations(attendanceStatus, item.allocations);
-        await this.validateAllocationProjects(
-          entry.employeeId,
-          item.allocations.map((a) => a.projectId),
-        );
       }
     }
 
     const updatedEntries = await this.prismaService.$transaction(async (tx) => {
+      if (dto.assignmentResolutions?.length) {
+        for (const resolution of dto.assignmentResolutions) {
+          if (resolution.action === "remove_allocation") {
+            continue;
+          }
+          await this.applyAssignmentResolution(tx, standup.date, resolution);
+        }
+      }
+      for (const item of entriesToSave) {
+        const entry = entryById.get(item.id)!;
+        const attendanceStatus =
+          item.attendanceStatus ?? entry.attendanceStatus;
+        if (item.allocations) {
+          await this.validateAllocationProjects(
+            entry.employeeId,
+            item.allocations.map((a) => a.projectId),
+            standup.date,
+            tx,
+          );
+        }
+      }
       const results = [];
-      for (const item of dto.entries) {
+      for (const item of entriesToSave) {
         const entry = entryById.get(item.id)!;
         const attendanceStatus =
           item.attendanceStatus ?? entry.attendanceStatus;
@@ -451,6 +501,7 @@ export class StandupsService {
       metadata: {
         entryIds: dto.entries.map((item) => item.id),
         count: dto.entries.length,
+        assignmentResolutions: dto.assignmentResolutions ?? [],
       },
     });
 
@@ -555,7 +606,15 @@ export class StandupsService {
         employeeGroup: { select: { id: true, name: true } },
         entries: {
           include: {
-            employee: true,
+            employee: {
+              include: {
+                assignments: {
+                  include: {
+                    project: { select: { id: true, name: true, status: true } },
+                  },
+                },
+              },
+            },
             allocations: { include: { project: true } },
           },
           orderBy: { employee: { name: "asc" } },
@@ -568,17 +627,11 @@ export class StandupsService {
     return standup;
   }
 
-  private async findActiveEmployeesForDate(
-    date: Date,
-    employeeGroupId?: string | null,
-  ) {
+  private async findActiveEmployeesForDate(date: Date) {
     return this.prismaService.employee.findMany({
       where: {
         status: PersonStatus.active,
         dateJoined: { lte: date },
-        ...(employeeGroupId
-          ? { groupMemberships: { some: { groupId: employeeGroupId } } }
-          : {}),
       },
       select: { id: true },
       orderBy: { name: "asc" },
@@ -589,10 +642,7 @@ export class StandupsService {
   private async syncMissingParticipants(
     standup: Awaited<ReturnType<StandupsService["loadStandupOrThrow"]>>,
   ) {
-    const active = await this.findActiveEmployeesForDate(
-      standup.date,
-      standup.employeeGroupId,
-    );
+    const active = await this.findActiveEmployeesForDate(standup.date);
     const existingIds = new Set(standup.entries.map((entry) => entry.employeeId));
     const missing = active.filter((employee) => !existingIds.has(employee.id));
     if (missing.length === 0) {
@@ -628,20 +678,43 @@ export class StandupsService {
     }
   }
 
+  private async isEmployeeAssignedToProjectOnDate(
+    employeeId: string,
+    projectId: string,
+    onDate: Date,
+    db: Prisma.TransactionClient | PrismaService = this.prismaService,
+  ): Promise<boolean> {
+    const assignments = await db.projectAssignment.findMany({
+      where: { employeeId, projectId },
+    });
+    return assignments.some((assignment) =>
+      assignmentCoversDate(
+        assignment.assignedAt,
+        assignment.unassignedAt,
+        onDate,
+      ),
+    );
+  }
+
   private async validateAllocationProjects(
     employeeId: string,
     projectIds: string[],
+    onDate?: Date,
+    db: Prisma.TransactionClient | PrismaService = this.prismaService,
   ): Promise<void> {
     for (const projectId of projectIds) {
-      const assignment = await this.prismaService.projectAssignment.findFirst({
-        where: { employeeId, projectId, unassignedAt: null },
-      });
-      if (!assignment) {
+      const assigned = await this.isEmployeeAssignedToProjectOnDate(
+        employeeId,
+        projectId,
+        onDate ?? new Date(),
+        db,
+      );
+      if (!assigned) {
         throw new BadRequestException(
           `Employee is not assigned to project ${projectId}`,
         );
       }
-      const project = await this.prismaService.project.findUnique({
+      const project = await db.project.findUnique({
         where: { id: projectId },
         include: {
           amcRecords: {
@@ -675,5 +748,232 @@ export class StandupsService {
         );
       }
     }
+  }
+
+  private findLaterActiveAssignment(
+    assignments: Array<{
+      id: string;
+      assignedAt: Date;
+      unassignedAt: Date | null;
+    }>,
+    standupDate: Date,
+  ): { id: string; assignedAt: Date } | null {
+    const standupDay = toIsoDate(standupDate);
+    let latest: { id: string; assignedAt: Date } | null = null;
+    for (const assignment of assignments) {
+      if (assignment.unassignedAt !== null) {
+        continue;
+      }
+      const assignedDay = toIsoDate(assignment.assignedAt);
+      if (assignedDay > standupDay) {
+        if (!latest || assignment.assignedAt > latest.assignedAt) {
+          latest = assignment;
+        }
+      }
+    }
+    return latest;
+  }
+
+  private validateAssignmentResolutions(
+    fixes: MissingAssignmentFix[],
+    resolutions: AssignmentResolutionItemDto[],
+  ): void {
+    for (const fix of fixes) {
+      const resolution = resolutions.find(
+        (item) =>
+          item.employeeId === fix.employeeId &&
+          item.projectId === fix.projectId,
+      );
+      if (!resolution) {
+        throw new BadRequestException(
+          `Missing resolution for ${fix.employeeName} on ${fix.projectName}`,
+        );
+      }
+      if (!fix.availableActions.includes(resolution.action)) {
+        throw new BadRequestException(
+          `Invalid action "${resolution.action}" for ${fix.employeeName} on ${fix.projectName}`,
+        );
+      }
+    }
+  }
+
+  private applyRemoveAllocationsToEntries(
+    entries: BatchUpdateStandupEntriesDto["entries"],
+    resolutions: AssignmentResolutionItemDto[],
+    fixes: MissingAssignmentFix[],
+  ): BatchUpdateStandupEntriesDto["entries"] {
+    return entries.map((entry) => {
+      const entryFixes = fixes.filter((fix) => fix.entryId === entry.id);
+      if (!entryFixes.length || !entry.allocations?.length) {
+        return entry;
+      }
+      const removeProjectIds = new Set(
+        resolutions
+          .filter((resolution) => resolution.action === "remove_allocation")
+          .filter((resolution) =>
+            entryFixes.some(
+              (fix) =>
+                fix.employeeId === resolution.employeeId &&
+                fix.projectId === resolution.projectId,
+            ),
+          )
+          .map((resolution) => resolution.projectId),
+      );
+      if (!removeProjectIds.size) {
+        return entry;
+      }
+      return {
+        ...entry,
+        allocations: entry.allocations.filter(
+          (allocation) => !removeProjectIds.has(allocation.projectId),
+        ),
+      };
+    });
+  }
+
+  private async applyAssignmentResolution(
+    tx: Prisma.TransactionClient,
+    standupDate: Date,
+    resolution: AssignmentResolutionItemDto,
+  ): Promise<void> {
+    const { employeeId, projectId, action } = resolution;
+    const alreadyAssigned = await this.isEmployeeAssignedToProjectOnDate(
+      employeeId,
+      projectId,
+      standupDate,
+      tx,
+    );
+    if (alreadyAssigned) {
+      return;
+    }
+
+    const assignments = await tx.projectAssignment.findMany({
+      where: { employeeId, projectId },
+    });
+    const laterActive = this.findLaterActiveAssignment(assignments, standupDate);
+
+    switch (action) {
+      case "backward_extend":
+        if (!laterActive) {
+          throw new BadRequestException(
+            `No later assignment to extend for project ${projectId}`,
+          );
+        }
+        await tx.projectAssignment.update({
+          where: { id: laterActive.id },
+          data: { assignedAt: standupDate },
+        });
+        return;
+      case "split":
+        if (!laterActive) {
+          throw new BadRequestException(
+            `No later assignment to split for project ${projectId}`,
+          );
+        }
+        const splitEnd = dayBefore(laterActive.assignedAt);
+        if (toIsoDate(splitEnd) < toIsoDate(standupDate)) {
+          throw new BadRequestException(
+            `Cannot split assignment for project ${projectId} on ${toIsoDate(standupDate)}`,
+          );
+        }
+        await tx.projectAssignment.create({
+          data: {
+            projectId,
+            employeeId,
+            assignedAt: standupDate,
+            unassignedAt: splitEnd,
+          },
+        });
+        return;
+      case "create":
+        if (laterActive) {
+          throw new BadRequestException(
+            `Use split or backward_extend for project ${projectId}; a later assignment already exists`,
+          );
+        }
+        await tx.projectAssignment.create({
+          data: {
+            projectId,
+            employeeId,
+            assignedAt: standupDate,
+          },
+        });
+        return;
+      default:
+        throw new BadRequestException(`Unknown assignment action: ${action}`);
+    }
+  }
+
+  private async findMissingAllocationAssignments(
+    standup: Awaited<ReturnType<StandupsService["findOne"]>>,
+    updates: BatchUpdateStandupEntriesDto["entries"],
+  ) {
+    const entryById = new Map(standup.entries.map((entry) => [entry.id, entry]));
+    const seen = new Set<string>();
+    const missing: MissingAssignmentFix[] = [];
+
+    for (const item of updates) {
+      const entry = entryById.get(item.id);
+      if (!entry || !item.allocations?.length) {
+        continue;
+      }
+      const attendanceStatus = item.attendanceStatus ?? entry.attendanceStatus;
+      if (attendanceStatus === AttendanceStatus.absent) {
+        continue;
+      }
+      for (const allocation of item.allocations) {
+        const assigned = await this.isEmployeeAssignedToProjectOnDate(
+          entry.employee.id,
+          allocation.projectId,
+          standup.date,
+        );
+        if (assigned) {
+          continue;
+        }
+        const project = await this.prismaService.project.findUnique({
+          where: { id: allocation.projectId },
+          select: { id: true, name: true },
+        });
+        if (!project) {
+          continue;
+        }
+        const key = `${entry.employee.id}:${project.id}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        const assignments = await this.prismaService.projectAssignment.findMany({
+          where: {
+            employeeId: entry.employee.id,
+            projectId: project.id,
+          },
+        });
+        const laterActive = this.findLaterActiveAssignment(
+          assignments,
+          standup.date,
+        );
+        const availableActions: MissingAssignmentAction[] = [
+          "remove_allocation",
+        ];
+        if (laterActive) {
+          availableActions.push("backward_extend", "split");
+        } else {
+          availableActions.push("create");
+        }
+        missing.push({
+          entryId: entry.id,
+          employeeId: entry.employee.id,
+          employeeName: entry.employee.name,
+          projectId: project.id,
+          projectName: project.name,
+          currentAssignedFrom: laterActive
+            ? toIsoDate(laterActive.assignedAt)
+            : null,
+          availableActions,
+        });
+      }
+    }
+
+    return missing;
   }
 }

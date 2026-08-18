@@ -36,12 +36,12 @@ const PREFERENCE_OPTIONS: Array<{
   {
     value: "everyone",
     label: "Everyone",
-    hint: "Always include all active employees without asking.",
+    hint: "Show all employees when opening a stand-up.",
   },
   {
     value: "group",
     label: "A specific group",
-    hint: "Always include only members of the selected group.",
+    hint: "Show only members of your selected group by default; others stay in the stand-up.",
   },
 ]
 
@@ -207,7 +207,7 @@ function ProfilePage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Stand-up participants</CardTitle>
+              <CardTitle className="text-base">Stand-up view</CardTitle>
             </CardHeader>
             <CardContent>
               {error ? <ErrorState message={error} /> : null}

@@ -6,6 +6,7 @@ import {
   IsBoolean,
   IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -21,7 +22,9 @@ export class CreateStandupDto {
   date!: string;
 
   @ApiPropertyOptional({
-    description: "Limit participants to this employee group; omit for everyone",
+    deprecated: true,
+    description:
+      "Ignored. Stand-ups always include all active employees; use profile group preference for UI filtering.",
   })
   @IsOptional()
   @IsString()
@@ -73,12 +76,49 @@ export class BatchUpdateStandupEntryItemDto extends UpdateStandupEntryDto {
   id!: string;
 }
 
+export const MISSING_ASSIGNMENT_ACTIONS = [
+  "backward_extend",
+  "split",
+  "create",
+  "remove_allocation",
+] as const;
+
+export type MissingAssignmentAction =
+  typeof MISSING_ASSIGNMENT_ACTIONS[number];
+
+export class AssignmentResolutionItemDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  employeeId!: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  projectId!: string;
+
+  @ApiProperty({ enum: MISSING_ASSIGNMENT_ACTIONS })
+  @IsIn(MISSING_ASSIGNMENT_ACTIONS)
+  action!: MissingAssignmentAction;
+}
+
 export class BatchUpdateStandupEntriesDto {
   @ApiProperty({ type: [BatchUpdateStandupEntryItemDto] })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => BatchUpdateStandupEntryItemDto)
   entries!: BatchUpdateStandupEntryItemDto[];
+
+  @ApiPropertyOptional({
+    type: [AssignmentResolutionItemDto],
+    description:
+      "How to resolve missing project assignments before saving stand-up entries.",
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => AssignmentResolutionItemDto)
+  assignmentResolutions?: AssignmentResolutionItemDto[];
 }
 
 export class StandupCalendarQueryDto {

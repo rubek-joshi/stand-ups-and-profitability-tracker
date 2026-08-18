@@ -91,9 +91,6 @@ function StandupsPage() {
   const [groupId, setGroupId] = React.useState("")
   const [remember, setRemember] = React.useState(false)
   const [creating, setCreating] = React.useState(false)
-  const [calendarRefreshKey, setCalendarRefreshKey] = React.useState(0)
-
-  const [historyRefreshKey, setHistoryRefreshKey] = React.useState(0)
 
   const preference = user?.standupScopePreference ?? "ask"
   const askEveryTime = preference === "ask"
@@ -145,16 +142,12 @@ function StandupsPage() {
   const totalPages = totalPagesFor(total, pageSize)
   const groupItems = Object.fromEntries(groups.map((g) => [g.id, g.name]))
 
-  const afterCreate = async () => {
+  const afterCreate = async (standupId: string) => {
     setOpen(false)
-    setCalendarRefreshKey((k) => k + 1)
-    setHistoryRefreshKey((k) => k + 1)
-    if (view === "list") {
-      void navigate({
-        search: (prev) => ({ ...prev, page: 1 }),
-      })
-      await load()
-    }
+    await navigate({
+      to: "/stand-ups/$id",
+      params: { id: standupId },
+    })
   }
 
   return (
@@ -254,17 +247,13 @@ function StandupsPage() {
         </TabsContent>
 
         <TabsContent value="calendar" className="mt-4">
-          <StandupCalendar
-            refreshKey={calendarRefreshKey}
-            onMissingDayClick={(day) => void openCreate(day)}
-          />
+          <StandupCalendar onMissingDayClick={(day) => void openCreate(day)} />
         </TabsContent>
 
         <TabsContent value="history" className="mt-4">
           <StandupHistoryView
             q={q}
             employeeId={employeeId}
-            refreshKey={historyRefreshKey}
             onSearchChange={(value) => {
               void navigate({
                 search: (prev) => ({
@@ -328,16 +317,11 @@ function StandupsPage() {
                   })
                   await refreshUser()
                 }
-                await api("/standups", {
+                const res = await api<Envelope<Standup>>("/standups", {
                   method: "POST",
-                  body: {
-                    date,
-                    ...(effectiveGroupId
-                      ? { employeeGroupId: effectiveGroupId }
-                      : {}),
-                  },
+                  body: { date },
                 })
-                await afterCreate()
+                await afterCreate(res.data.id)
               } catch (err) {
                 alert(err instanceof ApiError ? err.message : "Failed")
               } finally {
@@ -362,7 +346,11 @@ function StandupsPage() {
             {askEveryTime ? (
               <>
                 <div className="space-y-2">
-                  <Label>Who should be included?</Label>
+                  <Label>Who do you want to focus on?</Label>
+                  <p className="text-xs text-muted-foreground">
+                    All active employees are included in the stand-up. This only
+                    sets your default view filter.
+                  </p>
                   <div className="grid grid-cols-2 gap-2">
                     {(
                       [
@@ -430,11 +418,11 @@ function StandupsPage() {
               </>
             ) : (
               <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
-                Using saved preference:{" "}
+                Using saved view filter:{" "}
                 {preference === "group"
                   ? `group “${user?.standupPreferredGroup?.name ?? "selected"}”`
                   : "everyone"}
-                .{" "}
+                . All employees are still included in the stand-up.{" "}
                 <Link to="/profile" className="underline">
                   Change in profile
                 </Link>
