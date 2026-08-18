@@ -63,7 +63,7 @@ export type ProjectDashboard = {
     laborCostPaisa: string
   }
   laborSeries: Array<{
-    month: string
+    date: string
     laborCostPaisa: string
     allocationPercentTotal: number
     standupCount: number

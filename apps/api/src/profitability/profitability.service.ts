@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { AttendanceStatus } from "@workspace/database";
-import { daysInMonth } from "../_shared/utils/date.util";
+import { daysInMonth, toIsoDate } from "../_shared/utils/date.util";
 import { PrismaService } from "../prisma/prisma.service";
 
 export type ProjectProfitability = {
@@ -18,7 +18,7 @@ export type ProjectProfitability = {
 };
 
 export type ProjectLaborSeriesPoint = {
-  month: string;
+  date: string;
   laborCostPaisa: bigint;
   allocationPercentTotal: number;
   standupCount: number;
@@ -30,7 +30,7 @@ export type ProjectLaborSummary = {
   completedStandupCount: number;
   employeeCount: number;
   allocationPercentTotal: number;
-  monthly: ProjectLaborSeriesPoint[];
+  daily: ProjectLaborSeriesPoint[];
 };
 
 @Injectable()
@@ -147,7 +147,7 @@ export class ProfitabilityService {
       },
     });
 
-    const byMonth = new Map<
+    const byDate = new Map<
       string,
       {
         laborCostPaisa: bigint;
@@ -187,8 +187,8 @@ export class ProfitabilityService {
       const laborCostPaisa =
         (salary / BigInt(daysInMonth(standup.date)) * BigInt(allocation.percentage)) /
         100n;
-      const month = standup.date.toISOString().slice(0, 7);
-      const bucket = byMonth.get(month) ?? {
+      const date = toIsoDate(standup.date);
+      const bucket = byDate.get(date) ?? {
         laborCostPaisa: 0n,
         allocationPercentTotal: 0,
         standupIds: new Set<string>(),
@@ -199,7 +199,7 @@ export class ProfitabilityService {
       bucket.allocationPercentTotal += allocation.percentage;
       bucket.standupIds.add(standup.id);
       bucket.employeeIds.add(allocation.standupEntry.employeeId);
-      byMonth.set(month, bucket);
+      byDate.set(date, bucket);
 
       totalLaborCostPaisa += laborCostPaisa;
       allocationPercentTotal += allocation.percentage;
@@ -207,10 +207,10 @@ export class ProfitabilityService {
       employeeIds.add(allocation.standupEntry.employeeId);
     }
 
-    const monthly = [...byMonth.entries()]
+    const daily = [...byDate.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([month, bucket]) => ({
-        month,
+      .map(([date, bucket]) => ({
+        date,
         laborCostPaisa: bucket.laborCostPaisa,
         allocationPercentTotal: bucket.allocationPercentTotal,
         standupCount: bucket.standupIds.size,
@@ -222,7 +222,7 @@ export class ProfitabilityService {
       completedStandupCount: standupIds.size,
       employeeCount: employeeIds.size,
       allocationPercentTotal,
-      monthly,
+      daily,
     };
   }
 

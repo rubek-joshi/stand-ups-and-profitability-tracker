@@ -33,6 +33,7 @@ import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
+import { SHORTCUTS_FAB_BOTTOM_CLASS } from "@/components/keyboard-shortcuts"
 import {
   EmployeeStandupCard,
   isEntryComplete,
@@ -1005,7 +1006,7 @@ function StandupDetailPage() {
         size="icon"
         variant="secondary"
         aria-label="Scroll to top"
-        className={`fixed right-4 bottom-4 z-30 size-10 rounded-full shadow-md transition-[opacity,transform] md:right-6 md:bottom-6 ${
+        className={`fixed right-4 z-30 size-10 rounded-full shadow-md transition-[opacity,transform] md:right-6 ${SHORTCUTS_FAB_BOTTOM_CLASS} ${
           showScrollTop
             ? "translate-y-0 opacity-100"
             : "pointer-events-none translate-y-2 opacity-0"

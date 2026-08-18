@@ -5,6 +5,7 @@ import { Separator } from "@workspace/ui/components/separator"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandPalette } from "@/components/command-palette"
+import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { getToken } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { LoadingState } from "@/components/ui-states"
@@ -62,6 +63,7 @@ function AppLayout() {
           </div>
         </SidebarInset>
         <CommandPalette />
+        <KeyboardShortcuts />
       </SidebarProvider>
     </TooltipProvider>
   )

@@ -14,6 +14,8 @@ import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
@@ -27,6 +29,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { Progress } from "@workspace/ui/components/progress"
 import {
   Select,
   SelectContent,
@@ -37,6 +40,10 @@ import {
 import { Textarea } from "@workspace/ui/components/textarea"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@workspace/ui/components/toggle-group"
 import {
   Table,
   TableBody,
@@ -51,6 +58,7 @@ import { DeclineAmcDialog } from "@/components/amc/decline-amc-dialog"
 import { EditAmcDialog } from "@/components/amc/edit-amc-dialog"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import { PageHeader } from "@/components/page-header"
+import { PaginationBar } from "@/components/pagination-bar"
 import { CoreMemberLink, EmployeeLink } from "@/components/resource-link"
 import {
   TableActionButton,
@@ -61,8 +69,8 @@ import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
-import { formatNpr, parseNprInput } from "@/lib/money"
+import { DEFAULT_LIST_SEARCH, clampPage, totalPagesFor, type PageSize } from "@/lib/list-query"
+import { formatNpr, paisaToNpr, parseNprInput } from "@/lib/money"
 import type {
   AmcRecord,
   CoreMember,
@@ -103,6 +111,8 @@ function ProjectDetailPage() {
   const [amcCreateOpen, setAmcCreateOpen] = React.useState(false)
   const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
   const [editAmc, setEditAmc] = React.useState<AmcRecord | null>(null)
+  const [logPage, setLogPage] = React.useState(1)
+  const [logPageSize, setLogPageSize] = React.useState<PageSize>(10)
   const initialLoad = React.useRef(true)
 
   const load = React.useCallback(async () => {
@@ -176,6 +186,13 @@ function ProjectDetailPage() {
     project.isVatApplicable && profit
       ? Math.round((Number(profit.revenuePaisa) * (project.vatRateApplied ?? 0)) / 100)
       : 0
+  const assignmentLog = assignments.employees
+  const logTotalPages = totalPagesFor(assignmentLog.length, logPageSize)
+  const logPageSafe = clampPage(logPage, logTotalPages)
+  const pagedAssignmentLog = assignmentLog.slice(
+    (logPageSafe - 1) * logPageSize,
+    logPageSafe * logPageSize,
+  )
 
   const openAddEmployees = () => {
     setEmployeeQuery("")
@@ -293,14 +310,22 @@ function ProjectDetailPage() {
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-6">
           <Card>
-            <CardHeader className="space-y-1">
-              <CardTitle className="text-lg">Labor cost from stand-ups</CardTitle>
-              <p className="text-sm text-muted-foreground">
-                Monthly labor cost based on completed stand-up allocation percentages.
-              </p>
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-lg">Labor cost from stand-ups</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Stand-up labor against the duration-based budget run-rate.
+                </p>
+              </div>
             </CardHeader>
             <CardContent>
-              <ProjectLaborCostChart series={laborSeries} />
+              <ProjectLaborCostChart
+                series={laborSeries}
+                startDate={String(project.startDate).slice(0, 10)}
+                endDate={String(project.endDate).slice(0, 10)}
+                totalBudgetPaisa={profit?.revenuePaisa ?? project.budgetPaisa}
+                spentLaborPaisa={summary?.laborCostPaisa ?? "0"}
+              />
               <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
                 <Badge variant="outline">
                   {summary?.completedStandupCount ?? 0} completed stand-ups
@@ -487,7 +512,7 @@ function ProjectDetailPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {assignments.employees.map((assignment) => (
+                    {pagedAssignmentLog.map((assignment) => (
                       <TableRow key={assignment.id}>
                         <TableCell>
                           <EmployeeLink id={assignment.employeeId}>
@@ -518,7 +543,7 @@ function ProjectDetailPage() {
                         </TableActionsCell>
                       </TableRow>
                     ))}
-                    {assignments.employees.length === 0 ? (
+                    {assignmentLog.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={4} className="text-muted-foreground">
                           No employee assignments yet.
@@ -527,6 +552,19 @@ function ProjectDetailPage() {
                     ) : null}
                   </TableBody>
                 </Table>
+                {assignmentLog.length > 0 ? (
+                  <PaginationBar
+                    page={logPageSafe}
+                    totalPages={logTotalPages}
+                    total={assignmentLog.length}
+                    pageSize={logPageSize}
+                    onPageChange={setLogPage}
+                    onPageSizeChange={(size) => {
+                      setLogPageSize(size)
+                      setLogPage(1)
+                    }}
+                  />
+                ) : null}
               </div>
             </CardContent>
           </Card>
@@ -921,102 +959,183 @@ function ProjectMetricCard({
 
 function ProjectLaborCostChart({
   series,
+  startDate,
+  endDate,
+  totalBudgetPaisa,
+  spentLaborPaisa,
 }: {
   series: Array<{
-    month: string
+    date: string
     laborCostPaisa: string
     allocationPercentTotal: number
     standupCount: number
     employeeCount: number
   }>
+  startDate: string
+  endDate: string
+  totalBudgetPaisa: string
+  spentLaborPaisa: string
 }) {
+  const [grain, setGrain] = React.useState<LaborGrain>("monthly")
+  const durationMonths = inclusiveMonthCount(startDate, endDate)
+  const periodBudgetPaisa = periodBudgetForGrain(
+    Number(totalBudgetPaisa) || 0,
+    durationMonths,
+    grain,
+  )
+  const spent = Number(spentLaborPaisa) || 0
+  const totalBudget = Number(totalBudgetPaisa) || 0
+  const burn = totalBudget > 0 ? Math.min(100, (spent / totalBudget) * 100) : 0
+
   const chartConfig = {
     laborCost: {
       label: "Labor cost",
-      color: "hsl(var(--chart-1))",
+      color: "orange",
+    },
+    budget: {
+      label: "Period budget",
+      color: "var(--chart-2)",
     },
   } satisfies ChartConfig
 
-  const data = series.map((item) => ({
-    month: formatMonth(item.month),
-    laborCost: Number(item.laborCostPaisa),
-    allocationPercentTotal: item.allocationPercentTotal,
-    standupCount: item.standupCount,
-    employeeCount: item.employeeCount,
-  }))
-
-  if (data.length === 0) {
-    return (
-      <div className="flex h-70 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
-        No completed stand-up allocations yet.
-      </div>
-    )
-  }
+  const data = React.useMemo(
+    () =>
+      buildLaborChartData({
+        series,
+        startDate,
+        endDate,
+        grain,
+        periodBudgetPaisa,
+      }),
+    [series, startDate, endDate, grain, periodBudgetPaisa],
+  )
 
   return (
-    <ChartContainer config={chartConfig} className="aspect-auto h-70 w-full">
-      <AreaChart data={data} margin={{ left: 0, right: 12, top: 8, bottom: 8 }}>
-        <defs>
-          <linearGradient id="project-labor-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="var(--color-laborCost)" stopOpacity={0.35} />
-            <stop offset="95%" stopColor="var(--color-laborCost)" stopOpacity={0.02} />
-          </linearGradient>
-        </defs>
-        <CartesianGrid vertical={false} />
-        <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
-        <YAxis
-          tickLine={false}
-          axisLine={false}
-          tick={{ fontSize: 11 }}
-          tickFormatter={(value: number) => `${Math.round(value / 1000)}k`}
-          width={52}
-        />
-        <ChartTooltip
-          content={
-            <ChartTooltipContent
-              formatter={(_value, _name, item) => {
-                const payload = item?.payload as
-                  | {
-                      laborCost: number
-                      allocationPercentTotal: number
-                      standupCount: number
-                      employeeCount: number
-                    }
-                  | undefined
-                if (!payload) return null
-                return (
-                  <div className="grid gap-1">
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Labor cost</span>
-                      <span className="font-medium">{formatNpr(String(payload.laborCost))}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Allocations</span>
-                      <span className="font-medium">{payload.allocationPercentTotal}%</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Stand-ups</span>
-                      <span className="font-medium">{payload.standupCount}</span>
-                    </div>
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-muted-foreground">Employees</span>
-                      <span className="font-medium">{payload.employeeCount}</span>
-                    </div>
-                  </div>
-                )
-              }}
+    <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <ToggleGroup
+          value={[grain]}
+          onValueChange={(next) => {
+            const selected = next[0]
+            if (
+              selected === "daily" ||
+              selected === "weekly" ||
+              selected === "monthly" ||
+              selected === "annually"
+            ) {
+              setGrain(selected)
+            }
+          }}
+          variant="outline"
+          size="sm"
+          spacing={0}
+          className="flex-wrap"
+        >
+          <ToggleGroupItem value="daily">Daily</ToggleGroupItem>
+          <ToggleGroupItem value="weekly">Weekly</ToggleGroupItem>
+          <ToggleGroupItem value="monthly">Monthly</ToggleGroupItem>
+          <ToggleGroupItem value="annually">Annually</ToggleGroupItem>
+        </ToggleGroup>
+        <Badge variant="outline">{burn.toFixed(0)}% budget burned</Badge>
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">
+        {grainLabel(grain)} budget {formatNpr(String(Math.round(periodBudgetPaisa)))}{" "}
+        · {durationMonths} month{durationMonths === 1 ? "" : "s"} duration
+      </p>
+      {data.length === 0 ? (
+        <div className="mt-4 flex h-70 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
+          No completed stand-up allocations yet.
+        </div>
+      ) : (
+        <ChartContainer config={chartConfig} className="mt-4 aspect-auto h-70 w-full">
+          <AreaChart data={data} margin={{ left: 0, right: 12, top: 8, bottom: 8 }}>
+            <defs>
+              <linearGradient id="project-labor-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-laborCost)" stopOpacity={0.35} />
+                <stop offset="95%" stopColor="var(--color-laborCost)" stopOpacity={0.02} />
+              </linearGradient>
+              <linearGradient id="project-budget-fill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="var(--color-budget)" stopOpacity={0.2} />
+                <stop offset="95%" stopColor="var(--color-budget)" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 11 }}
+              tickFormatter={(value: number) =>
+                Math.abs(value) >= 1000
+                  ? `${Math.round(value / 1000)}k`
+                  : String(Math.round(value))
+              }
+              width={52}
             />
-          }
-        />
-        <Area
-          type="monotone"
-          dataKey="laborCost"
-          stroke="var(--color-laborCost)"
-          fill="url(#project-labor-fill)"
-          strokeWidth={2}
-        />
-      </AreaChart>
-    </ChartContainer>
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(_value, _name, item) => {
+                    const payload = item?.payload as LaborChartPoint | undefined
+                    if (!payload) return null
+                    return (
+                      <div className="grid gap-1">
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-muted-foreground">Labor cost</span>
+                          <span className="font-medium">
+                            {formatNpr(String(Math.round(payload.laborCost * 100)))}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-muted-foreground">Period budget</span>
+                          <span className="font-medium">
+                            {formatNpr(String(Math.round(payload.budget * 100)))}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-muted-foreground">Allocations</span>
+                          <span className="font-medium">{payload.allocationPercentTotal}%</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-muted-foreground">Stand-ups</span>
+                          <span className="font-medium">{payload.standupCount}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-4">
+                          <span className="text-muted-foreground">Employees</span>
+                          <span className="font-medium">{payload.employeeCount}</span>
+                        </div>
+                      </div>
+                    )
+                  }}
+                />
+              }
+            />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Area
+              type="monotone"
+              dataKey="budget"
+              name="Period budget"
+              stroke="var(--color-budget)"
+              fill="url(#project-budget-fill)"
+              strokeWidth={2}
+            />
+            <Area
+              type="monotone"
+              dataKey="laborCost"
+              name="Labor cost"
+              stroke="var(--color-laborCost)"
+              fill="url(#project-labor-fill)"
+              strokeWidth={2}
+            />
+          </AreaChart>
+        </ChartContainer>
+      )}
+      <Progress value={burn} className="mt-4 h-2" />
+      <div className="mt-2 flex justify-between text-xs text-muted-foreground">
+        <span>Spent {formatNpr(spentLaborPaisa)}</span>
+        <span>Budget {formatNpr(totalBudgetPaisa)}</span>
+      </div>
+    </div>
   )
 }
 
@@ -1037,14 +1156,176 @@ function DetailRow({
   )
 }
 
-function formatMonth(value: string) {
-  const [year, month] = value.split("-")
-  const date = new Date(Date.UTC(Number(year), Number(month) - 1, 1))
-  return Number.isNaN(date.getTime())
-    ? value
-    : new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        year: "2-digit",
-        timeZone: "UTC",
-      }).format(date)
+type LaborGrain = "daily" | "weekly" | "monthly" | "annually"
+
+type LaborChartPoint = {
+  key: string
+  label: string
+  laborCost: number
+  budget: number
+  allocationPercentTotal: number
+  standupCount: number
+  employeeCount: number
+}
+
+function grainLabel(grain: LaborGrain) {
+  if (grain === "daily") return "Daily"
+  if (grain === "weekly") return "Weekly"
+  if (grain === "monthly") return "Monthly"
+  return "Annual"
+}
+
+function inclusiveMonthCount(startDate: string, endDate: string) {
+  const start = parseUtcDate(startDate)
+  const end = parseUtcDate(endDate)
+  if (!start || !end) return 1
+  const months =
+    (end.getUTCFullYear() - start.getUTCFullYear()) * 12 +
+    (end.getUTCMonth() - start.getUTCMonth()) +
+    1
+  return Math.max(1, months)
+}
+
+function periodBudgetForGrain(
+  totalBudgetPaisa: number,
+  durationMonths: number,
+  grain: LaborGrain,
+) {
+  const months = Math.max(1, durationMonths)
+  const monthly = totalBudgetPaisa / months
+  if (grain === "monthly") return monthly
+  if (grain === "weekly") return monthly / 4
+  if (grain === "daily") return monthly / 4 / 7
+  return monthly * 12
+}
+
+function parseUtcDate(value: string) {
+  const key = String(value).slice(0, 10)
+  const date = new Date(`${key}T00:00:00.000Z`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function addUtcDays(date: Date, days: number) {
+  return new Date(date.getTime() + days * 86_400_000)
+}
+
+function isoWeekStart(date: Date) {
+  const day = date.getUTCDay() || 7
+  return addUtcDays(date, 1 - day)
+}
+
+function isoWeekKey(date: Date) {
+  const monday = isoWeekStart(date)
+  const thursday = addUtcDays(monday, 3)
+  const year = thursday.getUTCFullYear()
+  const week1Monday = isoWeekStart(new Date(Date.UTC(year, 0, 4)))
+  const week = Math.floor((monday.getTime() - week1Monday.getTime()) / (7 * 86_400_000)) + 1
+  return `${year}-W${String(week).padStart(2, "0")}`
+}
+
+function periodKeyForDate(date: Date, grain: LaborGrain) {
+  const iso = date.toISOString().slice(0, 10)
+  if (grain === "daily") return iso
+  if (grain === "weekly") return isoWeekKey(date)
+  if (grain === "monthly") return iso.slice(0, 7)
+  return String(date.getUTCFullYear())
+}
+
+function formatPeriodLabel(key: string, grain: LaborGrain) {
+  if (grain === "daily") {
+    return formatUtcLabel(key, { day: "numeric", month: "short" })
+  }
+  if (grain === "weekly") {
+    const year = Number(key.slice(0, 4))
+    const week = Number(key.slice(6))
+    const jan4 = new Date(Date.UTC(year, 0, 4))
+    const weekStart = addUtcDays(isoWeekStart(jan4), (week - 1) * 7)
+    return `W${String(week).padStart(2, "0")} ${formatUtcLabel(weekStart.toISOString().slice(0, 10), { day: "numeric", month: "short" })}`
+  }
+  if (grain === "monthly") {
+    return formatUtcLabel(`${key}-01`, { month: "short", year: "2-digit" })
+  }
+  return key
+}
+
+function formatUtcLabel(isoDate: string, options: Intl.DateTimeFormatOptions) {
+  const date = parseUtcDate(isoDate)
+  if (!date) return isoDate
+  return new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" }).format(date)
+}
+
+function buildLaborChartData({
+  series,
+  startDate,
+  endDate,
+  grain,
+  periodBudgetPaisa,
+}: {
+  series: Array<{
+    date: string
+    laborCostPaisa: string
+    allocationPercentTotal: number
+    standupCount: number
+    employeeCount: number
+  }>
+  startDate: string
+  endDate: string
+  grain: LaborGrain
+  periodBudgetPaisa: number
+}): LaborChartPoint[] {
+  const byDate = new Map(series.map((item) => [item.date.slice(0, 10), item]))
+  const start = parseUtcDate(startDate)
+  const projectEnd = parseUtcDate(endDate)
+  if (!start || !projectEnd) return []
+
+  const today = parseUtcDate(new Date().toISOString().slice(0, 10)) ?? projectEnd
+  const lastSeriesDate = series.reduce((latest, item) => {
+    return item.date > latest ? item.date : latest
+  }, startDate)
+  const lastDate = parseUtcDate(lastSeriesDate) ?? start
+  const rangeEndMs = Math.max(
+    Math.min(today.getTime(), projectEnd.getTime()),
+    lastDate.getTime(),
+  )
+
+  const buckets = new Map<
+    string,
+    {
+      laborCostPaisa: number
+      allocationPercentTotal: number
+      standupIds: number
+      employeeIds: number
+    }
+  >()
+
+  for (let cursor = start; cursor.getTime() <= rangeEndMs; cursor = addUtcDays(cursor, 1)) {
+    const key = periodKeyForDate(cursor, grain)
+    if (!buckets.has(key)) {
+      buckets.set(key, {
+        laborCostPaisa: 0,
+        allocationPercentTotal: 0,
+        standupIds: 0,
+        employeeIds: 0,
+      })
+    }
+    const iso = cursor.toISOString().slice(0, 10)
+    const point = byDate.get(iso)
+    if (!point) continue
+    const bucket = buckets.get(key)!
+    bucket.laborCostPaisa += Number(point.laborCostPaisa) || 0
+    bucket.allocationPercentTotal += point.allocationPercentTotal
+    bucket.standupIds += point.standupCount
+    bucket.employeeIds += point.employeeCount
+  }
+
+  const budgetNpr = paisaToNpr(periodBudgetPaisa)
+  return [...buckets.entries()].map(([key, bucket]) => ({
+    key,
+    label: formatPeriodLabel(key, grain),
+    laborCost: paisaToNpr(bucket.laborCostPaisa),
+    budget: budgetNpr,
+    allocationPercentTotal: bucket.allocationPercentTotal,
+    standupCount: bucket.standupIds,
+    employeeCount: bucket.employeeIds,
+  }))
 }

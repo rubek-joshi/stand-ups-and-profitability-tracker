@@ -608,8 +608,8 @@ export class ProjectsService {
         allocationPercentTotal: laborSummary.allocationPercentTotal,
         laborCostPaisa: String(laborSummary.totalLaborCostPaisa),
       },
-      laborSeries: laborSummary.monthly.map((item) => ({
-        month: item.month,
+      laborSeries: laborSummary.daily.map((item) => ({
+        date: item.date,
         laborCostPaisa: String(item.laborCostPaisa),
         allocationPercentTotal: item.allocationPercentTotal,
         standupCount: item.standupCount,
