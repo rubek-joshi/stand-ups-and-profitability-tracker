@@ -19,6 +19,7 @@ import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import {
   AssignCoreMemberDto,
   AssignEmployeeDto,
+  AssignEmployeesBulkDto,
   CreateExtensionDto,
   CreateProjectDto,
   UpdateProjectDto,
@@ -107,6 +108,17 @@ export class ProjectsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.projectsService.assignEmployee(id, dto, user.id);
+  }
+
+  @Post(":id/assignments/employees/bulk")
+  @RequirePermission("projects", "*")
+  @ApiOperation({ summary: "Assign multiple employees" })
+  async assignEmployeesBulk(
+    @Param("id") id: string,
+    @Body() dto: AssignEmployeesBulkDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.projectsService.assignEmployeesBulk(id, dto, user.id);
   }
 
   @Delete(":id/assignments/employees/:employeeId")

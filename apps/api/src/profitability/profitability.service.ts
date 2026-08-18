@@ -17,6 +17,22 @@ export type ProjectProfitability = {
   isTrendingOverBudget: boolean;
 };
 
+export type ProjectLaborSeriesPoint = {
+  month: string;
+  laborCostPaisa: bigint;
+  allocationPercentTotal: number;
+  standupCount: number;
+  employeeCount: number;
+};
+
+export type ProjectLaborSummary = {
+  totalLaborCostPaisa: bigint;
+  completedStandupCount: number;
+  employeeCount: number;
+  allocationPercentTotal: number;
+  monthly: ProjectLaborSeriesPoint[];
+};
+
 @Injectable()
 export class ProfitabilityService {
   private readonly cache = new Map<string, ProjectProfitability>();
@@ -113,6 +129,101 @@ export class ProfitabilityService {
       results.push(await this.calculateProjectProfitLoss(projectId, options));
     }
     return results;
+  }
+
+  async calculateProjectLaborSummary(
+    projectId: string,
+    options?: { from?: Date; to?: Date },
+  ): Promise<ProjectLaborSummary> {
+    const allocations = await this.prismaService.projectAllocation.findMany({
+      where: { projectId },
+      include: {
+        standupEntry: {
+          include: {
+            standup: true,
+            employee: { include: { salaryEntries: true } },
+          },
+        },
+      },
+    });
+
+    const byMonth = new Map<
+      string,
+      {
+        laborCostPaisa: bigint;
+        allocationPercentTotal: number;
+        standupIds: Set<string>;
+        employeeIds: Set<string>;
+      }
+    >();
+    const standupIds = new Set<string>();
+    const employeeIds = new Set<string>();
+    let totalLaborCostPaisa = 0n;
+    let allocationPercentTotal = 0;
+
+    for (const allocation of allocations) {
+      const standup = allocation.standupEntry.standup;
+      if (standup.status !== "completed") {
+        continue;
+      }
+      if (options?.from && standup.date < options.from) {
+        continue;
+      }
+      if (options?.to && standup.date > options.to) {
+        continue;
+      }
+      if (allocation.standupEntry.attendanceStatus === AttendanceStatus.absent) {
+        continue;
+      }
+
+      const salary = this.resolveSalary(
+        allocation.standupEntry.employee.salaryEntries,
+        standup.date,
+      );
+      if (salary === null) {
+        continue;
+      }
+
+      const laborCostPaisa =
+        (salary / BigInt(daysInMonth(standup.date)) * BigInt(allocation.percentage)) /
+        100n;
+      const month = standup.date.toISOString().slice(0, 7);
+      const bucket = byMonth.get(month) ?? {
+        laborCostPaisa: 0n,
+        allocationPercentTotal: 0,
+        standupIds: new Set<string>(),
+        employeeIds: new Set<string>(),
+      };
+
+      bucket.laborCostPaisa += laborCostPaisa;
+      bucket.allocationPercentTotal += allocation.percentage;
+      bucket.standupIds.add(standup.id);
+      bucket.employeeIds.add(allocation.standupEntry.employeeId);
+      byMonth.set(month, bucket);
+
+      totalLaborCostPaisa += laborCostPaisa;
+      allocationPercentTotal += allocation.percentage;
+      standupIds.add(standup.id);
+      employeeIds.add(allocation.standupEntry.employeeId);
+    }
+
+    const monthly = [...byMonth.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, bucket]) => ({
+        month,
+        laborCostPaisa: bucket.laborCostPaisa,
+        allocationPercentTotal: bucket.allocationPercentTotal,
+        standupCount: bucket.standupIds.size,
+        employeeCount: bucket.employeeIds.size,
+      }));
+
+    return {
+      totalLaborCostPaisa,
+      completedStandupCount: standupIds.size,
+      employeeCount: employeeIds.size,
+      allocationPercentTotal,
+      monthly,
+    };
   }
 
   private async calculateEmployeeCost(

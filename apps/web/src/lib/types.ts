@@ -46,6 +46,29 @@ export type Project = {
   amcRecord?: AmcRecord | null
   employeeAssignments?: ProjectAssignment[]
   coreMemberAssignments?: CoreMemberAssignment[]
+  dashboard?: ProjectDashboard
+}
+
+export type ProjectDashboard = {
+  summary: {
+    activeEmployeeCount: number
+    activeCoreMemberCount: number
+    employeeAssignmentCount: number
+    coreMemberAssignmentCount: number
+    extensionCount: number
+    autoExtensionCount: number
+    completedStandupCount: number
+    standupEmployeeCount: number
+    allocationPercentTotal: number
+    laborCostPaisa: string
+  }
+  laborSeries: Array<{
+    month: string
+    laborCostPaisa: string
+    allocationPercentTotal: number
+    standupCount: number
+    employeeCount: number
+  }>
 }
 
 export type ProjectProfitability = {

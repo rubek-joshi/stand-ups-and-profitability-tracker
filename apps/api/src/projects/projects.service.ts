@@ -25,6 +25,7 @@ import { ProfitabilityService } from "../profitability/profitability.service";
 import {
   AssignCoreMemberDto,
   AssignEmployeeDto,
+  AssignEmployeesBulkDto,
   CreateExtensionDto,
   CreateProjectDto,
   UpdateProjectDto,
@@ -125,6 +126,8 @@ export class ProjectsService {
     const project = await this.getProjectOrThrow(id);
     const profitability =
       await this.profitabilityService.calculateProjectProfitLoss(id);
+    const laborSummary =
+      await this.profitabilityService.calculateProjectLaborSummary(id);
     return {
       ...this.serializeProject(project),
       extensions: serializeMoneyList(project.extensions, EXTENSION_MONEY_FIELDS),
@@ -142,6 +145,7 @@ export class ProjectsService {
             ? null
             : String(profitability.forecastProfitLossPaisa),
       },
+      dashboard: this.buildDashboard(project, laborSummary),
     };
   }
 
@@ -192,11 +196,19 @@ export class ProjectsService {
     if (before.status === ProjectStatus.closed || before.status === ProjectStatus.under_amc) {
       throw new BadRequestException("Project is already closed");
     }
-    const project = await this.prismaService.project.update({
-      where: { id },
-      data: { status: ProjectStatus.closed },
-      include: this.projectInclude,
+    const closedAt = new Date();
+    const project = await this.prismaService.$transaction(async (tx) => {
+      await tx.projectAssignment.updateMany({
+        where: { projectId: id, unassignedAt: null },
+        data: { unassignedAt: closedAt },
+      });
+      return tx.project.update({
+        where: { id },
+        data: { status: ProjectStatus.closed },
+        include: this.projectInclude,
+      });
     });
+    this.profitabilityService.clearCache(id);
     await this.auditService.write({
       actorId,
       action: AuditAction.PROJECT_CLOSED,
@@ -205,6 +217,10 @@ export class ProjectsService {
       metadata: {
         before: this.serializeProject(before),
         after: this.serializeProject(project),
+        autoReleasedEmployeeIds: before.employeeAssignments
+          .filter((assignment) => !assignment.unassignedAt)
+          .map((assignment) => assignment.employeeId),
+        closedAt,
       },
     });
     return this.serializeProject(project);
@@ -244,6 +260,68 @@ export class ProjectsService {
       metadata: { projectId, employeeId: dto.employeeId },
     });
     return assignment;
+  }
+
+  async assignEmployeesBulk(
+    projectId: string,
+    dto: AssignEmployeesBulkDto,
+    actorId: string,
+  ) {
+    await this.getProjectOrThrow(projectId);
+    const employeeIds = [...new Set(dto.employeeIds)];
+    const employees = await this.prismaService.employee.findMany({
+      where: { id: { in: employeeIds } },
+      select: { id: true, name: true, email: true },
+    });
+    if (employees.length !== employeeIds.length) {
+      const foundIds = new Set(employees.map((employee) => employee.id));
+      const missingIds = employeeIds.filter((employeeId) => !foundIds.has(employeeId));
+      throw new NotFoundException(`Employees not found: ${missingIds.join(", ")}`);
+    }
+    const existing = await this.prismaService.projectAssignment.findMany({
+      where: {
+        projectId,
+        employeeId: { in: employeeIds },
+        unassignedAt: null,
+      },
+      include: { employee: true },
+    });
+    if (existing.length > 0) {
+      throw new BadRequestException(
+        `Already assigned: ${existing
+          .map((assignment) => assignment.employee?.name ?? assignment.employeeId)
+          .join(", ")}`,
+      );
+    }
+
+    const created = await this.prismaService.$transaction(async (tx) => {
+      await tx.projectAssignment.createMany({
+        data: employeeIds.map((employeeId) => ({ projectId, employeeId })),
+      });
+      return tx.projectAssignment.findMany({
+        where: {
+          projectId,
+          employeeId: { in: employeeIds },
+          unassignedAt: null,
+        },
+        include: { employee: true },
+        orderBy: { assignedAt: "desc" },
+      });
+    });
+
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.PROJECT_ASSIGNMENT_CREATED,
+      targetType: "ProjectAssignment",
+      targetId: projectId,
+      metadata: {
+        projectId,
+        employeeIds,
+        count: created.length,
+      },
+    });
+
+    return created;
   }
 
   async unassignEmployee(
@@ -501,6 +579,42 @@ export class ProjectsService {
       amcRecord: currentAmc
         ? serializeMoneyFields(currentAmc, ["amcAmountPaisa"] as const)
         : null,
+    };
+  }
+
+  private buildDashboard(
+    project: Awaited<ReturnType<ProjectsService["getProjectOrThrow"]>>,
+    laborSummary: Awaited<
+      ReturnType<ProfitabilityService["calculateProjectLaborSummary"]>
+    >,
+  ) {
+    const activeEmployeeAssignments = project.employeeAssignments.filter(
+      (assignment) => !assignment.unassignedAt,
+    );
+    const activeCoreMemberAssignments = project.coreMemberAssignments.filter(
+      (assignment) => !assignment.unassignedAt,
+    );
+    return {
+      summary: {
+        activeEmployeeCount: activeEmployeeAssignments.length,
+        activeCoreMemberCount: activeCoreMemberAssignments.length,
+        employeeAssignmentCount: project.employeeAssignments.length,
+        coreMemberAssignmentCount: project.coreMemberAssignments.length,
+        extensionCount: project.extensions.length,
+        autoExtensionCount: project.extensions.filter((extension) => extension.isAuto)
+          .length,
+        completedStandupCount: laborSummary.completedStandupCount,
+        standupEmployeeCount: laborSummary.employeeCount,
+        allocationPercentTotal: laborSummary.allocationPercentTotal,
+        laborCostPaisa: String(laborSummary.totalLaborCostPaisa),
+      },
+      laborSeries: laborSummary.monthly.map((item) => ({
+        month: item.month,
+        laborCostPaisa: String(item.laborCostPaisa),
+        allocationPercentTotal: item.allocationPercentTotal,
+        standupCount: item.standupCount,
+        employeeCount: item.employeeCount,
+      })),
     };
   }
 }

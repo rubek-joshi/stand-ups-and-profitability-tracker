@@ -92,6 +92,14 @@ export class AssignEmployeeDto {
   employeeId!: string;
 }
 
+export class AssignEmployeesBulkDto {
+  @ApiProperty({ type: [String], description: "One or more employee IDs" })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  employeeIds!: string[];
+}
+
 export class AssignCoreMemberDto {
   @ApiProperty()
   @IsString()
