@@ -4,6 +4,7 @@ import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Label } from "@workspace/ui/components/label"
 import { ApiError, getToken } from "@/lib/api"
+import { homePathForRole } from "@/lib/access"
 import { useAuth } from "@/lib/auth"
 import { PasswordInput } from "@/components/password-input"
 import { LoadingState } from "@/components/ui-states"
@@ -69,7 +70,7 @@ function ChangePasswordPage() {
               try {
                 await changePassword(currentPassword, newPassword)
                 await refreshUser()
-                void navigate({ to: "/" })
+                void navigate({ to: homePathForRole(user.role) })
               } catch (err) {
                 setError(
                   err instanceof ApiError ? err.message : "Failed to change password",

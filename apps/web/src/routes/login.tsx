@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@work
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { getToken } from "@/lib/api"
+import { homePathForRole } from "@/lib/access"
 import { useAuth } from "@/lib/auth"
 import { ApiError } from "@/lib/api"
 import { PasswordInput } from "@/components/password-input"
@@ -32,7 +33,7 @@ function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Tracker</CardTitle>
-          <CardDescription>Sign in with your admin account.</CardDescription>
+          <CardDescription>Sign in with your account.</CardDescription>
         </CardHeader>
         <CardContent>
           <form
@@ -44,7 +45,9 @@ function LoginPage() {
               try {
                 const user = await login(email.trim(), password)
                 void navigate({
-                  to: user.mustChangePassword ? "/change-password" : "/",
+                  to: user.mustChangePassword
+                    ? "/change-password"
+                    : homePathForRole(user.role),
                 })
               } catch (err) {
                 setError(err instanceof ApiError ? err.message : "Login failed")

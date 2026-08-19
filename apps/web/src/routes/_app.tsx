@@ -1,5 +1,5 @@
 import * as React from "react"
-import { Outlet, createFileRoute, redirect } from "@tanstack/react-router"
+import { Outlet, createFileRoute, redirect, useRouterState } from "@tanstack/react-router"
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@workspace/ui/components/sidebar"
 import { Separator } from "@workspace/ui/components/separator"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
@@ -7,7 +7,9 @@ import { AppSidebar } from "@/components/app-sidebar"
 import { CommandPalette } from "@/components/command-palette"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
 import { getToken } from "@/lib/api"
+import { homePathForRole } from "@/lib/access"
 import { useAuth } from "@/lib/auth"
+import { isAppPathAllowed } from "@/lib/nav"
 import { LoadingState } from "@/components/ui-states"
 
 export const Route = createFileRoute("/_app")({
@@ -24,6 +26,7 @@ export const Route = createFileRoute("/_app")({
 function AppLayout() {
   const { loading, token, user } = useAuth()
   const navigate = Route.useNavigate()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
 
   React.useEffect(() => {
     if (!loading && !token) {
@@ -36,6 +39,13 @@ function AppLayout() {
       void navigate({ to: "/change-password" })
     }
   }, [loading, token, user?.mustChangePassword, navigate])
+
+  React.useEffect(() => {
+    if (loading || !token || !user || user.mustChangePassword) return
+    if (!isAppPathAllowed(pathname, user.role)) {
+      void navigate({ to: homePathForRole(user.role) })
+    }
+  }, [loading, token, user, pathname, navigate])
 
   if (loading) {
     return (

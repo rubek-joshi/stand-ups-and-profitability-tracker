@@ -87,6 +87,10 @@ async function seed(): Promise<void> {
     ["manager", "employee-groups", "read"],
     ["manager", "core-members", "read"],
     ["manager", "clients", "read"],
+    ["standup_taker", "standups", "*"],
+    ["standup_taker", "projects", "read"],
+    ["standup_taker", "employees", "read"],
+    ["standup_taker", "employee-groups", "read"],
   ];
 
   for (const [role, obj, act] of policies) {

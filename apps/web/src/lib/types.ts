@@ -452,7 +452,7 @@ export type DashboardSummary = {
   }>
 }
 
-export type UserRole = "super_admin" | "admin" | "manager"
+export type UserRole = "super_admin" | "admin" | "manager" | "standup_taker"
 
 export type SystemUser = {
   id: string

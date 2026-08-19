@@ -10,7 +10,9 @@ import {
   CommandSeparator,
 } from "@workspace/ui/components/command"
 import { api, type Envelope } from "@/lib/api"
-import { NAV_ITEMS } from "@/lib/nav"
+import { isStaffRole } from "@/lib/access"
+import { useAuth } from "@/lib/auth"
+import { navItemsForRole } from "@/lib/nav"
 import { getRecents, pushRecent, type RecentItem } from "@/lib/recents"
 import type { Client, CoreMember, Employee, Project } from "@/lib/types"
 
@@ -23,10 +25,13 @@ type SearchEntity = {
 
 export function CommandPalette() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [recents, setRecents] = React.useState<RecentItem[]>([])
   const [entities, setEntities] = React.useState<SearchEntity[]>([])
+  const navItems = navItemsForRole(user?.role)
+  const canSearchEntities = isStaffRole(user?.role)
 
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -44,6 +49,10 @@ export function CommandPalette() {
     setRecents(getRecents())
     setQuery("")
     let cancelled = false
+    if (!canSearchEntities) {
+      setEntities([])
+      return
+    }
     ;(async () => {
       try {
         const [clients, projects, employees, coreMembers] = await Promise.all([
@@ -87,7 +96,7 @@ export function CommandPalette() {
     return () => {
       cancelled = true
     }
-  }, [open])
+  }, [open, canSearchEntities])
 
   const go = (item: { id: string; label: string; to: string; group: string }) => {
     pushRecent(item)
@@ -96,7 +105,7 @@ export function CommandPalette() {
   }
 
   const q = query.trim().toLowerCase()
-  const navMatches = NAV_ITEMS.filter((n) => {
+  const navMatches = navItems.filter((n) => {
     if (!q) return true
     return (
       n.title.toLowerCase().includes(q) ||
@@ -105,15 +114,21 @@ export function CommandPalette() {
     )
   })
   const entityMatches = entities.filter((e) => !q || e.label.toLowerCase().includes(q))
+  const recentMatches = recents.filter((r) => {
+    if (r.to === "/profile" || r.to.startsWith("/profile/")) return true
+    return navItems.some((n) =>
+      n.to === "/" ? r.to === "/" : r.to === n.to || r.to.startsWith(`${n.to}/`),
+    )
+  })
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen} title="Command palette" description="Search">
       <CommandInput placeholder="Search pages, clients, projects…" value={query} onValueChange={setQuery} />
       <CommandList>
         <CommandEmpty>No results</CommandEmpty>
-        {!q && recents.length > 0 ? (
+        {!q && recentMatches.length > 0 ? (
           <CommandGroup heading="Recent">
-            {recents.map((r) => (
+            {recentMatches.map((r) => (
               <CommandItem key={r.id} value={`recent-${r.id}`} onSelect={() => go(r)}>
                 <span className="truncate">{r.label}</span>
                 <span className="ml-auto text-xs text-muted-foreground">{r.group}</span>
@@ -121,7 +136,7 @@ export function CommandPalette() {
             ))}
           </CommandGroup>
         ) : null}
-        {!q && recents.length > 0 ? <CommandSeparator /> : null}
+        {!q && recentMatches.length > 0 ? <CommandSeparator /> : null}
         {navMatches.length > 0 ? (
           <CommandGroup heading="Navigation">
             {navMatches.map((n) => (

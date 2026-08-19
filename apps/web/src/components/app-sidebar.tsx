@@ -16,7 +16,8 @@ import {
 } from "@workspace/ui/components/sidebar"
 import { Button } from "@workspace/ui/components/button"
 import { IconLogout, IconUser } from "@tabler/icons-react"
-import { NAV_ITEMS } from "@/lib/nav"
+import { navItemsForRole } from "@/lib/nav"
+import { homePathForRole } from "@/lib/access"
 import { useAuth } from "@/lib/auth"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 
@@ -26,6 +27,8 @@ export function AppSidebar() {
   const { user, logout } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
   const { isMobile, setOpenMobile } = useSidebar()
+  const items = navItemsForRole(user?.role)
+  const homeTo = homePathForRole(user?.role)
 
   const dismissMobile = () => {
     if (isMobile) setOpenMobile(false)
@@ -36,7 +39,7 @@ export function AppSidebar() {
       <Sidebar collapsible="icon">
         <SidebarHeader className="gap-1 px-3 py-3">
           <Link
-            to="/"
+            to={homeTo}
             onClick={dismissMobile}
             className="flex items-center gap-2 truncate font-semibold"
           >
@@ -58,7 +61,7 @@ export function AppSidebar() {
             <SidebarGroupLabel>Navigate</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
-                {NAV_ITEMS.map((item) => {
+                {items.map((item) => {
                   const active =
                     item.to === "/"
                       ? pathname === "/"

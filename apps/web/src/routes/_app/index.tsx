@@ -87,7 +87,6 @@ function DashboardPage() {
       setSettings(sett?.data ?? null)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load dashboard")
-      setData(null)
     } finally {
       setLoading(false)
     }
@@ -132,10 +131,10 @@ function DashboardPage() {
         </div>
       </header>
 
-      {loading ? <LoadingState /> : null}
+      {loading && !dashboardData ? <LoadingState /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}
 
-      {dashboardData && !loading ? (
+      {dashboardData ? (
         <DashboardGrid
           data={dashboardData}
           editing={editing}

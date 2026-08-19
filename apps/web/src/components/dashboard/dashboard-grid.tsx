@@ -1,5 +1,7 @@
 import * as React from "react"
 import {
+  IconCopy,
+  IconClipboard,
   IconEye,
   IconEyeOff,
   IconGripVertical,
@@ -9,46 +11,36 @@ import {
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
+import { Textarea } from "@workspace/ui/components/textarea"
 import { cn } from "@workspace/ui/lib/utils"
-import { getCardDefs, type CardWidth } from "@/components/dashboard/cards"
+import { getCardDefs } from "@/components/dashboard/cards"
 import type { DashboardData } from "@/lib/dashboard-metrics"
+import {
+  CARD_WIDTHS,
+  defaultLayout,
+  loadLayoutFromStorage,
+  mergeLayout,
+  parseLayoutPayload,
+  readClipboard,
+  saveLayoutToStorage,
+  serializeLayout,
+  writeClipboard,
+  type LayoutItem,
+} from "@/lib/dashboard-layout"
 
-const STORAGE_KEY = "ops-dashboard-layout-v2"
-
-const WIDTHS: CardWidth[] = ["sm", "md", "lg", "xl"]
-
-const SPAN: Record<CardWidth, string> = {
+const SPAN: Record<LayoutItem["width"], string> = {
   sm: "md:col-span-3",
   md: "md:col-span-6",
   lg: "md:col-span-8",
   xl: "md:col-span-12",
-}
-
-interface LayoutItem {
-  id: string
-  width: CardWidth
-  hidden?: boolean
-}
-
-function defaultLayout(defs: ReturnType<typeof getCardDefs>): LayoutItem[] {
-  return defs.map((c) => ({ id: c.id, width: c.defaultWidth, hidden: false }))
-}
-
-function loadLayout(defs: ReturnType<typeof getCardDefs>): LayoutItem[] {
-  if (typeof window === "undefined") return defaultLayout(defs)
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY)
-    if (!raw) return defaultLayout(defs)
-    const parsed = JSON.parse(raw) as LayoutItem[]
-    const known = new Map(defaultLayout(defs).map((i) => [i.id, i]))
-    const merged = parsed.filter((i) => known.has(i.id))
-    for (const item of known.values()) {
-      if (!merged.some((m) => m.id === item.id)) merged.push(item)
-    }
-    return merged
-  } catch {
-    return defaultLayout(defs)
-  }
 }
 
 export function DashboardGrid({
@@ -63,18 +55,22 @@ export function DashboardGrid({
   const defs = React.useMemo(() => getCardDefs(data.canViewAudit), [data.canViewAudit])
   const defMap = React.useMemo(() => new Map(defs.map((c) => [c.id, c])), [defs])
 
-  const [layout, setLayout] = React.useState<LayoutItem[]>(() => defaultLayout(defs))
+  const [layout, setLayout] = React.useState<LayoutItem[]>(() => loadLayoutFromStorage(defs))
   const [dragId, setDragId] = React.useState<string | null>(null)
-  const hydrated = React.useRef(false)
+  const [copyMsg, setCopyMsg] = React.useState<string | null>(null)
+  const [copyError, setCopyError] = React.useState<string | null>(null)
+  const [pasteOpen, setPasteOpen] = React.useState(false)
+  const [pasteText, setPasteText] = React.useState("")
+  const [pasteError, setPasteError] = React.useState<string | null>(null)
+  const [pasteHint, setPasteHint] = React.useState<string | null>(null)
+  const [pasteWarnings, setPasteWarnings] = React.useState<string[]>([])
 
   React.useEffect(() => {
-    setLayout(loadLayout(defs))
-    hydrated.current = true
+    setLayout((prev) => mergeLayout(prev, defs))
   }, [defs])
 
   React.useEffect(() => {
-    if (!hydrated.current) return
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(layout))
+    saveLayoutToStorage(layout)
   }, [layout])
 
   const visibleLayout = layout.filter((item) => !item.hidden && defMap.has(item.id))
@@ -98,9 +94,9 @@ export function DashboardGrid({
     setLayout((prev) =>
       prev.map((item) => {
         if (item.id !== id) return item
-        const idx = WIDTHS.indexOf(item.width)
-        const nextIdx = Math.min(WIDTHS.length - 1, Math.max(0, idx + dir))
-        return { ...item, width: WIDTHS[nextIdx] ?? item.width }
+        const idx = CARD_WIDTHS.indexOf(item.width)
+        const nextIdx = Math.min(CARD_WIDTHS.length - 1, Math.max(0, idx + dir))
+        return { ...item, width: CARD_WIDTHS[nextIdx] ?? item.width }
       }),
     )
 
@@ -108,6 +104,59 @@ export function DashboardGrid({
     setLayout((prev) =>
       prev.map((item) => (item.id === id ? { ...item, hidden } : item)),
     )
+
+  const currentJson = serializeLayout(layout)
+
+  const handleCopy = async () => {
+    setCopyError(null)
+    const result = await writeClipboard(currentJson)
+    if (result.ok) {
+      setCopyMsg("Layout copied")
+      window.setTimeout(() => setCopyMsg(null), 2500)
+      return
+    }
+    setCopyError(result.error)
+    setPasteText(currentJson)
+    setPasteError(null)
+    setPasteHint("Copy failed. Select the JSON below and copy it manually.")
+    setPasteWarnings([])
+    setPasteOpen(true)
+  }
+
+  const openPaste = async () => {
+    setPasteError(null)
+    setPasteWarnings([])
+    setPasteHint(null)
+    setCopyError(null)
+    const clip = await readClipboard()
+    if (clip.ok) {
+      setPasteText(clip.text)
+      setPasteHint("Clipboard contents loaded. Review and apply.")
+    } else {
+      setPasteText("")
+      setPasteHint(clip.error)
+    }
+    setPasteOpen(true)
+  }
+
+  const applyPastedLayout = () => {
+    const parsed = parseLayoutPayload(pasteText, defs)
+    if (!parsed.ok) {
+      setPasteError(parsed.error)
+      setPasteWarnings([])
+      return
+    }
+    setLayout(parsed.items)
+    setPasteError(null)
+    setPasteWarnings(parsed.warnings)
+    setPasteOpen(false)
+    setCopyMsg(
+      parsed.warnings.length
+        ? "Layout applied, with some panels adjusted"
+        : "Layout applied",
+    )
+    window.setTimeout(() => setCopyMsg(null), 2500)
+  }
 
   const renderPanel = (item: LayoutItem, hiddenSection = false) => {
     const def = defMap.get(item.id)
@@ -204,12 +253,16 @@ export function DashboardGrid({
             Drag panels to reorder, resize with arrows, and hide panels you do not need. Layout is
             saved on this device.
           </p>
-          <div className="flex gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setLayout(defaultLayout(defs))}
-            >
+          <div className="flex flex-wrap items-center gap-2">
+            {copyMsg ? <p className="text-sm text-primary">{copyMsg}</p> : null}
+            {copyError ? <p className="text-sm text-destructive">{copyError}</p> : null}
+            <Button variant="outline" size="sm" onClick={() => void handleCopy()}>
+              <IconCopy className="size-4" /> Copy
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void openPaste()}>
+              <IconClipboard className="size-4" /> Paste
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setLayout(defaultLayout(defs))}>
               <IconRotateClockwise className="size-4" /> Reset
             </Button>
             <Button size="sm" onClick={() => onEditingChange(false)}>
@@ -233,6 +286,48 @@ export function DashboardGrid({
           </div>
         </div>
       ) : null}
+
+      <Dialog open={pasteOpen} onOpenChange={setPasteOpen}>
+        <DialogContent className="max-h-[min(90dvh,36rem)] w-full max-w-lg overflow-y-auto overscroll-contain sm:max-w-lg">
+          <DialogHeader className="shrink-0">
+            <DialogTitle>Dashboard layout</DialogTitle>
+            <DialogDescription>
+              Paste a copied layout JSON blob. Unknown panels are ignored; missing panels are added
+              at the end.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain">
+            {pasteHint ? <p className="text-sm text-muted-foreground">{pasteHint}</p> : null}
+            <Textarea
+              value={pasteText}
+              onChange={(e) => {
+                setPasteText(e.target.value)
+                setPasteError(null)
+              }}
+              spellCheck={false}
+              className="h-40 max-h-40 min-h-32 field-sizing-fixed resize-none overflow-auto font-mono text-xs"
+              placeholder='{"v":1,"items":[{"id":"profit","width":"md"}]}'
+              aria-invalid={Boolean(pasteError)}
+            />
+            {pasteError ? <p className="text-sm text-destructive">{pasteError}</p> : null}
+            {pasteWarnings.length > 0 ? (
+              <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
+                {pasteWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+          <DialogFooter className="shrink-0">
+            <Button type="button" variant="ghost" onClick={() => setPasteOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={applyPastedLayout}>
+              Apply layout
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }
