@@ -318,6 +318,20 @@ export type OrgSettings = {
   amcReminderLeadDays: number
   healthHealthyMinPercent: number
   healthAtRiskMinPercent: number
+  smtpHost?: string | null
+  smtpPort?: number
+  smtpSecure?: boolean
+  smtpUser?: string | null
+  smtpPassSet?: boolean
+  smtpFrom?: string | null
+}
+
+export type UserPasskey = {
+  id: string
+  name: string
+  lastUsedAt: string | null
+  createdAt: string
+  deviceType?: string | null
 }
 
 export type VatAccumulated = {

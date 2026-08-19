@@ -1,13 +1,16 @@
 import * as React from "react"
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router"
+import { browserSupportsWebAuthn } from "@simplewebauthn/browser"
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { Separator } from "@workspace/ui/components/separator"
 import { getToken } from "@/lib/api"
 import { homePathForRole } from "@/lib/access"
 import { useAuth } from "@/lib/auth"
 import { ApiError } from "@/lib/api"
+import { webAuthnErrorMessage } from "@/lib/webauthn"
 import { PasswordInput } from "@/components/password-input"
 
 export const Route = createFileRoute("/login")({
@@ -21,12 +24,24 @@ export const Route = createFileRoute("/login")({
 })
 
 function LoginPage() {
-  const { login } = useAuth()
+  const { login, loginWithPasskey } = useAuth()
   const navigate = useNavigate()
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(false)
+  const [passkeyLoading, setPasskeyLoading] = React.useState(false)
+  const [passkeysSupported, setPasskeysSupported] = React.useState(false)
+
+  React.useEffect(() => {
+    setPasskeysSupported(browserSupportsWebAuthn())
+  }, [])
+
+  async function afterLogin(user: Awaited<ReturnType<typeof login>>) {
+    void navigate({
+      to: user.mustChangePassword ? "/change-password" : homePathForRole(user.role),
+    })
+  }
 
   return (
     <div className="flex min-h-svh items-center justify-center bg-muted/30 p-4">
@@ -37,18 +52,14 @@ function LoginPage() {
         </CardHeader>
         <CardContent>
           <form
-            className="space-y-4"
+            className="flex flex-col gap-4"
             onSubmit={async (e) => {
               e.preventDefault()
               setError(null)
               setLoading(true)
               try {
                 const user = await login(email.trim(), password)
-                void navigate({
-                  to: user.mustChangePassword
-                    ? "/change-password"
-                    : homePathForRole(user.role),
-                })
+                await afterLogin(user)
               } catch (err) {
                 setError(err instanceof ApiError ? err.message : "Login failed")
               } finally {
@@ -56,7 +67,7 @@ function LoginPage() {
               }
             }}
           >
-            <div className="space-y-2">
+            <div className="flex flex-col gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -79,10 +90,39 @@ function LoginPage() {
               />
             </div>
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || passkeyLoading}>
               {loading ? "Signing in…" : "Sign in"}
             </Button>
           </form>
+          {passkeysSupported ? (
+            <div className="mt-4 flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <Separator className="flex-1" />
+                <span className="text-xs text-muted-foreground">or</span>
+                <Separator className="flex-1" />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                disabled={loading || passkeyLoading}
+                onClick={async () => {
+                  setError(null)
+                  setPasskeyLoading(true)
+                  try {
+                    const user = await loginWithPasskey(email.trim() || undefined)
+                    await afterLogin(user)
+                  } catch (err) {
+                    setError(webAuthnErrorMessage(err, "Passkey sign-in failed"))
+                  } finally {
+                    setPasskeyLoading(false)
+                  }
+                }}
+              >
+                {passkeyLoading ? "Waiting for passkey…" : "Sign in with a passkey"}
+              </Button>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

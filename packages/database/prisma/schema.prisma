@@ -120,6 +120,10 @@ enum AuditAction {
   USER_DEACTIVATED
   USER_REACTIVATED
   USER_PASSWORD_CHANGED
+  USER_PASSKEY_ADDED
+  USER_PASSKEY_UPDATED
+  USER_PASSKEY_REMOVED
+  SETTINGS_SMTP_TESTED
   EMPLOYEE_GROUP_CREATED
   EMPLOYEE_GROUP_UPDATED
   EMPLOYEE_GROUP_DELETED
@@ -147,10 +151,43 @@ model User {
   coreMemberSalaryChanges CoreMemberSalaryEntry[]  @relation("CoreMemberSalaryChangedBy")
   vatClearances           VatClearance[]
   dbSnapshots             DbSnapshot[]
+  passkeys                UserPasskey[]
   standupPreferredGroup   EmployeeGroup?           @relation("StandupPreferredGroup", fields: [standupPreferredGroupId], references: [id], onDelete: SetNull)
 
   @@index([standupPreferredGroupId])
   @@map("users")
+}
+
+model UserPasskey {
+  id           String    @id @default(cuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    Bytes
+  counter      BigInt    @default(0)
+  deviceType   String?
+  backedUp     Boolean   @default(false)
+  transports   String[]  @default([])
+  name         String
+  lastUsedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("user_passkeys")
+}
+
+model WebAuthnChallenge {
+  id        String   @id @default(cuid())
+  userId    String?
+  purpose   String
+  challenge String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+  @@map("webauthn_challenges")
 }
 
 model CasbinRule {
@@ -173,6 +210,12 @@ model OrgSettings {
   amcReminderLeadDays     Int      @default(7)
   healthHealthyMinPercent Int      @default(20)
   healthAtRiskMinPercent  Int      @default(0)
+  smtpHost                String?
+  smtpPort                Int      @default(587)
+  smtpSecure              Boolean  @default(false)
+  smtpUser                String?
+  smtpPass                String?
+  smtpFrom                String?
   createdAt               DateTime @default(now())
   updatedAt               DateTime @updatedAt
 

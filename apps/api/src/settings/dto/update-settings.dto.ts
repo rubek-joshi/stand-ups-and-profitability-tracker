@@ -1,5 +1,15 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsInt, IsOptional, Max, Min } from "class-validator";
+import {
+  IsBoolean,
+  IsEmail,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  ValidateIf,
+} from "class-validator";
 
 export class UpdateSettingsDto {
   @ApiPropertyOptional()
@@ -30,4 +40,45 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsInt()
   healthAtRiskMinPercent?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(255)
+  smtpHost?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(65535)
+  smtpPort?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  smtpSecure?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null)
+  @IsString()
+  @MaxLength(255)
+  smtpUser?: string | null;
+
+  @ApiPropertyOptional({
+    description:
+      "Omit to keep the current password. Send an empty string to clear it.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  smtpPass?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== "")
+  @IsEmail()
+  smtpFrom?: string | null;
 }

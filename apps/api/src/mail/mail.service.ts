@@ -1,6 +1,11 @@
-import { Injectable, Logger } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import nodemailer, { Transporter } from "nodemailer";
+import { PrismaService } from "../prisma/prisma.service";
 
 export type SendMailPayload = {
   to: string;
@@ -9,44 +14,102 @@ export type SendMailPayload = {
   html?: string;
 };
 
+type ResolvedSmtp = {
+  host: string;
+  port: number;
+  secure: boolean;
+  user?: string;
+  pass?: string;
+  from: string;
+};
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly transporter: Transporter | null;
 
-  constructor(private readonly configService: ConfigService) {
-    const host = this.configService.get<string>("SMTP_HOST");
-    if (!host) {
-      this.transporter = null;
-      this.logger.warn("SMTP_HOST is not set; emails will be logged only");
-      return;
-    }
-    this.transporter = nodemailer.createTransport({
-      host,
-      port: Number(this.configService.get<string>("SMTP_PORT") ?? 587),
-      secure: false,
-      auth: {
-        user: this.configService.get<string>("SMTP_USER") ?? undefined,
-        pass: this.configService.get<string>("SMTP_PASS") ?? undefined,
-      },
-    });
-  }
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prismaService: PrismaService,
+  ) {}
 
   async sendMail(payload: SendMailPayload): Promise<void> {
-    const from =
-      this.configService.get<string>("SMTP_FROM") ?? "noreply@example.com";
-    if (!this.transporter) {
+    const smtp = await this.resolveSmtp();
+    if (!smtp) {
       this.logger.log(
         `Mail skipped (no SMTP): to=${payload.to} subject=${payload.subject}`,
       );
       return;
     }
-    await this.transporter.sendMail({
-      from,
+    const transporter = this.createTransport(smtp);
+    await transporter.sendMail({
+      from: smtp.from,
       to: payload.to,
       subject: payload.subject,
       text: payload.text,
       html: payload.html,
     });
+  }
+
+  async sendTestMail(to: string): Promise<void> {
+    const smtp = await this.resolveSmtp();
+    if (!smtp) {
+      throw new BadRequestException(
+        "SMTP is not configured. Save host and from address first.",
+      );
+    }
+    const transporter = this.createTransport(smtp);
+    try {
+      await transporter.sendMail({
+        from: smtp.from,
+        to,
+        subject: "Tracker SMTP test",
+        text: "This is a test email from Tracker. SMTP is working.",
+        html: "<p>This is a test email from Tracker. SMTP is working.</p>",
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to send test email";
+      throw new BadRequestException(message);
+    }
+  }
+
+  private createTransport(smtp: ResolvedSmtp): Transporter {
+    return nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth:
+        smtp.user || smtp.pass
+          ? { user: smtp.user, pass: smtp.pass }
+          : undefined,
+    });
+  }
+
+  private async resolveSmtp(): Promise<ResolvedSmtp | null> {
+    const settings = await this.prismaService.orgSettings.findFirst();
+    const host =
+      settings?.smtpHost?.trim() ||
+      this.configService.get<string>("SMTP_HOST")?.trim() ||
+      "";
+    if (!host) return null;
+    const from =
+      settings?.smtpFrom?.trim() ||
+      this.configService.get<string>("SMTP_FROM")?.trim() ||
+      "noreply@example.com";
+    const port =
+      settings?.smtpPort ??
+      Number(this.configService.get<string>("SMTP_PORT") ?? 587);
+    const secure =
+      settings?.smtpSecure ??
+      this.configService.get<string>("SMTP_SECURE") === "true";
+    const user =
+      settings?.smtpUser?.trim() ||
+      this.configService.get<string>("SMTP_USER")?.trim() ||
+      undefined;
+    const pass =
+      settings?.smtpPass ||
+      this.configService.get<string>("SMTP_PASS") ||
+      undefined;
+    return { host, port, secure, user, pass, from };
   }
 }

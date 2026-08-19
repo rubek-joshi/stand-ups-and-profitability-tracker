@@ -21,6 +21,7 @@ type AuthContextValue = {
   token: string | null
   loading: boolean
   login: (email: string, password: string) => Promise<AuthUser>
+  loginWithPasskey: (email?: string) => Promise<AuthUser>
   logout: () => void
   refreshUser: () => Promise<void>
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>
@@ -77,6 +78,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res.data.user
   }, [])
 
+  const loginWithPasskey = React.useCallback(async (email?: string) => {
+    const { startAuthentication } = await import("@simplewebauthn/browser")
+    const optionsRes = await api<
+      Envelope<{
+        challengeId: string
+        options: Parameters<typeof startAuthentication>[0]["optionsJSON"]
+      }>
+    >("/auth/passkeys/login/options", {
+      method: "POST",
+      body: email ? { email } : {},
+      skipAuth: true,
+    })
+    const credential = await startAuthentication({
+      optionsJSON: optionsRes.data.options,
+    })
+    const res = await api<Envelope<{ accessToken: string; user: AuthUser }>>(
+      "/auth/passkeys/login/verify",
+      {
+        method: "POST",
+        body: { challengeId: optionsRes.data.challengeId, credential },
+        skipAuth: true,
+      },
+    )
+    setToken(res.data.accessToken)
+    setTokenState(res.data.accessToken)
+    setUser(res.data.user)
+    return res.data.user
+  }, [])
+
   const logout = React.useCallback(() => {
     setToken(null)
     setTokenState(null)
@@ -95,8 +125,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   )
 
   const value = React.useMemo(
-    () => ({ user, token, loading, login, logout, refreshUser, changePassword }),
-    [user, token, loading, login, logout, refreshUser, changePassword],
+    () => ({
+      user,
+      token,
+      loading,
+      login,
+      loginWithPasskey,
+      logout,
+      refreshUser,
+      changePassword,
+    }),
+    [user, token, loading, login, loginWithPasskey, logout, refreshUser, changePassword],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

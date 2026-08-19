@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { PageHeader } from "@/components/page-header"
+import { PasskeysCard } from "@/components/passkeys-card"
 import { PasswordInput } from "@/components/password-input"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
@@ -292,6 +293,8 @@ function ProfilePage() {
               </form>
             </CardContent>
           </Card>
+
+          <PasskeysCard />
 
           <Card>
             <CardHeader>

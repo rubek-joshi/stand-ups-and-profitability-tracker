@@ -25,6 +25,8 @@ export type {
   VatClearance,
   AuditLog,
   DbSnapshot,
+  UserPasskey,
+  WebAuthnChallenge,
   Prisma,
 } from "./generated/prisma/client";
 export {
