@@ -44,15 +44,23 @@ export class AuditService {
   async findAll(params: {
     action?: AuditAction;
     actorId?: string;
+    relatedUserId?: string;
     page?: string;
     pageSize?: string;
     skip?: number;
     take?: number;
   }) {
-    const where = {
+    const where: Prisma.AuditLogWhereInput = {
       ...(params.action ? { action: params.action } : {}),
-      ...(params.actorId ? { actorId: params.actorId } : {}),
     };
+    if (params.relatedUserId) {
+      where.OR = [
+        { actorId: params.relatedUserId },
+        { targetType: "User", targetId: params.relatedUserId },
+      ];
+    } else if (params.actorId) {
+      where.actorId = params.actorId;
+    }
     const pagination =
       resolvePagination({
         page: params.page,

@@ -13,7 +13,12 @@ import {
   resolvePagination,
 } from "../_shared/utils/pagination.util";
 import { PrismaService } from "../prisma/prisma.service";
-import { CreateUserDto, UpdateUserDto, USER_ROLES } from "./dto/user.dto";
+import {
+  CreateUserDto,
+  SetUserPasswordDto,
+  UpdateUserDto,
+  USER_ROLES,
+} from "./dto/user.dto";
 import { UserResponseDto } from "./dto/user-response.dto";
 
 const BCRYPT_ROUNDS = 12;
@@ -236,6 +241,35 @@ export class UsersService {
       action: AuditAction.USER_PASSWORD_CHANGED,
       targetType: "User",
       targetId: userId,
+    });
+    return this.toResponse(updated, role);
+  }
+
+  async setPassword(
+    id: string,
+    dto: SetUserPasswordDto,
+    actorId: string,
+  ): Promise<UserResponseDto> {
+    await this.findById(id);
+    const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    const mustChangePassword = dto.mustChangePassword ?? true;
+    const updated = await this.prismaService.user.update({
+      where: { id },
+      data: {
+        passwordHash,
+        mustChangePassword,
+      },
+    });
+    const role = await this.casbinService.getPrimaryRoleForUser(id);
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.USER_PASSWORD_CHANGED,
+      targetType: "User",
+      targetId: id,
+      metadata: {
+        mustChangePassword,
+        setByAdmin: true,
+      },
     });
     return this.toResponse(updated, role);
   }

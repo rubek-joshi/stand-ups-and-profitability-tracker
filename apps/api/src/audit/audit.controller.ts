@@ -28,6 +28,7 @@ export class AuditController {
   async findAll(
     @Query("action") action?: AuditAction,
     @Query("actorId") actorId?: string,
+    @Query("relatedUserId") relatedUserId?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
     @Query("skip") skip?: string,
@@ -36,6 +37,7 @@ export class AuditController {
     return this.auditService.findAll({
       action,
       actorId,
+      relatedUserId,
       page,
       pageSize,
       skip: skip ? Number(skip) : undefined,

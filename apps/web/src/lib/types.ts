@@ -202,6 +202,7 @@ export type EmployeeGroupMember = {
     id: string
     name: string
     email: string
+    contactNumber?: string | null
     status: PersonStatus
   }
 }
@@ -462,6 +463,9 @@ export type SystemUser = {
   mustChangePassword: boolean
   lastLoginAt: string | null
   role: UserRole | string | null
+  standupScopePreference?: "ask" | "everyone" | "group"
+  standupPreferredGroupId?: string | null
+  standupPreferredGroup?: { id: string; name: string } | null
   createdAt: string
   updatedAt?: string
 }

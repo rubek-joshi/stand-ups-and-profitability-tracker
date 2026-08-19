@@ -91,6 +91,22 @@ export class ChangePasswordDto {
   newPassword!: string;
 }
 
+export class SetUserPasswordDto {
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  @MaxLength(128)
+  password!: string;
+
+  @ApiPropertyOptional({
+    description: "Require the user to change this password on next login",
+    default: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  mustChangePassword?: boolean;
+}
+
 export class UpdateMyPreferencesDto {
   @ApiPropertyOptional({ enum: ["ask", "everyone", "group"] })
   @IsOptional()

@@ -48,6 +48,7 @@ export const Route = createFileRoute("/_app/audit")({
           ? action
           : undefined,
       actorId: parseOptionalString(search.actorId),
+      relatedUserId: parseOptionalString(search.relatedUserId),
     }
   },
   component: AuditPage,
@@ -121,11 +122,12 @@ const ENTITY_ROUTES: Record<string, string> = {
   Employee: "/employees/$id",
   CoreMember: "/core-members/$id",
   Standup: "/stand-ups/$id",
+  User: "/users/$id",
 }
 
 function AuditPage() {
   const navigate = Route.useNavigate()
-  const { page, pageSize, action, actorId } = Route.useSearch()
+  const { page, pageSize, action, actorId, relatedUserId } = Route.useSearch()
   const [logs, setLogs] = React.useState<AuditLog[]>([])
   const [actors, setActors] = React.useState<AuditActor[]>([])
   const [total, setTotal] = React.useState(0)
@@ -159,6 +161,7 @@ function AuditPage() {
       const qs = buildListQuery({
         action: action || undefined,
         actorId: actorId || undefined,
+        relatedUserId: relatedUserId || undefined,
         page,
         pageSize,
       })
@@ -178,7 +181,7 @@ function AuditPage() {
     } finally {
       setLoading(false)
     }
-  }, [action, actorId, page, pageSize])
+  }, [action, actorId, relatedUserId, page, pageSize])
 
   React.useEffect(() => {
     void loadActors()
@@ -256,7 +259,7 @@ function AuditPage() {
               </Select>
             </div>
             <div className="flex gap-1 mb-1">
-              {action || actorId ? (
+              {action || actorId || relatedUserId ? (
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -265,6 +268,7 @@ function AuditPage() {
                         ...prev,
                         action: undefined,
                         actorId: undefined,
+                        relatedUserId: undefined,
                         page: 1,
                       }),
                     })
@@ -280,6 +284,23 @@ function AuditPage() {
           </div>
         }
       />
+
+      {relatedUserId ? (
+        <p className="mb-4 text-sm text-muted-foreground">
+          Showing actions by or about this user.{" "}
+          <Button
+            variant="link"
+            className="h-auto p-0"
+            onClick={() => {
+              void navigate({
+                search: (prev) => ({ ...prev, relatedUserId: undefined, page: 1 }),
+              })
+            }}
+          >
+            Clear user filter
+          </Button>
+        </p>
+      ) : null}
 
       {loading ? <LoadingState /> : null}
       {error ? <ErrorState message={error} onRetry={load} /> : null}

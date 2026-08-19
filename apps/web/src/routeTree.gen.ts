@@ -26,6 +26,7 @@ import { Route as AppEmployeeGroupsIndexRouteImport } from './routes/_app/employ
 import { Route as AppCoreMembersIndexRouteImport } from './routes/_app/core-members/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
 import { Route as AppAmcIndexRouteImport } from './routes/_app/amc/index'
+import { Route as AppUsersIdRouteImport } from './routes/_app/users/$id'
 import { Route as AppStandUpsIdRouteImport } from './routes/_app/stand-ups/$id'
 import { Route as AppProjectsIdRouteImport } from './routes/_app/projects/$id'
 import { Route as AppEmployeesIdRouteImport } from './routes/_app/employees/$id'
@@ -122,6 +123,11 @@ const AppAmcIndexRoute = AppAmcIndexRouteImport.update({
   path: '/amc/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppUsersIdRoute = AppUsersIdRouteImport.update({
+  id: '/users/$id',
+  path: '/users/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppStandUpsIdRoute = AppStandUpsIdRouteImport.update({
   id: '/stand-ups/$id',
   path: '/stand-ups/$id',
@@ -194,6 +200,7 @@ export interface FileRoutesByFullPath {
   '/employees/$id': typeof AppEmployeesIdRoute
   '/projects/$id': typeof AppProjectsIdRoute
   '/stand-ups/$id': typeof AppStandUpsIdRoute
+  '/users/$id': typeof AppUsersIdRoute
   '/amc/': typeof AppAmcIndexRoute
   '/clients/': typeof AppClientsIndexRoute
   '/core-members/': typeof AppCoreMembersIndexRoute
@@ -223,6 +230,7 @@ export interface FileRoutesByTo {
   '/employees/$id': typeof AppEmployeesIdRoute
   '/projects/$id': typeof AppProjectsIdRoute
   '/stand-ups/$id': typeof AppStandUpsIdRoute
+  '/users/$id': typeof AppUsersIdRoute
   '/amc': typeof AppAmcIndexRoute
   '/clients': typeof AppClientsIndexRoute
   '/core-members': typeof AppCoreMembersIndexRoute
@@ -254,6 +262,7 @@ export interface FileRoutesById {
   '/_app/employees/$id': typeof AppEmployeesIdRoute
   '/_app/projects/$id': typeof AppProjectsIdRoute
   '/_app/stand-ups/$id': typeof AppStandUpsIdRoute
+  '/_app/users/$id': typeof AppUsersIdRoute
   '/_app/amc/': typeof AppAmcIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/core-members/': typeof AppCoreMembersIndexRoute
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
     | '/employees/$id'
     | '/projects/$id'
     | '/stand-ups/$id'
+    | '/users/$id'
     | '/amc/'
     | '/clients/'
     | '/core-members/'
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
     | '/employees/$id'
     | '/projects/$id'
     | '/stand-ups/$id'
+    | '/users/$id'
     | '/amc'
     | '/clients'
     | '/core-members'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/_app/employees/$id'
     | '/_app/projects/$id'
     | '/_app/stand-ups/$id'
+    | '/_app/users/$id'
     | '/_app/amc/'
     | '/_app/clients/'
     | '/_app/core-members/'
@@ -486,6 +498,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppAmcIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/users/$id': {
+      id: '/_app/users/$id'
+      path: '/users/$id'
+      fullPath: '/users/$id'
+      preLoaderRoute: typeof AppUsersIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/stand-ups/$id': {
       id: '/_app/stand-ups/$id'
       path: '/stand-ups/$id'
@@ -579,6 +598,7 @@ interface AppRouteChildren {
   AppEmployeesIdRoute: typeof AppEmployeesIdRoute
   AppProjectsIdRoute: typeof AppProjectsIdRoute
   AppStandUpsIdRoute: typeof AppStandUpsIdRoute
+  AppUsersIdRoute: typeof AppUsersIdRoute
   AppAmcIndexRoute: typeof AppAmcIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppCoreMembersIndexRoute: typeof AppCoreMembersIndexRoute
@@ -607,6 +627,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppEmployeesIdRoute: AppEmployeesIdRoute,
   AppProjectsIdRoute: AppProjectsIdRoute,
   AppStandUpsIdRoute: AppStandUpsIdRoute,
+  AppUsersIdRoute: AppUsersIdRoute,
   AppAmcIndexRoute: AppAmcIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppCoreMembersIndexRoute: AppCoreMembersIndexRoute,

@@ -281,6 +281,7 @@ export class EmployeeGroupsService {
               id: true,
               name: true,
               email: true,
+              contactNumber: true,
               status: true,
             },
           },

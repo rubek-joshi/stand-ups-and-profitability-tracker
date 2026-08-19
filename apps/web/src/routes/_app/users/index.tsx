@@ -1,7 +1,6 @@
 import * as React from "react"
-import { createFileRoute } from "@tanstack/react-router"
+import { Link, createFileRoute } from "@tanstack/react-router"
 import {
-  IconPencil,
   IconPlayerPlay,
   IconPlayerPause,
   IconSearch,
@@ -46,42 +45,13 @@ import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { GeneratePasswordButton, PasswordInput } from "@/components/password-input"
 import { buildListQuery, parseListSearch, totalPagesFor } from "@/lib/list-query"
+import { formatLastLogin, ROLE_ITEMS, ROLE_LABELS, roleLabel } from "@/lib/roles"
 import type { SystemUser, UserRole } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/users/")({
   validateSearch: (search: Record<string, unknown>) => parseListSearch(search),
   component: UsersPage,
 })
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  super_admin: "Super admin",
-  admin: "Admin",
-  manager: "Manager",
-  standup_taker: "Stand-up taker",
-}
-
-const ROLE_ITEMS = Object.fromEntries(
-  (Object.keys(ROLE_LABELS) as UserRole[]).map((role) => [role, ROLE_LABELS[role]]),
-)
-
-function formatLastLogin(value: string | null): string {
-  if (!value) return "Never"
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return "—"
-  return date.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  })
-}
-
-function roleLabel(role: string | null | undefined): string {
-  if (!role) return "—"
-  if (role in ROLE_LABELS) return ROLE_LABELS[role as UserRole]
-  return role
-}
 
 function UsersPage() {
   const { user: currentUser } = useAuth()
@@ -92,7 +62,6 @@ function UsersPage() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [createOpen, setCreateOpen] = React.useState(false)
-  const [editUser, setEditUser] = React.useState<SystemUser | null>(null)
   const [searchInput, setSearchInput] = React.useState(q ?? "")
   const [formError, setFormError] = React.useState<string | null>(null)
   const [createForm, setCreateForm] = React.useState({
@@ -101,11 +70,6 @@ function UsersPage() {
     password: "",
     role: "manager" as UserRole,
     mustChangePassword: true,
-  })
-  const [editForm, setEditForm] = React.useState({
-    name: "",
-    email: "",
-    role: "manager" as UserRole,
   })
   const { confirm, dialog } = useConfirmDialog()
 
@@ -207,7 +171,13 @@ function UsersPage() {
                   return (
                     <TableRow key={u.id}>
                       <TableCell className="font-medium">
-                        {u.name}
+                        <Link
+                          to="/users/$id"
+                          params={{ id: u.id }}
+                          className="hover:underline"
+                        >
+                          {u.name}
+                        </Link>
                         {isSelf ? (
                           <span className="ml-2 text-xs text-muted-foreground">(you)</span>
                         ) : null}
@@ -221,20 +191,6 @@ function UsersPage() {
                         {formatLastLogin(u.lastLoginAt)}
                       </TableCell>
                       <TableActionsCell>
-                        <TableActionButton
-                          label="Edit"
-                          onClick={() => {
-                            setFormError(null)
-                            setEditUser(u)
-                            setEditForm({
-                              name: u.name,
-                              email: u.email,
-                              role: (u.role as UserRole) || "manager",
-                            })
-                          }}
-                        >
-                          <IconPencil className="size-3.5" />
-                        </TableActionButton>
                         {u.isActive ? (
                           <TableActionButton
                             label="Deactivate"
@@ -419,97 +375,6 @@ function UsersPage() {
                 Cancel
               </Button>
               <Button type="submit">Create</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={Boolean(editUser)}
-        onOpenChange={(open) => {
-          if (!open) setEditUser(null)
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Edit user</DialogTitle>
-          </DialogHeader>
-          <form
-            className="space-y-3"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              if (!editUser) return
-              setFormError(null)
-              try {
-                await api(`/users/${editUser.id}`, {
-                  method: "PATCH",
-                  body: {
-                    name: editForm.name.trim(),
-                    email: editForm.email.trim(),
-                    ...(currentUser?.id === editUser.id
-                      ? {}
-                      : { role: editForm.role }),
-                  },
-                })
-                setEditUser(null)
-                await load()
-              } catch (err) {
-                setFormError(err instanceof ApiError ? err.message : "Failed to update user")
-              }
-            }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="edit-user-name">Name</Label>
-              <Input
-                id="edit-user-name"
-                required
-                value={editForm.name}
-                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="edit-user-email">Email</Label>
-              <Input
-                id="edit-user-email"
-                type="email"
-                required
-                value={editForm.email}
-                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Role</Label>
-              <Select
-                value={editForm.role}
-                onValueChange={(v) =>
-                  setEditForm((f) => ({ ...f, role: (v as UserRole) ?? "manager" }))
-                }
-                items={ROLE_ITEMS}
-                disabled={currentUser?.id === editUser?.id}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(ROLE_LABELS) as UserRole[]).map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {ROLE_LABELS[role]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {currentUser?.id === editUser?.id ? (
-                <p className="text-xs text-muted-foreground">
-                  You cannot change your own role.
-                </p>
-              ) : null}
-            </div>
-            {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditUser(null)}>
-                Cancel
-              </Button>
-              <Button type="submit">Save</Button>
             </DialogFooter>
           </form>
         </DialogContent>

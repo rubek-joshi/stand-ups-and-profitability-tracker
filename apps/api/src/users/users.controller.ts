@@ -14,7 +14,7 @@ import { AuthUser } from "../auth/types/auth-user.type";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
 import { PoliciesGuard } from "../casbin/guards/policies.guard";
-import { CreateUserDto, UpdateUserDto } from "./dto/user.dto";
+import { CreateUserDto, SetUserPasswordDto, UpdateUserDto } from "./dto/user.dto";
 import { UsersService } from "./users.service";
 
 @ApiTags("users")
@@ -48,6 +48,17 @@ export class UsersController {
   async findOne(@Param("id") id: string) {
     const user = await this.usersService.findById(id);
     return this.usersService.toResponseAsync(user);
+  }
+
+  @Post(":id/password")
+  @RequirePermission("users", "*")
+  @ApiOperation({ summary: "Set a user's password (admin)" })
+  async setPassword(
+    @Param("id") id: string,
+    @Body() dto: SetUserPasswordDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.usersService.setPassword(id, dto, user.id);
   }
 
   @Patch(":id")

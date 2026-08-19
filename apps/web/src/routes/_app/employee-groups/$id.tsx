@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
-import { IconTrash, IconUserMinus, IconUserPlus } from "@tabler/icons-react"
+import { IconPencil, IconTrash, IconUserMinus, IconUserPlus } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
@@ -23,8 +23,10 @@ import {
   TableRow,
 } from "@workspace/ui/components/table"
 import { PageHeader } from "@/components/page-header"
+import { PaginationBar } from "@/components/pagination-bar"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
+import { MailLink, TelLink } from "@/components/contact-link"
 import { EmployeeLink } from "@/components/resource-link"
 import {
   TableActionButton,
@@ -32,7 +34,12 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
-import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
+import {
+  clampPage,
+  DEFAULT_LIST_SEARCH,
+  type PageSize,
+  totalPagesFor,
+} from "@/lib/list-query"
 import type { Employee, EmployeeGroup } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/employee-groups/$id")({
@@ -49,8 +56,11 @@ function EmployeeGroupDetailPage() {
   const [addQuery, setAddQuery] = React.useState("")
   const [selectedEmployeeIds, setSelectedEmployeeIds] = React.useState<string[]>([])
   const [addingMembers, setAddingMembers] = React.useState(false)
+  const [editing, setEditing] = React.useState(false)
   const [name, setName] = React.useState("")
   const [description, setDescription] = React.useState("")
+  const [page, setPage] = React.useState(1)
+  const [pageSize, setPageSize] = React.useState<PageSize>(25)
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -76,13 +86,23 @@ function EmployeeGroupDetailPage() {
 
   React.useEffect(() => {
     void load()
+    setPage(1)
+    setEditing(false)
   }, [load])
+
+  const members = group?.members ?? []
+  const totalPages = totalPagesFor(members.length, pageSize)
+  const currentPage = clampPage(page, totalPages)
+
+  React.useEffect(() => {
+    if (page !== currentPage) setPage(currentPage)
+  }, [page, currentPage])
 
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={load} />
   if (!group) return null
 
-  const memberIds = new Set((group.members ?? []).map((m) => m.employeeId))
+  const memberIds = new Set(members.map((m) => m.employeeId))
   const available = employees.filter((e) => !memberIds.has(e.id))
   const filteredAvailable = available.filter((employee) => {
     const query = addQuery.trim().toLowerCase()
@@ -95,6 +115,19 @@ function EmployeeGroupDetailPage() {
   const allFilteredSelected =
     filteredAvailable.length > 0 &&
     filteredAvailable.every((employee) => selectedEmployeeIds.includes(employee.id))
+  const pageMembers = members.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+
+  const startEdit = () => {
+    setName(group.name)
+    setDescription(group.description ?? "")
+    setEditing(true)
+  }
+
+  const cancelEdit = () => {
+    setName(group.name)
+    setDescription(group.description ?? "")
+    setEditing(false)
+  }
 
   const openAddMembers = () => {
     setAddQuery("")
@@ -191,84 +224,22 @@ function EmployeeGroupDetailPage() {
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+        <Card className="min-w-0">
+          <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
+            <CardTitle className="text-base">Members ({members.length})</CardTitle>
+            <Button disabled={available.length === 0} onClick={openAddMembers}>
+              <IconUserPlus className="size-3.5" />
+              Add members
+            </Button>
           </CardHeader>
-          <CardContent>
-            <form
-              className="grid gap-3"
-              onSubmit={async (e) => {
-                e.preventDefault()
-                setSaving(true)
-                try {
-                  const res = await api<Envelope<EmployeeGroup>>(
-                    `/employee-groups/${id}`,
-                    {
-                      method: "PATCH",
-                      body: {
-                        name: name.trim(),
-                        description: description.trim() || null,
-                      },
-                    },
-                  )
-                  setGroup(res.data)
-                } catch (err) {
-                  alert(err instanceof ApiError ? err.message : "Save failed")
-                } finally {
-                  setSaving(false)
-                }
-              }}
-            >
-              <div className="grid gap-2">
-                <Label htmlFor="edit-group-name">Name</Label>
-                <Input
-                  id="edit-group-name"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="edit-group-desc">Description</Label>
-                <Textarea
-                  id="edit-group-desc"
-                  rows={3}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </div>
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving…" : "Save changes"}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Members ({group.members?.length ?? 0})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <Button
-                disabled={available.length === 0}
-                onClick={openAddMembers}
-              >
-                <IconUserPlus className="size-3.5" />
-                Add members
-              </Button>
-            </div>
-
+          <CardContent className="flex flex-col gap-4">
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
-              <DialogContent className="sm:max-w-lg">
+              <DialogContent className="max-h-[min(90dvh,36rem)] overflow-y-auto sm:max-w-lg">
                 <DialogHeader>
                   <DialogTitle>Add members</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-3">
+                <div className="flex flex-col gap-3">
                   <Input
                     value={addQuery}
                     onChange={(e) => setAddQuery(e.target.value)}
@@ -286,7 +257,7 @@ function EmployeeGroupDetailPage() {
                       Select all shown ({filteredAvailable.length})
                     </label>
                   ) : null}
-                  <div className="max-h-72 space-y-1 overflow-y-auto">
+                  <div className="max-h-72 overflow-y-auto">
                     {filteredAvailable.length === 0 ? (
                       <p className="py-6 text-center text-sm text-muted-foreground">
                         {available.length === 0
@@ -294,27 +265,29 @@ function EmployeeGroupDetailPage() {
                           : "No employees match your search."}
                       </p>
                     ) : (
-                      filteredAvailable.map((employee) => (
-                        <label
-                          key={employee.id}
-                          className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-muted/60"
-                        >
-                          <Checkbox
-                            checked={selectedEmployeeIds.includes(employee.id)}
-                            onCheckedChange={(checked) =>
-                              toggleEmployee(employee.id, Boolean(checked))
-                            }
-                          />
-                          <span className="min-w-0">
-                            <span className="block text-sm font-medium">
-                              {employee.name}
+                      <div className="flex flex-col gap-1">
+                        {filteredAvailable.map((employee) => (
+                          <label
+                            key={employee.id}
+                            className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-muted/60"
+                          >
+                            <Checkbox
+                              checked={selectedEmployeeIds.includes(employee.id)}
+                              onCheckedChange={(checked) =>
+                                toggleEmployee(employee.id, Boolean(checked))
+                              }
+                            />
+                            <span className="min-w-0">
+                              <span className="block text-sm font-medium">
+                                {employee.name}
+                              </span>
+                              <span className="block text-xs text-muted-foreground">
+                                {employee.email}
+                              </span>
                             </span>
-                            <span className="block text-xs text-muted-foreground">
-                              {employee.email}
-                            </span>
-                          </span>
-                        </label>
-                      ))
+                          </label>
+                        ))}
+                      </div>
                     )}
                   </div>
                 </div>
@@ -343,19 +316,25 @@ function EmployeeGroupDetailPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
                   <TableActionsHead />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {(group.members ?? []).map((m) => (
+                {pageMembers.map((m) => (
                   <TableRow key={m.employeeId}>
                     <TableCell>
-                      <EmployeeLink id={m.employeeId}>
-                        {m.employee.name}
-                      </EmployeeLink>
+                      <EmployeeLink id={m.employeeId}>{m.employee.name}</EmployeeLink>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {m.employee.email}
+                    <TableCell>
+                      <MailLink value={m.employee.email} withCopy="hover" />
+                    </TableCell>
+                    <TableCell>
+                      {m.employee.contactNumber ? (
+                        <TelLink value={m.employee.contactNumber} withCopy="hover" />
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableActionsCell>
                       <TableActionButton
@@ -370,9 +349,7 @@ function EmployeeGroupDetailPage() {
                             setGroup(res.data)
                           } catch (e) {
                             alert(
-                              e instanceof ApiError
-                                ? e.message
-                                : "Failed to remove",
+                              e instanceof ApiError ? e.message : "Failed to remove",
                             )
                           }
                         }}
@@ -382,17 +359,128 @@ function EmployeeGroupDetailPage() {
                     </TableActionsCell>
                   </TableRow>
                 ))}
-                {(group.members ?? []).length === 0 ? (
+                {members.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-muted-foreground">
+                    <TableCell colSpan={4} className="text-muted-foreground">
                       No members yet.
                     </TableCell>
                   </TableRow>
                 ) : null}
               </TableBody>
             </Table>
+
+            {members.length > 0 ? (
+              <PaginationBar
+                page={currentPage}
+                totalPages={totalPages}
+                total={members.length}
+                pageSize={pageSize}
+                onPageChange={setPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size)
+                  setPage(1)
+                }}
+              />
+            ) : null}
           </CardContent>
         </Card>
+
+        <aside className="lg:sticky lg:top-6">
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+              <CardTitle className="text-base">Details</CardTitle>
+              {!editing ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0"
+                  aria-label="Edit details"
+                  onClick={startEdit}
+                >
+                  <IconPencil className="size-4" />
+                </Button>
+              ) : null}
+            </CardHeader>
+            <CardContent>
+              {editing ? (
+                <form
+                  className="flex flex-col gap-3"
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    setSaving(true)
+                    try {
+                      const res = await api<Envelope<EmployeeGroup>>(
+                        `/employee-groups/${id}`,
+                        {
+                          method: "PATCH",
+                          body: {
+                            name: name.trim(),
+                            description: description.trim() || null,
+                          },
+                        },
+                      )
+                      setGroup(res.data)
+                      setName(res.data.name)
+                      setDescription(res.data.description ?? "")
+                      setEditing(false)
+                    } catch (err) {
+                      alert(err instanceof ApiError ? err.message : "Save failed")
+                    } finally {
+                      setSaving(false)
+                    }
+                  }}
+                >
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="edit-group-name">Name</Label>
+                    <Input
+                      id="edit-group-name"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="edit-group-desc">Description</Label>
+                    <Textarea
+                      id="edit-group-desc"
+                      rows={4}
+                      className="field-sizing-fixed max-h-40"
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" disabled={saving}>
+                      {saving ? "Saving…" : "Save"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={cancelEdit}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <dl className="flex flex-col gap-4 text-sm">
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-muted-foreground">Name</dt>
+                    <dd className="font-medium">{group.name}</dd>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <dt className="text-muted-foreground">Description</dt>
+                    <dd className="whitespace-pre-wrap">
+                      {group.description?.trim() || "—"}
+                    </dd>
+                  </div>
+                </dl>
+              )}
+            </CardContent>
+          </Card>
+        </aside>
       </div>
       {dialog}
     </div>

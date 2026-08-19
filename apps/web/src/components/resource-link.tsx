@@ -87,6 +87,22 @@ export function StandupLink({
   )
 }
 
+export function UserLink({
+  id,
+  children,
+  className,
+}: ResourceLinkProps & { id: string }) {
+  return (
+    <Link
+      to="/users/$id"
+      params={{ id }}
+      className={cn("font-medium hover:underline", className)}
+    >
+      {children}
+    </Link>
+  )
+}
+
 /** Resolve audit/API target types to a detail-page link when possible. */
 export function EntityLink({
   type,
@@ -124,6 +140,12 @@ export function EntityLink({
         <StandupLink id={id} className={className}>
           {children}
         </StandupLink>
+      )
+    case "User":
+      return (
+        <UserLink id={id} className={className}>
+          {children}
+        </UserLink>
       )
     default:
       return <span className={className}>{children}</span>
