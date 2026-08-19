@@ -1,5 +1,6 @@
 import * as React from "react"
 import {
+  $getRoot,
   $getSelection,
   $isRangeSelection,
   FORMAT_TEXT_COMMAND,
@@ -37,10 +38,43 @@ import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 
 type Props = {
+  editorKey?: string
   value: string
   onChange: (value: string) => void
   disabled?: boolean
   placeholder?: string
+}
+
+const standupNotesEditors = new Map<string, LexicalEditor>()
+
+export function focusStandupNotes(entryId: string) {
+  const editor = standupNotesEditors.get(entryId)
+  if (!editor) return
+  editor.getRootElement()?.scrollIntoView({ block: "center", behavior: "auto" })
+  const focusEditor = () => {
+    editor.focus(
+      () => {
+        editor.update(() => {
+          $getRoot().selectEnd()
+        })
+      },
+      { defaultSelection: "rootEnd" },
+    )
+  }
+  window.setTimeout(focusEditor, 0)
+}
+
+function RegisterStandupNotesEditor({ editorKey }: { editorKey: string }) {
+  const [editor] = useLexicalComposerContext()
+  React.useEffect(() => {
+    standupNotesEditors.set(editorKey, editor)
+    return () => {
+      if (standupNotesEditors.get(editorKey) === editor) {
+        standupNotesEditors.delete(editorKey)
+      }
+    }
+  }, [editor, editorKey])
+  return null
 }
 
 const editorTheme = {
@@ -71,6 +105,7 @@ function normalizeMarkdown(value: string) {
 }
 
 function MarkdownNotesInner({
+  editorKey,
   value,
   onChange,
   disabled,
@@ -106,8 +141,10 @@ function MarkdownNotesInner({
 
   return (
     <>
+      {editorKey ? <RegisterStandupNotesEditor editorKey={editorKey} /> : null}
       <Toolbar disabled={disabled} />
       <div
+        data-standup-notes=""
         className={cn(
           "relative rounded-md border border-input bg-transparent shadow-xs transition-[color,box-shadow]",
           "focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50",
@@ -237,6 +274,7 @@ function ToolbarButton({
       size="icon-xs"
       variant={active ? "secondary" : "ghost"}
       disabled={disabled}
+      tabIndex={-1}
       title={title}
       className="text-muted-foreground"
       onClick={onClick}
@@ -247,6 +285,7 @@ function ToolbarButton({
 }
 
 export function MarkdownNotes({
+  editorKey,
   value,
   onChange,
   disabled,
@@ -278,6 +317,7 @@ export function MarkdownNotes({
       </span>
       <LexicalComposer initialConfig={initialConfig}>
         <MarkdownNotesInner
+          editorKey={editorKey}
           value={value}
           onChange={onChange}
           disabled={disabled}

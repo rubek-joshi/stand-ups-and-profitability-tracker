@@ -74,7 +74,7 @@ export function EmployeeStandupCard({
     .toUpperCase()
 
   return (
-    <Card className={cn(!working && "bg-muted/30")}>
+    <Card className={cn(!working && "bg-muted/30")} data-standup-entry={entry.id}>
       <CardContent className="p-4 sm:p-5">
         <header className="flex flex-wrap items-center gap-3">
           <span
@@ -107,6 +107,7 @@ export function EmployeeStandupCard({
                 <button
                   key={option.value}
                   type="button"
+                  tabIndex={-1}
                   disabled={readonly}
                   onClick={() => {
                     const status = option.value
@@ -133,6 +134,7 @@ export function EmployeeStandupCard({
         {working ? (
           <div className="mt-4 grid gap-5 lg:grid-cols-2">
             <MarkdownNotes
+              editorKey={entry.id}
               value={draft.notesMarkdown}
               disabled={readonly}
               onChange={onNotesChange}

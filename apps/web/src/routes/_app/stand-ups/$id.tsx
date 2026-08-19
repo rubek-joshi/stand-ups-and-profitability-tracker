@@ -40,6 +40,7 @@ import {
   isWorking,
   type EntryDraft,
 } from "@/components/standup/employee-standup-card"
+import { focusStandupNotes } from "@/components/standup/markdown-notes"
 import {
   rebalance,
   type DraftAlloc,
@@ -461,6 +462,34 @@ function getMissingAssignmentsFromStandup(
   return result
 }
 
+function nextWorkingEntryId(
+  visibleIds: string[],
+  workingIds: string[],
+  currentId: string,
+): string | "save" {
+  const visIndex = visibleIds.indexOf(currentId)
+  const start = visIndex === -1 ? 0 : visIndex + 1
+  for (let i = start; i < visibleIds.length; i++) {
+    const id = visibleIds[i]!
+    if (workingIds.includes(id)) return id
+  }
+  return "save"
+}
+
+function previousWorkingEntryId(
+  visibleIds: string[],
+  workingIds: string[],
+  currentId: string,
+): string | null {
+  const visIndex = visibleIds.indexOf(currentId)
+  const start = visIndex === -1 ? visibleIds.length - 1 : visIndex - 1
+  for (let i = start; i >= 0; i--) {
+    const id = visibleIds[i]!
+    if (workingIds.includes(id)) return id
+  }
+  return null
+}
+
 function StandupDetailPage() {
   const { id } = Route.useParams()
   const { user } = useAuth()
@@ -496,6 +525,12 @@ function StandupDetailPage() {
   const notesMapRef = React.useRef<Y.Map<string> | null>(null)
   const draftsRef = React.useRef(drafts)
   draftsRef.current = drafts
+  const saveAllEndRef = React.useRef<HTMLButtonElement | null>(null)
+  const tabNavRef = React.useRef({
+    readonly: true,
+    visibleIds: [] as string[],
+    workingIds: [] as string[],
+  })
 
   const readonly = standup?.status === "completed"
   const isDirty =
@@ -531,6 +566,69 @@ function StandupDetailPage() {
   React.useEffect(() => {
     void load()
   }, [load])
+
+  React.useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return
+      const { readonly, visibleIds, workingIds } = tabNavRef.current
+      if (readonly || workingIds.length === 0) return
+      const target = event.target
+      if (!(target instanceof HTMLElement)) return
+      if (target.closest("[role='dialog'], [role='alertdialog']")) return
+
+      const saveAll = saveAllEndRef.current
+      const inSaveAll = Boolean(
+        saveAll && (target === saveAll || saveAll.contains(target)),
+      )
+      const entryId = target.closest("[data-standup-entry]")?.getAttribute(
+        "data-standup-entry",
+      )
+      const inNotes = Boolean(target.closest("[data-standup-notes]"))
+
+      if (event.shiftKey) {
+        if (inSaveAll) {
+          event.preventDefault()
+          event.stopPropagation()
+          focusStandupNotes(workingIds[workingIds.length - 1]!)
+          return
+        }
+        if (!entryId) return
+        if (workingIds.includes(entryId) && !inNotes) {
+          event.preventDefault()
+          event.stopPropagation()
+          focusStandupNotes(entryId)
+          return
+        }
+        const previous = previousWorkingEntryId(visibleIds, workingIds, entryId)
+        if (!previous) return
+        event.preventDefault()
+        event.stopPropagation()
+        focusStandupNotes(previous)
+        return
+      }
+
+      if (inSaveAll) return
+      if (!entryId) return
+      if (workingIds.includes(entryId) && !inNotes) {
+        event.preventDefault()
+        event.stopPropagation()
+        focusStandupNotes(entryId)
+        return
+      }
+      event.preventDefault()
+      event.stopPropagation()
+      const next = nextWorkingEntryId(visibleIds, workingIds, entryId)
+      if (next === "save") {
+        saveAll?.focus()
+        saveAll?.scrollIntoView({ block: "nearest", behavior: "smooth" })
+      } else {
+        focusStandupNotes(next)
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
+  }, [])
 
   React.useEffect(() => {
     setShowAllEmployees(user?.standupScopePreference !== "group")
@@ -867,6 +965,19 @@ function StandupDetailPage() {
   })
   const absentCount = entries.length - working.length
 
+  tabNavRef.current = {
+    readonly,
+    visibleIds: visible.map((entry) => entry.id),
+    workingIds: visible
+      .filter((entry) => {
+        const draft = drafts[entry.id]
+        return draft
+          ? isWorking(draft.attendanceStatus)
+          : entry.attendanceStatus !== "absent"
+      })
+      .map((entry) => entry.id),
+  }
+
   const dateLabel = new Date(String(standup.date).slice(0, 10)).toLocaleDateString(
     undefined,
     { weekday: "long", day: "numeric", month: "long", year: "numeric" },
@@ -908,6 +1019,26 @@ function StandupDetailPage() {
       className="gap-1.5"
       disabled={saving || !isDirty}
       onClick={() => void saveAll()}
+    >
+      <IconDeviceFloppy className="size-3.5" />
+      {saving ? "Saving…" : "Save all"}
+    </Button>
+  ) : null
+
+  const saveAllEndButton = !readonly ? (
+    <Button
+      ref={saveAllEndRef}
+      type="button"
+      size="sm"
+      variant={isDirty ? "default" : "outline"}
+      className={`gap-1.5 ${!isDirty || saving ? "opacity-50" : ""}`}
+      data-standup-save-all=""
+      disabled={saving}
+      aria-disabled={!isDirty || saving}
+      onClick={() => {
+        if (!isDirty || saving) return
+        void saveAll()
+      }}
     >
       <IconDeviceFloppy className="size-3.5" />
       {saving ? "Saving…" : "Save all"}
@@ -1077,7 +1208,7 @@ function StandupDetailPage() {
       </div>
 
       {!readonly && entries.length > 0 ? (
-        <div className="mt-6 flex border-t pt-4">{saveAllButton}</div>
+        <div className="mt-6 flex border-t pt-4">{saveAllEndButton}</div>
       ) : null}
 
       {leaveDialog}
