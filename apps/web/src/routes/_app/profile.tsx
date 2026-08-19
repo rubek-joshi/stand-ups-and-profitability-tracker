@@ -100,7 +100,8 @@ function ProfilePage() {
         description="Your account, appearance, and stand-up preferences"
       />
 
-      <div className="grid gap-6 lg:grid-cols-2 lg:items-start [&>*]:min-w-0">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
+        <div className="grid min-w-0 gap-6">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Account</CardTitle>
@@ -218,6 +219,69 @@ function ProfilePage() {
           </Card>
 
           <PasskeysCard />
+        </div>
+
+        <aside className="flex flex-col gap-6 lg:sticky lg:top-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Appearance</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTheme("system")}
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
+                    theme === "system"
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <IconDeviceDesktop className="size-5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">System</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Match your device setting
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme("light")}
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
+                    theme === "light"
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <IconSun className="size-5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Light</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Bright background for daytime use
+                    </p>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme("dark")}
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
+                    theme === "dark"
+                      ? "border-primary bg-primary/10"
+                      : "border-border hover:bg-muted"
+                  }`}
+                >
+                  <IconMoon className="size-5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Dark</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      Dimmer UI for low-light environments
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card>
             <CardHeader>
@@ -354,68 +418,6 @@ function ProfilePage() {
                   ) : null}
                 </form>
               ) : null}
-            </CardContent>
-          </Card>
-
-        <aside className="lg:sticky lg:top-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Appearance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTheme("system")}
-                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
-                    theme === "system"
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-muted"
-                  }`}
-                >
-                  <IconDeviceDesktop className="size-5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">System</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Match your device setting
-                    </p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("light")}
-                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
-                    theme === "light"
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-muted"
-                  }`}
-                >
-                  <IconSun className="size-5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Light</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Bright background for daytime use
-                    </p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("dark")}
-                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
-                    theme === "dark"
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-muted"
-                  }`}
-                >
-                  <IconMoon className="size-5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Dark</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Dimmer UI for low-light environments
-                    </p>
-                  </div>
-                </button>
-              </div>
             </CardContent>
           </Card>
         </aside>

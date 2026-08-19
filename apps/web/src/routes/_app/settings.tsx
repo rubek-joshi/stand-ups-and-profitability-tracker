@@ -182,13 +182,25 @@ function SettingsPage() {
         description="Organization-wide defaults, mail delivery and data snapshots."
       />
       {!smtpConfigured ? (
-        <Alert>
-          <IconAlertTriangle />
-          <AlertTitle>SMTP is not configured</AlertTitle>
-          <AlertDescription>
-            Outgoing mail will not be sent until you save an SMTP host below.
-          </AlertDescription>
-        </Alert>
+        <a
+          href="#smtp-settings"
+          className="block rounded-lg outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
+          onClick={(e) => {
+            e.preventDefault()
+            document
+              .getElementById("smtp-settings")
+              ?.scrollIntoView({ behavior: "smooth", block: "start" })
+          }}
+        >
+          <Alert className="cursor-pointer transition-colors hover:bg-muted/50">
+            <IconAlertTriangle />
+            <AlertTitle>SMTP is not configured</AlertTitle>
+            <AlertDescription>
+              Outgoing mail will not be sent until you save an SMTP host. Click
+              to jump to SMTP configuration.
+            </AlertDescription>
+          </Alert>
+        </a>
       ) : null}
 
       <Card>
@@ -294,7 +306,7 @@ function SettingsPage() {
         </CardFooter>
       </Card>
 
-      <Card>
+      <Card id="smtp-settings" className="scroll-mt-4">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <IconMail className="size-4 text-primary" />
