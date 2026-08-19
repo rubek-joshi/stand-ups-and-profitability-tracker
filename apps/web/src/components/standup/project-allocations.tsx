@@ -35,17 +35,34 @@ const barColors = [
   "bg-muted-foreground/40",
 ]
 
+const MIN_ALLOCATION = 1
+
+function pct(allocation: DraftAlloc) {
+  return Number(allocation.percentage) || 0
+}
+
 export function totalPercent(allocations: DraftAlloc[]) {
-  return allocations.reduce((sum, a) => sum + (Number(a.percentage) || 0), 0)
+  return allocations.reduce((sum, a) => sum + pct(a), 0)
+}
+
+export function maxPercentFor(allocations: DraftAlloc[], projectId: string) {
+  let reserved = 0
+  for (const allocation of allocations) {
+    if (allocation.projectId === projectId) continue
+    reserved += allocation.locked ? pct(allocation) : MIN_ALLOCATION
+  }
+  return Math.max(MIN_ALLOCATION, 100 - reserved)
 }
 
 export function rebalance(allocations: DraftAlloc[]): DraftAlloc[] {
   if (allocations.length === 0) return []
-  const locked = allocations.filter((a) => a.locked)
   const unlocked = allocations.filter((a) => !a.locked)
-  const lockedTotal = locked.reduce((sum, a) => sum + (Number(a.percentage) || 0), 0)
+  const lockedTotal = allocations
+    .filter((a) => a.locked)
+    .reduce((sum, a) => sum + pct(a), 0)
   const remaining = Math.max(0, 100 - lockedTotal)
   if (unlocked.length === 0) return allocations
+  if (remaining < unlocked.length * MIN_ALLOCATION) return allocations
 
   const base = Math.floor(remaining / unlocked.length)
   let leftover = remaining - base * unlocked.length
@@ -57,20 +74,101 @@ export function rebalance(allocations: DraftAlloc[]): DraftAlloc[] {
   })
 }
 
+function takeFromUnlocked(
+  allocations: DraftAlloc[],
+  amount: number,
+  exceptId?: string,
+): { allocations: DraftAlloc[]; taken: number } {
+  if (amount <= 0) return { allocations, taken: 0 }
+
+  const percents = new Map(allocations.map((a) => [a.projectId, pct(a)]))
+  const donorIds = allocations
+    .filter((a) => !a.locked && a.projectId !== exceptId)
+    .map((a) => a.projectId)
+
+  let taken = 0
+  while (taken < amount) {
+    const donors = donorIds
+      .filter((id) => (percents.get(id) ?? 0) > MIN_ALLOCATION)
+      .sort((a, b) => (percents.get(b) ?? 0) - (percents.get(a) ?? 0) || a.localeCompare(b))
+    if (donors.length === 0) break
+    const donor = donors[0]!
+    percents.set(donor, (percents.get(donor) ?? 0) - 1)
+    taken += 1
+  }
+
+  return {
+    taken,
+    allocations: allocations.map((a) => ({
+      ...a,
+      percentage: percents.get(a.projectId) ?? pct(a),
+    })),
+  }
+}
+
 export function setAllocationPercent(
   allocations: DraftAlloc[],
   projectId: string,
   percent: number,
 ): DraftAlloc[] {
-  const othersTotal = allocations
-    .filter((a) => a.projectId !== projectId)
-    .reduce((sum, a) => sum + (Number(a.percentage) || 0), 0)
-  const maxAllowed = Math.max(0, 100 - othersTotal)
-  const clamped = Math.max(0, Math.min(maxAllowed, Math.round(percent)))
-  // Do not auto-fill remaining % — under 100% is allowed (under-utilized).
-  return allocations.map((a) =>
-    a.projectId === projectId ? { ...a, percentage: clamped, locked: true } : a,
+  const current = allocations.find((a) => a.projectId === projectId)
+  if (!current) return allocations
+
+  const from = pct(current)
+  const raw = Number(percent)
+  const desired = Math.max(
+    MIN_ALLOCATION,
+    Math.min(
+      maxPercentFor(allocations, projectId),
+      Number.isFinite(raw) ? Math.round(raw) : from,
+    ),
   )
+
+  if (desired <= from) {
+    return allocations.map((a) =>
+      a.projectId === projectId ? { ...a, percentage: desired } : a,
+    )
+  }
+
+  const unallocated = Math.max(0, 100 - totalPercent(allocations))
+  const want = desired - from
+  const fromPool = Math.min(want, unallocated)
+  const raised = allocations.map((a) =>
+    a.projectId === projectId ? { ...a, percentage: from + fromPool } : a,
+  )
+  const { allocations: stolen, taken } = takeFromUnlocked(
+    raised,
+    want - fromPool,
+    projectId,
+  )
+  return stolen.map((a) =>
+    a.projectId === projectId
+      ? { ...a, percentage: from + fromPool + taken }
+      : a,
+  )
+}
+
+function canAddProject(allocations: DraftAlloc[]) {
+  const unlockedCount = allocations.filter((a) => !a.locked).length + 1
+  const lockedTotal = allocations
+    .filter((a) => a.locked)
+    .reduce((sum, a) => sum + pct(a), 0)
+  const remaining = Math.max(0, 100 - lockedTotal)
+  if (remaining >= unlockedCount * MIN_ALLOCATION) return true
+  return allocations.some((a) => !a.locked && pct(a) > MIN_ALLOCATION)
+}
+
+function addProject(allocations: DraftAlloc[], projectId: string): DraftAlloc[] {
+  const next = [...allocations, { projectId, percentage: MIN_ALLOCATION, locked: false }]
+  const unlockedCount = next.filter((a) => !a.locked).length
+  const lockedTotal = next.filter((a) => a.locked).reduce((sum, a) => sum + pct(a), 0)
+  const remaining = Math.max(0, 100 - lockedTotal)
+  if (unlockedCount > 0 && remaining >= unlockedCount * MIN_ALLOCATION) {
+    return rebalance(next)
+  }
+  const { allocations: reduced, taken } = takeFromUnlocked(allocations, MIN_ALLOCATION)
+  if (taken < MIN_ALLOCATION) return allocations
+  return [...reduced, { projectId, percentage: MIN_ALLOCATION, locked: false }]
 }
 
 export function ProjectAllocations({
@@ -87,11 +185,11 @@ export function ProjectAllocations({
   )
 
   const toggleProject = (projectId: string) => {
-    const exists = selectedIds.has(projectId)
-    const next = exists
-      ? allocations.filter((a) => a.projectId !== projectId)
-      : [...allocations, { projectId, percentage: 0, locked: false }]
-    onChange(rebalance(next))
+    if (selectedIds.has(projectId)) {
+      onChange(rebalance(allocations.filter((a) => a.projectId !== projectId)))
+      return
+    }
+    onChange(addProject(allocations, projectId))
   }
 
   return (
@@ -157,14 +255,17 @@ export function ProjectAllocations({
             ) : (
               projects.map((project) => {
                 const active = selectedIds.has(project.id)
+                const canSelect = active || canAddProject(allocations)
                 return (
                   <button
                     key={project.id}
                     type="button"
+                    disabled={!canSelect}
                     onClick={() => toggleProject(project.id)}
                     className={cn(
                       "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted",
                       active && "bg-muted",
+                      !canSelect && "cursor-not-allowed opacity-50",
                     )}
                   >
                     <span
@@ -225,7 +326,7 @@ export function ProjectAllocations({
                   />
                   <Input
                     type="number"
-                    min={0}
+                    min={MIN_ALLOCATION}
                     max={100}
                     disabled={disabled}
                     value={a.percentage}
@@ -245,7 +346,7 @@ export function ProjectAllocations({
                     size="icon-sm"
                     variant="ghost"
                     disabled={disabled}
-                    title={a.locked ? "Unlock (auto-balance)" : "Lock this percentage"}
+                    title={a.locked ? "Unlock this percentage" : "Lock this percentage"}
                     className={cn(a.locked && "text-primary")}
                     onClick={() =>
                       onChange(
