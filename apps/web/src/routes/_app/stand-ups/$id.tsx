@@ -40,6 +40,10 @@ import {
   isWorking,
   type EntryDraft,
 } from "@/components/standup/employee-standup-card"
+import {
+  rebalance,
+  type DraftAlloc,
+} from "@/components/standup/project-allocations"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import * as Y from "yjs"
@@ -314,6 +318,85 @@ function hasProjectRosterAssignment(
   })
 }
 
+/** Empty notes = not edited yet. Absent is also treated as a manual edit. */
+function hasManualEntryEdit(draft: EntryDraft): boolean {
+  if (draft.attendanceStatus === "absent") return true
+  return draft.notesMarkdown.trim().length > 0
+}
+
+function assignedProjectIdsOnDate(
+  entry: NonNullable<Standup["entries"]>[number],
+  standupDate: string,
+  projects: Project[],
+): string[] {
+  const names = new Map<string, string>()
+  for (const assignment of entry.employee.assignments ?? []) {
+    const projectId = assignment.project?.id ?? assignment.projectId
+    if (!projectId) continue
+    if (
+      !assignmentCoversDate(
+        assignment.assignedAt,
+        assignment.unassignedAt,
+        standupDate,
+      )
+    ) {
+      continue
+    }
+    names.set(projectId, assignment.project?.name ?? projectId)
+  }
+  for (const project of projects) {
+    if (
+      hasProjectRosterAssignment(
+        projects,
+        entry.employee.id,
+        project.id,
+        standupDate,
+      )
+    ) {
+      names.set(project.id, project.name)
+    }
+  }
+  return [...names.entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]) || a[0].localeCompare(b[0]))
+    .map(([id]) => id)
+}
+
+function sameProjectSplit(left: DraftAlloc[], right: DraftAlloc[]): boolean {
+  if (left.length !== right.length) return false
+  const percents = new Map(
+    left.map((item) => [item.projectId, Number(item.percentage) || 0]),
+  )
+  return right.every(
+    (item) => percents.get(item.projectId) === (Number(item.percentage) || 0),
+  )
+}
+
+function applyAssignedProjectDefaults(
+  drafts: Record<string, EntryDraft>,
+  standup: Standup,
+  projects: Project[],
+): Record<string, EntryDraft> {
+  if (standup.status === "completed") return drafts
+  const standupDate = String(standup.date).slice(0, 10)
+  let changed = false
+  const next = { ...drafts }
+  for (const entry of standup.entries ?? []) {
+    const draft = next[entry.id]
+    if (!draft || hasManualEntryEdit(draft)) continue
+    const allocations = rebalance(
+      assignedProjectIdsOnDate(entry, standupDate, projects).map((projectId) => ({
+        projectId,
+        percentage: 0,
+        locked: false,
+      })),
+    )
+    if (sameProjectSplit(draft.allocations, allocations)) continue
+    next[entry.id] = { ...draft, allocations }
+    changed = true
+  }
+  return changed ? next : drafts
+}
+
 function getMissingAssignmentsFromStandup(
   standup: Standup,
   drafts: Record<string, EntryDraft>,
@@ -434,9 +517,10 @@ function StandupDetailPage() {
       ])
       setStandup(s.data)
       setProjects(p.data)
-      const next = draftsFromStandup(s.data)
+      const fromServer = draftsFromStandup(s.data)
+      const next = applyAssignedProjectDefaults(fromServer, s.data, p.data)
       setDrafts(next)
-      setBaseline(serializeDrafts(next))
+      setBaseline(serializeDrafts(fromServer))
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load stand-up")
     } finally {
