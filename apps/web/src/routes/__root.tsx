@@ -1,6 +1,8 @@
 import { HeadContent, Outlet, Scripts, createRootRoute } from "@tanstack/react-router"
 import { AuthProvider } from "@/lib/auth"
+import { PAGE_CONTAINER_CLASS } from "@/lib/layout"
 import { ThemeProvider, themeInitScript } from "@/lib/theme"
+import { cn } from "@workspace/ui/lib/utils"
 
 import appCss from "@workspace/ui/globals.css?url"
 
@@ -14,7 +16,7 @@ export const Route = createRootRoute({
     links: [{ rel: "stylesheet", href: appCss }],
   }),
   notFoundComponent: () => (
-    <main className="container mx-auto p-4 pt-16">
+    <main className={cn(PAGE_CONTAINER_CLASS, "p-4 pt-16")}>
       <h1 className="text-xl font-semibold">404</h1>
       <p className="text-muted-foreground">The requested page could not be found.</p>
     </main>

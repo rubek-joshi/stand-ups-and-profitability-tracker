@@ -135,7 +135,7 @@ function VatPage() {
   }
 
   return (
-    <div>
+    <>
       <PageHeader
         title="VAT"
         description="Everything you owe, everything you've settled, and the paper trail in between."
@@ -378,7 +378,7 @@ function VatPage() {
           </section>
         </>
       ) : null}
-    </div>
+    </>
   )
 }
 

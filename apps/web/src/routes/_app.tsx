@@ -3,6 +3,7 @@ import { Outlet, createFileRoute, redirect, useRouterState } from "@tanstack/rea
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@workspace/ui/components/sidebar"
 import { Separator } from "@workspace/ui/components/separator"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
+import { cn } from "@workspace/ui/lib/utils"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandPalette } from "@/components/command-palette"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
@@ -10,6 +11,7 @@ import { getToken } from "@/lib/api"
 import { homePathForRole } from "@/lib/access"
 import { useAuth } from "@/lib/auth"
 import { isAppPathAllowed } from "@/lib/nav"
+import { PAGE_CONTAINER_CLASS } from "@/lib/layout"
 import { LoadingState } from "@/components/ui-states"
 
 export const Route = createFileRoute("/_app")({
@@ -68,7 +70,7 @@ function AppLayout() {
             <Separator orientation="vertical" className="h-4" />
             <span className="text-sm font-medium">Tracker</span>
           </header>
-          <div className="flex-1 p-4 md:p-6">
+          <div className={cn("flex-1 p-4 md:p-6", PAGE_CONTAINER_CLASS)}>
             <Outlet />
           </div>
         </SidebarInset>
