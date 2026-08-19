@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
-import { IconExternalLink } from "@tabler/icons-react"
+import { IconExternalLink, IconPencil } from "@tabler/icons-react"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -28,6 +28,11 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { MailLink } from "@/components/contact-link"
@@ -78,9 +83,10 @@ function UserDetailPage() {
   const [auditError, setAuditError] = React.useState<string | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const [editOpen, setEditOpen] = React.useState(false)
+  const [editing, setEditing] = React.useState(false)
   const [passwordOpen, setPasswordOpen] = React.useState(false)
   const [formError, setFormError] = React.useState<string | null>(null)
+  const [saving, setSaving] = React.useState(false)
   const [editForm, setEditForm] = React.useState({
     name: "",
     email: "",
@@ -137,6 +143,7 @@ function UserDetailPage() {
 
   React.useEffect(() => {
     void load()
+    setEditing(false)
   }, [load])
 
   React.useEffect(() => {
@@ -159,34 +166,24 @@ function UserDetailPage() {
         actions={
           <>
             <StatusBadge status={user.isActive ? "active" : "inactive"} />
-            <Button
+            <HintedButton
+              hint="You can change your password from Profile instead."
+              disabled={isSelf}
               variant="outline"
               onClick={() => {
-                setFormError(null)
-                setEditForm({
-                  name: user.name,
-                  email: user.email,
-                  role: (user.role as UserRole) || "manager",
-                })
-                setEditOpen(true)
-              }}
-            >
-              Edit
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
+                if (isSelf) return
                 setFormError(null)
                 setPasswordForm({ password: "", mustChangePassword: true })
                 setPasswordOpen(true)
               }}
             >
               Change password
-            </Button>
+            </HintedButton>
             {user.isActive ? (
-              <Button
-                variant="outline"
+              <HintedButton
+                hint="You cannot deactivate your own account."
                 disabled={isSelf}
+                variant="outline"
                 onClick={async () => {
                   if (isSelf) return
                   const ok = await confirm({
@@ -209,11 +206,12 @@ function UserDetailPage() {
                 }}
               >
                 Deactivate
-              </Button>
+              </HintedButton>
             ) : (
-              <Button
-                variant="outline"
+              <HintedButton
+                hint="You cannot reactivate your own account."
                 disabled={isSelf}
+                variant="outline"
                 onClick={async () => {
                   try {
                     await api(`/users/${id}`, {
@@ -228,38 +226,15 @@ function UserDetailPage() {
                 }}
               >
                 Reactivate
-              </Button>
+              </HintedButton>
             )}
           </>
         }
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)] lg:items-start">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-1 text-sm">
-            <DetailRow label="Name" value={isSelf ? `${user.name} (you)` : user.name} />
-            <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
-              <span className="text-muted-foreground">Email</span>
-              <MailLink value={user.email} withCopy />
-            </div>
-            <DetailRow label="Role" value={roleLabel(user.role)} />
-            <DetailRow label="Status" value={user.isActive ? "Active" : "Inactive"} />
-            <DetailRow
-              label="Must change password"
-              value={user.mustChangePassword ? "Yes" : "No"}
-            />
-            <DetailRow label="Last login" value={formatLastLogin(user.lastLoginAt)} />
-            <DetailRow label="Stand-up scope" value={standupScopeLabel(user)} />
-            <DetailRow label="Created" value={formatDateTime(user.createdAt)} />
-            <DetailRow label="Updated" value={formatDateTime(user.updatedAt)} />
-          </CardContent>
-        </Card>
-
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
         {isSuperAdmin ? (
-          <Card>
+          <Card className="min-w-0">
             <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
               <CardTitle className="text-base">Recent activity</CardTitle>
               <Link
@@ -346,90 +321,151 @@ function UserDetailPage() {
               )}
             </CardContent>
           </Card>
-        ) : null}
-      </div>
+        ) : (
+          <div className="hidden min-w-0 lg:block" />
+        )}
 
-      <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-h-[min(90dvh,36rem)] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Edit user</DialogTitle>
-          </DialogHeader>
-          <form
-            className="flex flex-col gap-3"
-            onSubmit={async (e) => {
-              e.preventDefault()
-              setFormError(null)
-              try {
-                await api(`/users/${id}`, {
-                  method: "PATCH",
-                  body: {
-                    name: editForm.name.trim(),
-                    email: editForm.email.trim(),
-                    ...(isSelf ? {} : { role: editForm.role }),
-                  },
-                })
-                setEditOpen(false)
-                await load()
-                await loadAudit()
-              } catch (err) {
-                setFormError(err instanceof ApiError ? err.message : "Failed to update user")
-              }
-            }}
-          >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="edit-user-name">Name</Label>
-              <Input
-                id="edit-user-name"
-                required
-                value={editForm.name}
-                onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="edit-user-email">Email</Label>
-              <Input
-                id="edit-user-email"
-                type="email"
-                required
-                value={editForm.email}
-                onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
-              />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label>Role</Label>
-              <Select
-                value={editForm.role}
-                onValueChange={(v) =>
-                  setEditForm((f) => ({ ...f, role: (v as UserRole) ?? "manager" }))
-                }
-                items={ROLE_ITEMS}
-                disabled={isSelf}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {(Object.keys(ROLE_LABELS) as UserRole[]).map((role) => (
-                    <SelectItem key={role} value={role}>
-                      {ROLE_LABELS[role]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {isSelf ? (
-                <p className="text-xs text-muted-foreground">You cannot change your own role.</p>
+        <aside className="lg:sticky lg:top-6">
+          <Card>
+            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+              <CardTitle className="text-base">Details</CardTitle>
+              {!editing ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="size-8 shrink-0"
+                  aria-label="Edit details"
+                  onClick={() => {
+                    setFormError(null)
+                    setEditForm({
+                      name: user.name,
+                      email: user.email,
+                      role: (user.role as UserRole) || "manager",
+                    })
+                    setEditing(true)
+                  }}
+                >
+                  <IconPencil className="size-4" />
+                </Button>
               ) : null}
-            </div>
-            {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>
-                Cancel
-              </Button>
-              <Button type="submit">Save</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+            </CardHeader>
+            <CardContent>
+              {editing ? (
+                <form
+                  className="flex flex-col gap-3"
+                  onSubmit={async (e) => {
+                    e.preventDefault()
+                    setFormError(null)
+                    setSaving(true)
+                    try {
+                      await api(`/users/${id}`, {
+                        method: "PATCH",
+                        body: {
+                          name: editForm.name.trim(),
+                          email: editForm.email.trim(),
+                          ...(isSelf ? {} : { role: editForm.role }),
+                        },
+                      })
+                      setEditing(false)
+                      await load()
+                      await loadAudit()
+                    } catch (err) {
+                      setFormError(
+                        err instanceof ApiError ? err.message : "Failed to update user",
+                      )
+                    } finally {
+                      setSaving(false)
+                    }
+                  }}
+                >
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="edit-user-name">Name</Label>
+                    <Input
+                      id="edit-user-name"
+                      required
+                      value={editForm.name}
+                      onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="edit-user-email">Email</Label>
+                    <Input
+                      id="edit-user-email"
+                      type="email"
+                      required
+                      value={editForm.email}
+                      onChange={(e) => setEditForm((f) => ({ ...f, email: e.target.value }))}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label>Role</Label>
+                    <Select
+                      value={editForm.role}
+                      onValueChange={(v) =>
+                        setEditForm((f) => ({ ...f, role: (v as UserRole) ?? "manager" }))
+                      }
+                      items={ROLE_ITEMS}
+                      disabled={isSelf}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(ROLE_LABELS) as UserRole[]).map((role) => (
+                          <SelectItem key={role} value={role}>
+                            {ROLE_LABELS[role]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {isSelf ? (
+                      <p className="text-xs text-muted-foreground">
+                        You cannot change your own role.
+                      </p>
+                    ) : null}
+                  </div>
+                  {formError ? <p className="text-sm text-destructive">{formError}</p> : null}
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="submit" disabled={saving}>
+                      {saving ? "Saving…" : "Save"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={saving}
+                      onClick={() => {
+                        setFormError(null)
+                        setEditing(false)
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              ) : (
+                <div className="flex flex-col gap-1 text-sm">
+                  <DetailRow label="Name" value={isSelf ? `${user.name} (you)` : user.name} />
+                  <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
+                    <span className="text-muted-foreground">Email</span>
+                    <MailLink value={user.email} withCopy />
+                  </div>
+                  <DetailRow label="Role" value={roleLabel(user.role)} />
+                  <DetailRow label="Status" value={user.isActive ? "Active" : "Inactive"} />
+                  <DetailRow
+                    label="Must change password"
+                    value={user.mustChangePassword ? "Yes" : "No"}
+                  />
+                  <DetailRow label="Last login" value={formatLastLogin(user.lastLoginAt)} />
+                  <DetailRow label="Stand-up scope" value={standupScopeLabel(user)} />
+                  <DetailRow label="Created" value={formatDateTime(user.createdAt)} />
+                  <DetailRow label="Updated" value={formatDateTime(user.updatedAt)} />
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
 
       <Dialog open={passwordOpen} onOpenChange={setPasswordOpen}>
         <DialogContent className="max-h-[min(90dvh,36rem)] overflow-y-auto">
@@ -509,5 +545,26 @@ function DetailRow({ label, value }: { label: string; value: string }) {
       <span className="text-muted-foreground">{label}</span>
       <span className="text-right font-medium">{value}</span>
     </div>
+  )
+}
+
+/** Disabled buttons ignore hover; wrap them so the tooltip still appears. */
+function HintedButton({
+  hint,
+  disabled,
+  children,
+  ...props
+}: React.ComponentProps<typeof Button> & { hint: string }) {
+  const button = (
+    <Button disabled={disabled} {...props}>
+      {children}
+    </Button>
+  )
+  if (!disabled) return button
+  return (
+    <Tooltip>
+      <TooltipTrigger render={<span className="inline-flex" />}>{button}</TooltipTrigger>
+      <TooltipContent>{hint}</TooltipContent>
+    </Tooltip>
   )
 }
