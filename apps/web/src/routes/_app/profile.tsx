@@ -13,8 +13,8 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { PageHeader } from "@/components/page-header"
+import { ChangePasswordDialog } from "@/components/change-password-dialog"
 import { PasskeysCard } from "@/components/passkeys-card"
-import { PasswordInput } from "@/components/password-input"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -48,7 +48,7 @@ const PREFERENCE_OPTIONS: Array<{
 ]
 
 function ProfilePage() {
-  const { user, refreshUser, changePassword } = useAuth()
+  const { user, refreshUser } = useAuth()
   const { theme, setTheme } = useTheme()
   const [name, setName] = React.useState("")
   const [editingName, setEditingName] = React.useState(false)
@@ -60,12 +60,7 @@ function ProfilePage() {
   const [saving, setSaving] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [savedMsg, setSavedMsg] = React.useState<string | null>(null)
-  const [currentPassword, setCurrentPassword] = React.useState("")
-  const [newPassword, setNewPassword] = React.useState("")
-  const [confirmPassword, setConfirmPassword] = React.useState("")
-  const [passwordError, setPasswordError] = React.useState<string | null>(null)
-  const [passwordSaved, setPasswordSaved] = React.useState<string | null>(null)
-  const [savingPassword, setSavingPassword] = React.useState(false)
+  const [passwordOpen, setPasswordOpen] = React.useState(false)
 
   React.useEffect(() => {
     if (!user) return
@@ -105,8 +100,7 @@ function ProfilePage() {
         description="Your account, appearance, and stand-up preferences"
       />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        <div className="min-w-0 space-y-6">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start [&>*]:min-w-0">
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Account</CardTitle>
@@ -210,87 +204,16 @@ function ProfilePage() {
                   {user.role}
                 </p>
               ) : null}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Change password</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form
-                className="grid max-w-md gap-4"
-                onSubmit={async (e) => {
-                  e.preventDefault()
-                  setPasswordError(null)
-                  setPasswordSaved(null)
-                  if (newPassword !== confirmPassword) {
-                    setPasswordError("New passwords do not match")
-                    return
-                  }
-                  setSavingPassword(true)
-                  try {
-                    await changePassword(currentPassword, newPassword)
-                    setCurrentPassword("")
-                    setNewPassword("")
-                    setConfirmPassword("")
-                    setPasswordSaved("Password updated.")
-                  } catch (err) {
-                    setPasswordError(
-                      err instanceof ApiError
-                        ? err.message
-                        : "Failed to change password",
-                    )
-                  } finally {
-                    setSavingPassword(false)
-                  }
-                }}
-              >
-                <div className="grid gap-2">
-                  <Label htmlFor="current-password">Current password</Label>
-                  <PasswordInput
-                    id="current-password"
-                    autoComplete="current-password"
-                    required
-                    minLength={8}
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="new-password">New password</Label>
-                  <PasswordInput
-                    id="new-password"
-                    autoComplete="new-password"
-                    required
-                    minLength={8}
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="confirm-password">Confirm new password</Label>
-                  <PasswordInput
-                    id="confirm-password"
-                    autoComplete="new-password"
-                    required
-                    minLength={8}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                  />
-                </div>
-                {passwordError ? (
-                  <p className="text-sm text-destructive">{passwordError}</p>
-                ) : null}
-                {passwordSaved ? (
-                  <p className="text-sm text-muted-foreground">{passwordSaved}</p>
-                ) : null}
-                <div>
-                  <Button type="submit" disabled={savingPassword}>
-                    {savingPassword ? "Updating…" : "Update password"}
-                  </Button>
-                </div>
-              </form>
+              <div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setPasswordOpen(true)}
+                >
+                  Change password
+                </Button>
+              </div>
             </CardContent>
           </Card>
 
@@ -433,7 +356,6 @@ function ProfilePage() {
               ) : null}
             </CardContent>
           </Card>
-        </div>
 
         <aside className="lg:sticky lg:top-4">
           <Card>
@@ -498,6 +420,10 @@ function ProfilePage() {
           </Card>
         </aside>
       </div>
+      <ChangePasswordDialog
+        open={passwordOpen}
+        onOpenChange={setPasswordOpen}
+      />
     </div>
   )
 }
