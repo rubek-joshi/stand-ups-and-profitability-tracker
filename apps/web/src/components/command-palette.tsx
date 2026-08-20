@@ -8,6 +8,7 @@ import {
   CommandItem,
   CommandList,
   CommandSeparator,
+  CommandShortcut,
 } from "@workspace/ui/components/command"
 import { api, type Envelope } from "@/lib/api"
 import { isStaffRole } from "@/lib/access"
@@ -130,8 +131,8 @@ export function CommandPalette() {
           <CommandGroup heading="Recent">
             {recentMatches.map((r) => (
               <CommandItem key={r.id} value={`recent-${r.id}`} onSelect={() => go(r)}>
-                <span className="truncate">{r.label}</span>
-                <span className="ml-auto text-xs text-muted-foreground">{r.group}</span>
+                <span className="min-w-0 flex-1 truncate">{r.label}</span>
+                <CommandShortcut className="tracking-normal">{r.group}</CommandShortcut>
               </CommandItem>
             ))}
           </CommandGroup>
