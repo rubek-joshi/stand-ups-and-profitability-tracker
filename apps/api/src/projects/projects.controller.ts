@@ -25,13 +25,17 @@ import {
   UpdateProjectDto,
 } from "./dto/project.dto";
 import { ProjectsService } from "./projects.service";
+import { StandupsService } from "../standups/standups.service";
 
 @ApiTags("projects")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, PoliciesGuard)
 @Controller("projects")
 export class ProjectsController {
-  constructor(private readonly projectsService: ProjectsService) {}
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly standupsService: StandupsService,
+  ) {}
 
   @Post()
   @RequirePermission("projects", "*")
@@ -61,6 +65,22 @@ export class ProjectsController {
   @ApiOperation({ summary: "Get project with profitability" })
   async findOne(@Param("id") id: string) {
     return this.projectsService.findOne(id);
+  }
+
+  @Get(":id/standups")
+  @RequirePermission("standups", "read")
+  @ApiOperation({
+    summary: "Stand-up history for this project (tasks for this project only)",
+  })
+  async findStandups(
+    @Param("id") id: string,
+    @Query("cursor") cursor?: string,
+    @Query("limit") limit?: string,
+  ) {
+    return this.standupsService.findByProject(id, {
+      cursor,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Patch(":id")

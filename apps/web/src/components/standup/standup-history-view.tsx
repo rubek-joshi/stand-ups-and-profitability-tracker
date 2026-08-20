@@ -17,21 +17,28 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
-import { isWorking } from "@/components/standup/employee-standup-card"
+import { isWorking } from "@/components/standup/entry-draft"
 import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
-import type { AttendanceStatus, Employee } from "@/lib/types"
+import type {
+  AttendanceStatus,
+  Employee,
+  Project,
+  StandupTask,
+  StandupTaskState,
+} from "@/lib/types"
 import { format, parseISO } from "date-fns"
 
 export type StandupHistoryRecord = {
   id: string
   employee: { id: string; name: string }
   attendanceStatus: AttendanceStatus
-  notesMarkdown: string | null
+  miscellaneousNotes: string | null
   allocations: Array<{
     projectId: string
     projectName: string
     percentage: number
     isNonBillable: boolean
+    tasks?: StandupTask[]
   }>
 }
 
@@ -200,22 +207,35 @@ function HighlightText({
 type Props = {
   q: string
   employeeId: string
+  projectId: string
   refreshKey?: number
   onSearchChange: (value: string) => void
   onEmployeeChange: (value: string) => void
+  onProjectChange: (value: string) => void
 }
 
 const ALL_EMPLOYEES = "__all__"
+const ALL_PROJECTS = "__all__"
+
+const TASK_STATE_CLASS: Record<StandupTaskState, string> = {
+  open: "text-foreground",
+  done: "text-muted-foreground line-through",
+  tomorrow: "text-task-tomorrow",
+  progress: "text-task-progress",
+}
 
 export function StandupHistoryView({
   q,
   employeeId,
+  projectId,
   refreshKey = 0,
   onSearchChange,
   onEmployeeChange,
+  onProjectChange,
 }: Props) {
   const [searchInput, setSearchInput] = React.useState(q)
   const [employees, setEmployees] = React.useState<Employee[]>([])
+  const [projects, setProjects] = React.useState<Project[]>([])
   const [days, setDays] = React.useState<StandupHistoryDay[]>([])
   const [cursor, setCursor] = React.useState<string | null>(null)
   const [hasMore, setHasMore] = React.useState(false)
@@ -240,15 +260,22 @@ export function StandupHistoryView({
     let cancelled = false
     void (async () => {
       try {
-        const res = await api<PaginatedEnvelope<Employee[]> | Envelope<Employee[]>>(
-          "/employees",
-        )
+        const [empRes, projRes] = await Promise.all([
+          api<PaginatedEnvelope<Employee[]> | Envelope<Employee[]>>("/employees"),
+          api<Envelope<Project[]> | PaginatedEnvelope<Project[]>>("/projects"),
+        ])
         if (cancelled) return
         setEmployees(
-          [...res.data].sort((a, b) => a.name.localeCompare(b.name)),
+          [...empRes.data].sort((a, b) => a.name.localeCompare(b.name)),
+        )
+        setProjects(
+          [...projRes.data].sort((a, b) => a.name.localeCompare(b.name)),
         )
       } catch {
-        if (!cancelled) setEmployees([])
+        if (!cancelled) {
+          setEmployees([])
+          setProjects([])
+        }
       }
     })()
     return () => {
@@ -270,6 +297,15 @@ export function StandupHistoryView({
     [employees],
   )
 
+  const projectItems = React.useMemo(
+    () =>
+      Object.fromEntries([
+        [ALL_PROJECTS, "All projects"],
+        ...projects.map((project) => [project.id, project.name]),
+      ]),
+    [projects],
+  )
+
   const loadPage = React.useCallback(
     async (opts: { reset: boolean; cursorOverride?: string | null }) => {
       const requestId = ++requestIdRef.current
@@ -284,6 +320,7 @@ export function StandupHistoryView({
         const params = new URLSearchParams()
         if (q.trim()) params.set("q", q.trim())
         if (employeeId.trim()) params.set("employeeId", employeeId.trim())
+        if (projectId.trim()) params.set("projectId", projectId.trim())
         const nextCursor = opts.reset ? null : (opts.cursorOverride ?? cursor)
         if (nextCursor) params.set("cursor", nextCursor)
         params.set("limit", "10")
@@ -308,13 +345,13 @@ export function StandupHistoryView({
         }
       }
     },
-    [q, employeeId, cursor],
+    [q, employeeId, projectId, cursor],
   )
 
   React.useEffect(() => {
     setCursor(null)
     void loadPage({ reset: true })
-  }, [q, employeeId, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [q, employeeId, projectId, refreshKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   React.useEffect(() => {
     const el = sentinelRef.current
@@ -342,7 +379,7 @@ export function StandupHistoryView({
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name, project, or notes (fuzzy)…"
+            placeholder="Search by name, project, notes, or tasks (fuzzy)…"
             className="pl-9"
             aria-label="Search stand-up history"
           />
@@ -354,7 +391,7 @@ export function StandupHistoryView({
           }}
           items={employeeItems}
         >
-          <SelectTrigger className="w-64" aria-label="Filter by employee">
+          <SelectTrigger className="w-56" aria-label="Filter by employee">
             <SelectValue placeholder="All employees" />
           </SelectTrigger>
           <SelectContent>
@@ -364,6 +401,25 @@ export function StandupHistoryView({
                 {employee.status === "left"
                   ? `${employee.name} (left)`
                   : employee.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={projectId || ALL_PROJECTS}
+          onValueChange={(value) => {
+            onProjectChange(value === ALL_PROJECTS || !value ? "" : value)
+          }}
+          items={projectItems}
+        >
+          <SelectTrigger className="w-56" aria-label="Filter by project">
+            <SelectValue placeholder="All projects" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
+            {projects.map((project) => (
+              <SelectItem key={project.id} value={project.id}>
+                {project.name}
               </SelectItem>
             ))}
           </SelectContent>
@@ -378,13 +434,9 @@ export function StandupHistoryView({
       {!loading && !error && days.length === 0 ? (
         <EmptyState
           message={
-            q.trim() && employeeId
-              ? "No stand-ups match this employee and search."
-              : q.trim()
-                ? "No stand-ups match your search."
-                : employeeId
-                  ? "No stand-up history for this employee."
-                  : "No stand-up history yet."
+            q.trim() || employeeId || projectId
+              ? "No stand-ups match these filters."
+              : "No stand-up history yet."
           }
         />
       ) : null}
@@ -431,30 +483,61 @@ export function StandupHistoryView({
                       >
                         {ATTENDANCE_LABELS[record.attendanceStatus]}
                       </span>
+                    </div>
+                    <div className="mt-2 space-y-2">
                       {record.allocations.map((allocation) => (
-                        <span
-                          key={allocation.projectId}
-                          className="flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-xs text-muted-foreground"
-                        >
+                        <div key={allocation.projectId} className="rounded-md bg-muted/40 px-3 py-2">
+                          <div className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                            <HighlightText
+                              text={allocation.projectName}
+                              query={highlightQuery}
+                            />
+                            <IconChevronRight className="size-3" />
+                            {allocation.percentage}%
+                          </div>
+                          {(allocation.tasks ?? []).length > 0 ? (
+                            <ul className="mt-1 space-y-0.5">
+                              {(allocation.tasks ?? []).map((task) => (
+                                <li
+                                  key={task.id}
+                                  className={cn(
+                                    "text-sm",
+                                    TASK_STATE_CLASS[task.state],
+                                  )}
+                                >
+                                  <HighlightText text={task.text || "(empty)"} query={highlightQuery} />
+                                  {task.blocker ? (
+                                    <span className="mt-0.5 block text-xs text-task-blocker">
+                                      Blocked:{" "}
+                                      <HighlightText
+                                        text={task.blocker}
+                                        query={highlightQuery}
+                                      />
+                                    </span>
+                                  ) : null}
+                                </li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-1 text-xs text-muted-foreground">No tasks</p>
+                          )}
+                        </div>
+                      ))}
+                      {!projectId && record.miscellaneousNotes?.trim() ? (
+                        <p className="whitespace-pre-wrap text-sm text-muted-foreground">
                           <HighlightText
-                            text={allocation.projectName}
+                            text={record.miscellaneousNotes}
                             query={highlightQuery}
                           />
-                          <IconChevronRight className="size-3" />
-                          {allocation.percentage}%
-                        </span>
-                      ))}
+                        </p>
+                      ) : null}
+                      {record.allocations.length === 0 &&
+                      !record.miscellaneousNotes?.trim() ? (
+                        <p className="text-sm text-muted-foreground">
+                          No tasks recorded.
+                        </p>
+                      ) : null}
                     </div>
-                    <p className="mt-1.5 whitespace-pre-wrap text-sm text-muted-foreground">
-                      {record.notesMarkdown?.trim() ? (
-                        <HighlightText
-                          text={record.notesMarkdown}
-                          query={highlightQuery}
-                        />
-                      ) : (
-                        "No notes recorded."
-                      )}
-                    </p>
                   </li>
                 ))}
               </ul>

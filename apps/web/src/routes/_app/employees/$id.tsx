@@ -572,11 +572,21 @@ function EmployeeDetailPage() {
                           ))
                         )}
                       </div>
-                      {entry.notesMarkdown?.trim() ? (
-                        <span className="line-clamp-1 text-muted-foreground">
-                          {entry.notesMarkdown}
-                        </span>
-                      ) : null}
+                      {(() => {
+                        const taskPreview = (entry.allocations ?? [])
+                          .flatMap((a) => a.tasks ?? [])
+                          .map((t) => t.text.trim())
+                          .filter(Boolean)
+                          .slice(0, 3)
+                          .join(" · ")
+                        const misc = entry.miscellaneousNotes?.trim()
+                        const preview = taskPreview || misc
+                        return preview ? (
+                          <span className="line-clamp-1 text-muted-foreground">
+                            {preview}
+                          </span>
+                        ) : null
+                      })()}
                     </li>
                   ))}
                 </ul>

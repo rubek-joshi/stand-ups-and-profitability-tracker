@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { AttendanceStatus } from "@workspace/database";
+import { AttendanceStatus, StandupTaskState } from "@workspace/database";
 import { Type } from "class-transformer";
 import {
   IsArray,
@@ -32,6 +32,32 @@ export class CreateStandupDto {
   employeeGroupId?: string;
 }
 
+export class StandupTaskDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @ApiProperty({ default: "" })
+  @IsString()
+  text!: string;
+
+  @ApiProperty({ enum: StandupTaskState, default: StandupTaskState.open })
+  @IsEnum(StandupTaskState)
+  state!: StandupTaskState;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  blocker?: string | null;
+
+  @ApiPropertyOptional({ default: 0 })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  sortOrder?: number;
+}
+
 export class AllocationDto {
   @ApiProperty()
   @IsString()
@@ -48,6 +74,13 @@ export class AllocationDto {
   @IsOptional()
   @IsBoolean()
   isNonBillable?: boolean;
+
+  @ApiPropertyOptional({ type: [StandupTaskDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => StandupTaskDto)
+  tasks?: StandupTaskDto[];
 }
 
 export class UpdateStandupEntryDto {
@@ -56,10 +89,10 @@ export class UpdateStandupEntryDto {
   @IsEnum(AttendanceStatus)
   attendanceStatus?: AttendanceStatus;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ nullable: true })
   @IsOptional()
   @IsString()
-  notesMarkdown?: string;
+  miscellaneousNotes?: string | null;
 
   @ApiPropertyOptional({ type: [AllocationDto] })
   @IsOptional()
@@ -133,7 +166,8 @@ export class StandupCalendarQueryDto {
 
 export class StandupHistoryQueryDto {
   @ApiPropertyOptional({
-    description: "Full-text search across employee name, project name, and notes",
+    description:
+      "Full-text search across employee name, project name, misc notes, and tasks",
   })
   @IsOptional()
   @IsString()
@@ -146,6 +180,14 @@ export class StandupHistoryQueryDto {
   @IsString()
   @IsNotEmpty()
   employeeId?: string;
+
+  @ApiPropertyOptional({
+    description: "Limit history to entries that allocate to this project",
+  })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  projectId?: string;
 
   @ApiPropertyOptional({
     description: "Opaque cursor from a previous history response",

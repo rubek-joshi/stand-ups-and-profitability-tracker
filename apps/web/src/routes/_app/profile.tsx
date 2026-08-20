@@ -19,7 +19,7 @@ import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useTheme } from "@/lib/theme"
-import type { EmployeeGroup, StandupScopePreference } from "@/lib/types"
+import type { EmployeeGroup, StandupLayoutPreference, StandupScopePreference } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/profile")({
   component: ProfilePage,
@@ -54,6 +54,8 @@ function ProfilePage() {
   const [editingName, setEditingName] = React.useState(false)
   const [groups, setGroups] = React.useState<EmployeeGroup[]>([])
   const [preference, setPreference] = React.useState<StandupScopePreference>("ask")
+  const [layoutPreference, setLayoutPreference] =
+    React.useState<StandupLayoutPreference>("card")
   const [groupId, setGroupId] = React.useState("")
   const [loadingGroups, setLoadingGroups] = React.useState(true)
   const [savingName, setSavingName] = React.useState(false)
@@ -66,6 +68,7 @@ function ProfilePage() {
     if (!user) return
     if (!editingName) setName(user.name)
     setPreference(user.standupScopePreference ?? "ask")
+    setLayoutPreference(user.standupLayoutPreference ?? "card")
     setGroupId(user.standupPreferredGroupId ?? "")
   }, [user, editingName])
 
@@ -306,6 +309,7 @@ function ProfilePage() {
                         method: "PATCH",
                         body: {
                           standupScopePreference: preference,
+                          standupLayoutPreference: layoutPreference,
                           standupPreferredGroupId:
                             preference === "group" ? groupId : null,
                         },
@@ -341,6 +345,31 @@ function ProfilePage() {
                         </p>
                       </button>
                     ))}
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Default layout</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(
+                        [
+                          { id: "card" as const, label: "Card view" },
+                          { id: "table" as const, label: "Table view" },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setLayoutPreference(opt.id)}
+                          className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                            layoutPreference === opt.id
+                              ? "border-primary bg-primary/10 font-medium"
+                              : "border-border hover:bg-muted"
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {preference === "group" ? (

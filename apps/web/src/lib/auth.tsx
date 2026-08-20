@@ -10,6 +10,7 @@ export type AuthUser = {
   lastLoginAt?: string | null
   role?: string | null
   standupScopePreference?: "ask" | "everyone" | "group"
+  standupLayoutPreference?: "card" | "table"
   standupPreferredGroupId?: string | null
   standupPreferredGroup?: { id: string; name: string } | null
   createdAt?: string

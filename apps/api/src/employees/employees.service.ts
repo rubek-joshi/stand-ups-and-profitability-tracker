@@ -137,6 +137,7 @@ export class EmployeesService {
             allocations: {
               include: {
                 project: { select: { id: true, name: true, status: true } },
+                tasks: { orderBy: { sortOrder: "asc" } },
               },
             },
           },

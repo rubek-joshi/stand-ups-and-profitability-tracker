@@ -5,7 +5,9 @@ import {
   IconCalendar,
   IconClipboard,
   IconDeviceFloppy,
+  IconLayoutGrid,
   IconSearch,
+  IconTable,
   IconUsers,
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
@@ -35,12 +37,16 @@ import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { SHORTCUTS_FAB_BOTTOM_CLASS } from "@/components/keyboard-shortcuts"
 import {
-  EmployeeStandupCard,
+  ATTENDANCE_META,
+  buildEntriesPayload,
+  draftsFromStandup,
   isEntryComplete,
   isWorking,
+  serializeDrafts,
   type EntryDraft,
-} from "@/components/standup/employee-standup-card"
-import { focusStandupNotes } from "@/components/standup/markdown-notes"
+} from "@/components/standup/entry-draft"
+import { StandupCardView } from "@/components/standup/standup-card-view"
+import { StandupTableView } from "@/components/standup/table-view"
 import {
   rebalance,
   type DraftAlloc,
@@ -58,102 +64,12 @@ import type {
   MissingProjectAssignment,
   Project,
   Standup,
+  StandupLayoutPreference,
 } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/stand-ups/$id")({
   component: StandupDetailPage,
 })
-
-const ATTENDANCE_LABEL: Record<string, string> = {
-  present: "Present",
-  late: "Late",
-  first_half_leave: "1st half leave",
-  second_half_leave: "2nd half leave",
-  absent: "Absent",
-}
-
-function draftsFromStandup(standup: Standup): Record<string, EntryDraft> {
-  const next: Record<string, EntryDraft> = {}
-  for (const entry of standup.entries ?? []) {
-    next[entry.id] = {
-      attendanceStatus: entry.attendanceStatus,
-      notesMarkdown: entry.notesMarkdown ?? "",
-      allocations: (entry.allocations ?? []).map((a) => ({
-        projectId: a.projectId,
-        percentage: a.percentage,
-        isNonBillable: a.isNonBillable,
-        locked: false,
-      })),
-    }
-  }
-  return next
-}
-
-function serializeDrafts(drafts: Record<string, EntryDraft>): string {
-  const ids = Object.keys(drafts).sort()
-  return JSON.stringify(
-    ids.map((id) => {
-      const d = drafts[id]!
-      return {
-        id,
-        attendanceStatus: d.attendanceStatus,
-        notesMarkdown: d.notesMarkdown,
-        allocations: d.allocations
-          .filter((a) => a.projectId)
-          .map((a) => ({
-            projectId: a.projectId,
-            percentage: Number(a.percentage),
-            isNonBillable: Boolean(a.isNonBillable),
-          })),
-      }
-    }),
-  )
-}
-
-function buildEntriesPayload(
-  entries: Standup["entries"],
-  drafts: Record<string, EntryDraft>,
-  employeeIds?: Set<string> | null,
-) {
-  const scoped = (entries ?? []).filter((entry) =>
-    employeeIds ? employeeIds.has(entry.employee.id) : true,
-  )
-  return scoped.map((entry) => {
-    const d = drafts[entry.id]
-    if (!d) {
-      return {
-        id: entry.id,
-        attendanceStatus: entry.attendanceStatus,
-        notesMarkdown: entry.notesMarkdown ?? "",
-        allocations: (entry.allocations ?? []).map((a) => ({
-          projectId: a.projectId,
-          percentage: Number(a.percentage),
-          isNonBillable: a.isNonBillable,
-        })),
-      }
-    }
-    if (d.attendanceStatus === "absent") {
-      return {
-        id: entry.id,
-        attendanceStatus: "absent" as const,
-        notesMarkdown: "",
-        allocations: [],
-      }
-    }
-    return {
-      id: entry.id,
-      attendanceStatus: d.attendanceStatus,
-      notesMarkdown: d.notesMarkdown,
-      allocations: d.allocations
-        .filter((a) => a.projectId)
-        .map((a) => ({
-          projectId: a.projectId,
-          percentage: Number(a.percentage),
-          isNonBillable: a.isNonBillable,
-        })),
-    }
-  })
-}
 
 function extractMissingAssignmentPayload(body: unknown): MissingProjectAssignment[] | null {
   if (!body || typeof body !== "object") return null
@@ -323,10 +239,18 @@ function hasProjectRosterAssignment(
   })
 }
 
-/** Empty notes = not edited yet. Absent is also treated as a manual edit. */
-function hasManualEntryEdit(draft: EntryDraft): boolean {
-  if (draft.attendanceStatus === "absent") return true
-  return draft.notesMarkdown.trim().length > 0
+function entryHasTasks(draft: EntryDraft): boolean {
+  return draft.allocations.some((a) =>
+    a.tasks.some((t) => t.text.trim().length > 0),
+  )
+}
+
+function shouldApplyAssignedDefaults(draft: EntryDraft): boolean {
+  if (draft.attendanceStatus === "absent") return false
+  if (draft.allocations.length > 0) return false
+  if (draft.miscellaneousNotes.trim().length > 0) return false
+  if (entryHasTasks(draft)) return false
+  return true
 }
 
 function assignedProjectIdsOnDate(
@@ -387,14 +311,14 @@ function applyAssignedProjectDefaults(
   const next = { ...drafts }
   for (const entry of standup.entries ?? []) {
     const draft = next[entry.id]
-    if (!draft || hasManualEntryEdit(draft)) continue
+    if (!draft || !shouldApplyAssignedDefaults(draft)) continue
     const allocations = rebalance(
       assignedProjectIdsOnDate(entry, standupDate, projects).map((projectId) => ({
         projectId,
         percentage: 0,
         locked: false,
       })),
-    )
+    ).map((a) => ({ ...a, tasks: [] as EntryDraft["allocations"][number]["tasks"] }))
     if (sameProjectSplit(draft.allocations, allocations)) continue
     next[entry.id] = { ...draft, allocations }
     changed = true
@@ -468,37 +392,55 @@ function getMissingAssignmentsFromStandup(
   return result
 }
 
-function nextWorkingEntryId(
-  visibleIds: string[],
-  workingIds: string[],
-  currentId: string,
-): string | "save" {
-  const visIndex = visibleIds.indexOf(currentId)
-  const start = visIndex === -1 ? 0 : visIndex + 1
-  for (let i = start; i < visibleIds.length; i++) {
-    const id = visibleIds[i]!
-    if (workingIds.includes(id)) return id
-  }
-  return "save"
+function serializeCollabEntry(draft: EntryDraft): string {
+  return JSON.stringify({
+    miscellaneousNotes: draft.miscellaneousNotes,
+    attendanceStatus: draft.attendanceStatus,
+    allocations: draft.allocations,
+  })
 }
 
-function previousWorkingEntryId(
-  visibleIds: string[],
-  workingIds: string[],
-  currentId: string,
-): string | null {
-  const visIndex = visibleIds.indexOf(currentId)
-  const start = visIndex === -1 ? visibleIds.length - 1 : visIndex - 1
-  for (let i = start; i >= 0; i--) {
-    const id = visibleIds[i]!
-    if (workingIds.includes(id)) return id
+function parseCollabEntry(raw: string, fallback: EntryDraft): EntryDraft {
+  try {
+    const parsed = JSON.parse(raw) as Partial<EntryDraft>
+    return {
+      attendanceStatus: parsed.attendanceStatus ?? fallback.attendanceStatus,
+      miscellaneousNotes:
+        typeof parsed.miscellaneousNotes === "string"
+          ? parsed.miscellaneousNotes
+          : fallback.miscellaneousNotes,
+      allocations: Array.isArray(parsed.allocations)
+        ? parsed.allocations.map((a) => ({
+            projectId: a.projectId,
+            percentage: a.percentage,
+            isNonBillable: a.isNonBillable,
+            locked: Boolean(a.locked),
+            tasks: Array.isArray(a.tasks) ? a.tasks : [],
+          }))
+        : fallback.allocations,
+    }
+  } catch {
+    return fallback
   }
-  return null
+}
+
+function tasksSignature(draft: EntryDraft): string {
+  return JSON.stringify(
+    draft.allocations.map((a) => ({
+      projectId: a.projectId,
+      tasks: a.tasks.map((t) => ({
+        id: t.id,
+        text: t.text,
+        state: t.state,
+        blocker: t.blocker,
+      })),
+    })),
+  )
 }
 
 function StandupDetailPage() {
   const { id } = Route.useParams()
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
   const [standup, setStandup] = React.useState<Standup | null>(null)
   const [projects, setProjects] = React.useState<Project[]>([])
@@ -513,6 +455,9 @@ function StandupDetailPage() {
   const [collabConnected, setCollabConnected] = React.useState(false)
   const [leaveBusy, setLeaveBusy] = React.useState(false)
   const [showScrollTop, setShowScrollTop] = React.useState(false)
+  const [layout, setLayout] = React.useState<StandupLayoutPreference>(
+    () => user?.standupLayoutPreference ?? "card",
+  )
   const [groupMemberIds, setGroupMemberIds] = React.useState<Set<string> | null>(null)
   const [showAllEmployees, setShowAllEmployees] = React.useState(
     () => user?.standupScopePreference !== "group",
@@ -528,15 +473,9 @@ function StandupDetailPage() {
     title: string
     description: string
   } | null>(null)
-  const notesMapRef = React.useRef<Y.Map<string> | null>(null)
+  const entriesMapRef = React.useRef<Y.Map<string> | null>(null)
   const draftsRef = React.useRef(drafts)
   draftsRef.current = drafts
-  const saveAllEndRef = React.useRef<HTMLButtonElement | null>(null)
-  const tabNavRef = React.useRef({
-    readonly: true,
-    visibleIds: [] as string[],
-    workingIds: [] as string[],
-  })
 
   const readonly = standup?.status === "completed"
   const isDirty =
@@ -558,7 +497,7 @@ function StandupDetailPage() {
       ])
       setStandup(s.data)
       setProjects(p.data)
-      const fromServer = draftsFromStandup(s.data)
+      const fromServer = draftsFromStandup(s.data.entries)
       const next = applyAssignedProjectDefaults(fromServer, s.data, p.data)
       setDrafts(next)
       setBaseline(serializeDrafts(fromServer))
@@ -574,67 +513,8 @@ function StandupDetailPage() {
   }, [load])
 
   React.useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Tab" || event.altKey || event.ctrlKey || event.metaKey) return
-      const { readonly, visibleIds, workingIds } = tabNavRef.current
-      if (readonly || workingIds.length === 0) return
-      const target = event.target
-      if (!(target instanceof HTMLElement)) return
-      if (target.closest("[role='dialog'], [role='alertdialog']")) return
-
-      const saveAll = saveAllEndRef.current
-      const inSaveAll = Boolean(
-        saveAll && (target === saveAll || saveAll.contains(target)),
-      )
-      const entryId = target.closest("[data-standup-entry]")?.getAttribute(
-        "data-standup-entry",
-      )
-      const inNotes = Boolean(target.closest("[data-standup-notes]"))
-
-      if (event.shiftKey) {
-        if (inSaveAll) {
-          event.preventDefault()
-          event.stopPropagation()
-          focusStandupNotes(workingIds[workingIds.length - 1]!)
-          return
-        }
-        if (!entryId) return
-        if (workingIds.includes(entryId) && !inNotes) {
-          event.preventDefault()
-          event.stopPropagation()
-          focusStandupNotes(entryId)
-          return
-        }
-        const previous = previousWorkingEntryId(visibleIds, workingIds, entryId)
-        if (!previous) return
-        event.preventDefault()
-        event.stopPropagation()
-        focusStandupNotes(previous)
-        return
-      }
-
-      if (inSaveAll) return
-      if (!entryId) return
-      if (workingIds.includes(entryId) && !inNotes) {
-        event.preventDefault()
-        event.stopPropagation()
-        focusStandupNotes(entryId)
-        return
-      }
-      event.preventDefault()
-      event.stopPropagation()
-      const next = nextWorkingEntryId(visibleIds, workingIds, entryId)
-      if (next === "save") {
-        saveAll?.focus()
-        saveAll?.scrollIntoView({ block: "nearest", behavior: "smooth" })
-      } else {
-        focusStandupNotes(next)
-      }
-    }
-
-    window.addEventListener("keydown", onKeyDown, true)
-    return () => window.removeEventListener("keydown", onKeyDown, true)
-  }, [])
+    setLayout(user?.standupLayoutPreference ?? "card")
+  }, [user?.standupLayoutPreference, id])
 
   React.useEffect(() => {
     setShowAllEmployees(user?.standupScopePreference !== "group")
@@ -677,23 +557,28 @@ function StandupDetailPage() {
       setPeers(nextPeers)
       setCollabConnected(true)
     })
-    const notesMap = session.doc.getMap<string>("notes")
-    notesMapRef.current = notesMap
+    const entriesMap = session.doc.getMap<string>("entries")
+    entriesMapRef.current = entriesMap
     const observer = () => {
       setDrafts((prev) => {
         const next = { ...prev }
-        for (const [entryId, text] of notesMap.entries()) {
-          if (next[entryId]) {
-            next[entryId] = { ...next[entryId], notesMarkdown: text }
+        let changed = false
+        for (const [entryId, raw] of entriesMap.entries()) {
+          if (typeof raw !== "string" || !next[entryId]) continue
+          const merged = parseCollabEntry(raw, next[entryId]!)
+          if (serializeCollabEntry(merged) === serializeCollabEntry(next[entryId]!)) {
+            continue
           }
+          next[entryId] = merged
+          changed = true
         }
-        return next
+        return changed ? next : prev
       })
     }
-    notesMap.observe(observer)
+    entriesMap.observe(observer)
     return () => {
-      notesMap.unobserve(observer)
-      notesMapRef.current = null
+      entriesMap.unobserve(observer)
+      entriesMapRef.current = null
       session.disconnect()
       setCollabConnected(false)
       setPeers([])
@@ -758,7 +643,7 @@ function StandupDetailPage() {
         },
       })
       setStandup(res.data)
-      const nextDrafts = draftsFromStandup(res.data)
+      const nextDrafts = draftsFromStandup(res.data.entries)
       setDrafts(nextDrafts)
       setBaseline(serializeDrafts(nextDrafts))
       setMissingAssignments([])
@@ -782,6 +667,36 @@ function StandupDetailPage() {
       setSaving(false)
     }
   }, [id, standup, readonly, projects, user, groupMemberIds, showAllEmployees])
+
+  const handleDraftChange = React.useCallback(
+    (entryId: string, next: EntryDraft) => {
+      const prev = draftsRef.current[entryId]
+      setDrafts((current) => ({ ...current, [entryId]: next }))
+      if (!prev) return
+      const miscChanged = prev.miscellaneousNotes !== next.miscellaneousNotes
+      const tasksChanged = tasksSignature(prev) !== tasksSignature(next)
+      if (miscChanged || tasksChanged) {
+        entriesMapRef.current?.set(entryId, serializeCollabEntry(next))
+      }
+    },
+    [],
+  )
+
+  const changeLayout = React.useCallback(
+    async (next: StandupLayoutPreference) => {
+      setLayout(next)
+      try {
+        await api("/auth/me", {
+          method: "PATCH",
+          body: { standupLayoutPreference: next },
+        })
+        await refreshUser()
+      } catch {
+        // Preference persistence is best-effort.
+      }
+    },
+    [refreshUser],
+  )
 
   const leaveDialog = (
     <AlertDialog
@@ -986,19 +901,6 @@ function StandupDetailPage() {
   })
   const absentCount = scopedEntries.length - working.length
 
-  tabNavRef.current = {
-    readonly,
-    visibleIds: visible.map((entry) => entry.id),
-    workingIds: visible
-      .filter((entry) => {
-        const draft = drafts[entry.id]
-        return draft
-          ? isWorking(draft.attendanceStatus)
-          : entry.attendanceStatus !== "absent"
-      })
-      .map((entry) => entry.id),
-  }
-
   const dateLabel = new Date(String(standup.date).slice(0, 10)).toLocaleDateString(
     undefined,
     { weekday: "long", day: "numeric", month: "long", year: "numeric" },
@@ -1008,7 +910,8 @@ function StandupDetailPage() {
     const lines = entries.map((e) => {
       const d = drafts[e.id]
       if (!d) return `## ${e.employee.name}`
-      const status = ATTENDANCE_LABEL[d.attendanceStatus] ?? d.attendanceStatus
+      const status =
+        ATTENDANCE_META[d.attendanceStatus]?.label ?? d.attendanceStatus
       if (!isWorking(d.attendanceStatus)) return `## ${e.employee.name} — ${status}`
       const split =
         d.allocations
@@ -1017,7 +920,26 @@ function StandupDetailPage() {
             return `${name} ${a.percentage}%`
           })
           .join(", ") || "no projects"
-      return `## ${e.employee.name} — ${status}\n_${split}_\n${d.notesMarkdown.trim() || "(no notes)"}`
+      const taskBlocks = d.allocations
+        .map((a) => {
+          const name = projects.find((p) => p.id === a.projectId)?.name ?? a.projectId
+          const tasks = a.tasks.filter((t) => t.text.trim().length > 0)
+          if (tasks.length === 0) return null
+          return `### ${name}\n${tasks
+            .map((t) => `- ${t.text.trim()}${t.blocker ? " [blocker]" : ""}`)
+            .join("\n")}`
+        })
+        .filter(Boolean)
+        .join("\n\n")
+      const misc = d.miscellaneousNotes.trim()
+      const parts = [
+        `## ${e.employee.name} — ${status}`,
+        `_${split}_`,
+        taskBlocks || null,
+        misc ? `Misc:\n${misc}` : null,
+      ].filter(Boolean)
+      if (!taskBlocks && !misc) parts.push("(no notes)")
+      return parts.join("\n")
     })
     const text = `# Stand-up · ${dateLabel}\n\n${lines.join("\n\n")}`
     try {
@@ -1048,7 +970,6 @@ function StandupDetailPage() {
 
   const saveAllEndButton = !readonly ? (
     <Button
-      ref={saveAllEndRef}
       type="button"
       size="sm"
       variant={isDirty ? "default" : "outline"}
@@ -1070,7 +991,7 @@ function StandupDetailPage() {
     <div>
       <PageHeader
         title={`Stand-up · ${dateLabel}`}
-        description="Attendance, notes, and project allocations"
+        description="Attendance, tasks, and project allocations"
         breadcrumbs={[
           { label: "Stand-ups", to: "/stand-ups", search: { page: 1, pageSize: 25 } },
           { label: dateLabel },
@@ -1150,6 +1071,31 @@ function StandupDetailPage() {
           <span>{absentCount} absent</span>
         </div>
 
+        <div className="flex items-center gap-1 rounded-md border p-0.5">
+          <Button
+            type="button"
+            size="sm"
+            variant={layout === "card" ? "secondary" : "ghost"}
+            className="h-8 gap-1.5 px-2.5"
+            aria-pressed={layout === "card"}
+            onClick={() => void changeLayout("card")}
+          >
+            <IconLayoutGrid className="size-3.5" />
+            Cards
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={layout === "table" ? "secondary" : "ghost"}
+            className="h-8 gap-1.5 px-2.5"
+            aria-pressed={layout === "table"}
+            onClick={() => void changeLayout("table")}
+          >
+            <IconTable className="size-3.5" />
+            Table
+          </Button>
+        </div>
+
         <div className="relative w-full sm:w-52">
           <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -1191,42 +1137,33 @@ function StandupDetailPage() {
         {saveAllButton}
       </div>
 
-      <div className="space-y-4">
-        {visible.map((entry) => {
-          const draft = drafts[entry.id]
-          if (!draft) return null
-          return (
-            <EmployeeStandupCard
-              key={entry.id}
-              entry={entry}
-              draft={draft}
-              projects={projects}
-              readonly={readonly}
-              onChange={(next) =>
-                setDrafts((prev) => ({ ...prev, [entry.id]: next }))
-              }
-              onNotesChange={(notes) => {
-                notesMapRef.current?.set(entry.id, notes)
-                setDrafts((prev) => ({
-                  ...prev,
-                  [entry.id]: { ...prev[entry.id]!, notesMarkdown: notes },
-                }))
-              }}
-            />
-          )
-        })}
-        {visible.length === 0 ? (
-          <Card>
-            <CardContent className="px-4 py-10 text-center text-sm text-muted-foreground">
-              {query.trim()
-                ? `No one matches “${query.trim()}”.`
-                : groupFilterActive
-                  ? "No employees from your group in this stand-up."
-                  : "No employees in this stand-up."}
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+      {visible.length === 0 ? (
+        <Card>
+          <CardContent className="px-4 py-10 text-center text-sm text-muted-foreground">
+            {query.trim()
+              ? `No one matches “${query.trim()}”.`
+              : groupFilterActive
+                ? "No employees from your group in this stand-up."
+                : "No employees in this stand-up."}
+          </CardContent>
+        </Card>
+      ) : layout === "table" ? (
+        <StandupTableView
+          entries={visible}
+          drafts={drafts}
+          projects={projects}
+          readonly={readonly}
+          onDraftChange={handleDraftChange}
+        />
+      ) : (
+        <StandupCardView
+          entries={visible}
+          drafts={drafts}
+          projects={projects}
+          readonly={readonly}
+          onDraftChange={handleDraftChange}
+        />
+      )}
 
       {!readonly && entries.length > 0 ? (
         <div className="mt-6 flex border-t pt-4">{saveAllEndButton}</div>

@@ -43,6 +43,7 @@ type Props = {
   onChange: (value: string) => void
   disabled?: boolean
   placeholder?: string
+  label?: string
 }
 
 const standupNotesEditors = new Map<string, LexicalEditor>()
@@ -289,7 +290,8 @@ export function MarkdownNotes({
   value,
   onChange,
   disabled,
-  placeholder = "- Project A: …\n- Project B: …\n- Blockers: …",
+  placeholder = "Anything else the team should know…",
+  label = "Miscellaneous · markdown",
 }: Props) {
   const editorId = React.useId()
   const initialConfig = React.useMemo(
@@ -313,7 +315,7 @@ export function MarkdownNotes({
   return (
     <div className="space-y-2">
       <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        Standup notes · markdown
+        {label}
       </span>
       <LexicalComposer initialConfig={initialConfig}>
         <MarkdownNotesInner

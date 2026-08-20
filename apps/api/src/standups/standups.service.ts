@@ -13,6 +13,7 @@ import {
   Prisma,
   ProjectStatus,
   StandupStatus,
+  StandupTaskState,
 } from "@workspace/database";
 import { AuditService } from "../audit/audit.service";
 import {
@@ -94,10 +95,16 @@ export class StandupsService {
         },
       },
       include: {
-        entries: { include: { employee: true, allocations: true } },
+        entries: {
+          include: {
+            employee: true,
+            allocations: { include: { project: true, tasks: true } },
+          },
+        },
         employeeGroup: { select: { id: true, name: true } },
       },
     });
+    await this.carryForwardTasksFromPreviousDay(standup.id, date);
     await this.auditService.write({
       actorId,
       action: AuditAction.STANDUP_CREATED,
@@ -108,7 +115,7 @@ export class StandupsService {
         entryCount: employees.length,
       },
     });
-    return standup;
+    return this.loadStandupOrThrow(standup.id);
   }
 
   async findAll(filters: { page?: string; pageSize?: string } = {}) {
@@ -170,6 +177,7 @@ export class StandupsService {
     const limit = Math.min(Math.max(query.limit ?? 10, 1), 50);
     const q = query.q?.trim() ?? "";
     const employeeId = query.employeeId?.trim() || null;
+    const projectId = query.projectId?.trim() || null;
 
     if (employeeId) {
       const employee = await this.prismaService.employee.findUnique({
@@ -178,6 +186,15 @@ export class StandupsService {
       });
       if (!employee) {
         throw new NotFoundException(`Employee ${employeeId} not found`);
+      }
+    }
+    if (projectId) {
+      const project = await this.prismaService.project.findUnique({
+        where: { id: projectId },
+        select: { id: true },
+      });
+      if (!project) {
+        throw new NotFoundException(`Project ${projectId} not found`);
       }
     }
 
@@ -192,6 +209,7 @@ export class StandupsService {
     const rows = await this.queryHistoryStandupIds(
       q || null,
       employeeId,
+      projectId,
       cursorDate,
       cursorId,
       limit + 1,
@@ -212,11 +230,20 @@ export class StandupsService {
       where: { id: { in: pageIds } },
       include: {
         entries: {
-          where: employeeId ? { employeeId } : undefined,
+          where: {
+            ...(employeeId ? { employeeId } : {}),
+            ...(projectId
+              ? { allocations: { some: { projectId } } }
+              : {}),
+          },
           include: {
             employee: { select: { id: true, name: true } },
             allocations: {
-              include: { project: { select: { id: true, name: true } } },
+              where: projectId ? { projectId } : undefined,
+              include: {
+                project: { select: { id: true, name: true } },
+                tasks: { orderBy: { sortOrder: "asc" } },
+              },
             },
           },
           orderBy: { employee: { name: "asc" } },
@@ -235,12 +262,19 @@ export class StandupsService {
         id: entry.id,
         employee: entry.employee,
         attendanceStatus: entry.attendanceStatus,
-        notesMarkdown: entry.notesMarkdown,
+        miscellaneousNotes: projectId ? null : entry.miscellaneousNotes,
         allocations: entry.allocations.map((allocation) => ({
           projectId: allocation.projectId,
           projectName: allocation.project.name,
           percentage: allocation.percentage,
           isNonBillable: allocation.isNonBillable,
+          tasks: allocation.tasks.map((task) => ({
+            id: task.id,
+            text: task.text,
+            state: task.state,
+            blocker: task.blocker,
+            sortOrder: task.sortOrder,
+          })),
         })),
       })),
     }));
@@ -254,6 +288,102 @@ export class StandupsService {
     return {
       data,
       meta: { nextCursor, hasMore },
+    };
+  }
+
+  async findByProject(projectId: string, filters: { limit?: number; cursor?: string } = {}) {
+    const project = await this.prismaService.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, name: true },
+    });
+    if (!project) {
+      throw new NotFoundException(`Project ${projectId} not found`);
+    }
+
+    const limit = Math.min(Math.max(filters.limit ?? 20, 1), 50);
+    let cursorDate: Date | null = null;
+    let cursorId: string | null = null;
+    if (filters.cursor) {
+      const decoded = this.decodeHistoryCursor(filters.cursor);
+      cursorDate = parseIsoDate(decoded.date);
+      cursorId = decoded.id;
+    }
+
+    const rows = await this.queryHistoryStandupIds(
+      null,
+      null,
+      projectId,
+      cursorDate,
+      cursorId,
+      limit + 1,
+    );
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    if (pageRows.length === 0) {
+      return {
+        data: [],
+        meta: { nextCursor: null, hasMore: false, project },
+      };
+    }
+
+    const pageIds = pageRows.map((row) => row.id);
+    const standups = await this.prismaService.standup.findMany({
+      where: { id: { in: pageIds } },
+      include: {
+        entries: {
+          where: { allocations: { some: { projectId } } },
+          include: {
+            employee: { select: { id: true, name: true } },
+            allocations: {
+              where: { projectId },
+              include: {
+                project: { select: { id: true, name: true } },
+                tasks: { orderBy: { sortOrder: "asc" } },
+              },
+            },
+          },
+          orderBy: { employee: { name: "asc" } },
+        },
+      },
+    });
+    const order = new Map(pageIds.map((id, index) => [id, index]));
+    standups.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
+
+    const data = standups.map((standup) => ({
+      date: toIsoDate(standup.date),
+      standupId: standup.id,
+      status: standup.status,
+      records: standup.entries.map((entry) => ({
+        id: entry.id,
+        employee: entry.employee,
+        attendanceStatus: entry.attendanceStatus,
+        allocations: entry.allocations.map((allocation) => ({
+          projectId: allocation.projectId,
+          projectName: allocation.project.name,
+          percentage: allocation.percentage,
+          isNonBillable: allocation.isNonBillable,
+          tasks: allocation.tasks.map((task) => ({
+            id: task.id,
+            text: task.text,
+            state: task.state,
+            blocker: task.blocker,
+            sortOrder: task.sortOrder,
+          })),
+        })),
+      })),
+    }));
+
+    const last = standups[standups.length - 1];
+    return {
+      data,
+      meta: {
+        nextCursor:
+          hasMore && last
+            ? this.encodeHistoryCursor(toIsoDate(last.date), last.id)
+            : null,
+        hasMore,
+        project,
+      },
     };
   }
 
@@ -280,11 +410,13 @@ export class StandupsService {
   private queryHistoryStandupIds(
     q: string | null,
     employeeId: string | null,
+    projectId: string | null,
     cursorDate: Date | null,
     cursorId: string | null,
     limit: number,
   ) {
-    if (q || employeeId) {
+    const hasFilter = Boolean(q || employeeId || projectId);
+    if (hasFilter) {
       if (cursorDate && cursorId) {
         return this.prismaService.$queryRaw<Array<{ id: string; date: Date }>>`
           SELECT s.id, s.date
@@ -294,6 +426,13 @@ export class StandupsService {
             SELECT 1 FROM standup_entries se
             WHERE se."standupId" = s.id
             AND (${employeeId}::text IS NULL OR se."employeeId" = ${employeeId})
+            AND (
+              ${projectId}::text IS NULL
+              OR EXISTS (
+                SELECT 1 FROM project_allocations pa
+                WHERE pa."standupEntryId" = se.id AND pa."projectId" = ${projectId}
+              )
+            )
             AND (
               ${q}::text IS NULL
               OR standup_entry_matches_search(se.search_text, se.search_vector, ${q})
@@ -310,6 +449,13 @@ export class StandupsService {
           SELECT 1 FROM standup_entries se
           WHERE se."standupId" = s.id
           AND (${employeeId}::text IS NULL OR se."employeeId" = ${employeeId})
+          AND (
+            ${projectId}::text IS NULL
+            OR EXISTS (
+              SELECT 1 FROM project_allocations pa
+              WHERE pa."standupEntryId" = se.id AND pa."projectId" = ${projectId}
+            )
+          )
           AND (
             ${q}::text IS NULL
             OR standup_entry_matches_search(se.search_text, se.search_vector, ${q})
@@ -420,6 +566,9 @@ export class StandupsService {
         throw new NotFoundException(`Standup entry ${item.id} not found`);
       }
       const attendanceStatus = item.attendanceStatus ?? entry.attendanceStatus;
+      if (attendanceStatus === AttendanceStatus.absent) {
+        continue;
+      }
       if (item.allocations) {
         this.validateAllocations(attendanceStatus, item.allocations);
       }
@@ -438,7 +587,10 @@ export class StandupsService {
         const entry = entryById.get(item.id)!;
         const attendanceStatus =
           item.attendanceStatus ?? entry.attendanceStatus;
-        if (item.allocations) {
+        if (
+          attendanceStatus !== AttendanceStatus.absent &&
+          item.allocations?.length
+        ) {
           await this.validateAllocationProjects(
             entry.employeeId,
             item.allocations.map((a) => a.projectId),
@@ -452,34 +604,62 @@ export class StandupsService {
         const entry = entryById.get(item.id)!;
         const attendanceStatus =
           item.attendanceStatus ?? entry.attendanceStatus;
-        if (item.allocations) {
+        const isAbsent = attendanceStatus === AttendanceStatus.absent;
+
+        if (item.allocations !== undefined || isAbsent) {
           await tx.projectAllocation.deleteMany({
             where: { standupEntryId: item.id },
           });
-          if (
-            attendanceStatus !== AttendanceStatus.absent &&
-            item.allocations.length > 0
-          ) {
-            await tx.projectAllocation.createMany({
-              data: item.allocations.map((allocation) => ({
-                standupEntryId: item.id,
-                projectId: allocation.projectId,
-                percentage: allocation.percentage,
-                isNonBillable: allocation.isNonBillable ?? false,
-              })),
-            });
+          if (!isAbsent && item.allocations?.length) {
+            for (const [index, allocation] of item.allocations.entries()) {
+              const tasks = (allocation.tasks ?? [])
+                .map((task, taskIndex) => ({
+                  text: task.text ?? "",
+                  state: task.state ?? StandupTaskState.open,
+                  blocker: task.blocker?.trim() ? task.blocker.trim() : null,
+                  sortOrder: task.sortOrder ?? taskIndex,
+                }))
+                .filter(
+                  (task) =>
+                    task.text.trim().length > 0 ||
+                    task.blocker !== null ||
+                    task.state !== StandupTaskState.open,
+                );
+              await tx.projectAllocation.create({
+                data: {
+                  standupEntryId: item.id,
+                  projectId: allocation.projectId,
+                  percentage: allocation.percentage,
+                  isNonBillable: allocation.isNonBillable ?? false,
+                  tasks: {
+                    create: tasks,
+                  },
+                },
+              });
+              void index;
+            }
           }
         }
+
         results.push(
           await tx.standupEntry.update({
             where: { id: item.id },
             data: {
               attendanceStatus: item.attendanceStatus,
-              notesMarkdown: item.notesMarkdown,
+              miscellaneousNotes: isAbsent
+                ? null
+                : item.miscellaneousNotes !== undefined
+                  ? item.miscellaneousNotes
+                  : undefined,
             },
             include: {
               employee: true,
-              allocations: { include: { project: true } },
+              allocations: {
+                include: {
+                  project: true,
+                  tasks: { orderBy: { sortOrder: "asc" } },
+                },
+              },
             },
           }),
         );
@@ -615,7 +795,12 @@ export class StandupsService {
                 },
               },
             },
-            allocations: { include: { project: true } },
+            allocations: {
+              include: {
+                project: true,
+                tasks: { orderBy: { sortOrder: "asc" as const } },
+              },
+            },
           },
           orderBy: { employee: { name: "asc" } },
         },
@@ -656,6 +841,96 @@ export class StandupsService {
       })),
       skipDuplicates: true,
     });
+    await this.carryForwardTasksFromPreviousDay(
+      standup.id,
+      standup.date,
+      missing.map((employee) => employee.id),
+    );
+  }
+
+  private async carryForwardTasksFromPreviousDay(
+    standupId: string,
+    date: Date,
+    employeeIds?: string[],
+  ) {
+    const previous = await this.prismaService.standup.findFirst({
+      where: { date: dayBefore(date) },
+      include: {
+        entries: {
+          where: employeeIds?.length
+            ? { employeeId: { in: employeeIds } }
+            : undefined,
+          include: {
+            allocations: {
+              include: {
+                tasks: {
+                  where: {
+                    state: {
+                      in: [StandupTaskState.tomorrow, StandupTaskState.progress],
+                    },
+                  },
+                  orderBy: { sortOrder: "asc" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!previous?.entries.length) {
+      return;
+    }
+
+    const newEntries = await this.prismaService.standupEntry.findMany({
+      where: {
+        standupId,
+        ...(employeeIds?.length
+          ? { employeeId: { in: employeeIds } }
+          : {}),
+      },
+      include: { allocations: true },
+    });
+
+    for (const entry of newEntries) {
+      if (entry.allocations.length > 0) {
+        continue;
+      }
+      const previousEntry = previous.entries.find(
+        (item) => item.employeeId === entry.employeeId,
+      );
+      if (!previousEntry) {
+        continue;
+      }
+      const toCarry = previousEntry.allocations.filter(
+        (allocation) => allocation.tasks.length > 0,
+      );
+      if (!toCarry.length) {
+        continue;
+      }
+      const base = Math.floor(100 / toCarry.length);
+      const remainder = 100 - base * toCarry.length;
+      for (const [index, allocation] of toCarry.entries()) {
+        await this.prismaService.projectAllocation.create({
+          data: {
+            standupEntryId: entry.id,
+            projectId: allocation.projectId,
+            percentage: base + (index === 0 ? remainder : 0),
+            isNonBillable: allocation.isNonBillable,
+            tasks: {
+              create: allocation.tasks.map((task, taskIndex) => ({
+                text: task.text,
+                state:
+                  task.state === StandupTaskState.tomorrow
+                    ? StandupTaskState.open
+                    : StandupTaskState.progress,
+                blocker: task.blocker,
+                sortOrder: taskIndex,
+              })),
+            },
+          },
+        });
+      }
+    }
   }
 
   private validateAllocations(

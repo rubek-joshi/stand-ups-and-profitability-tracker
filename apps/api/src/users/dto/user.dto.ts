@@ -113,6 +113,11 @@ export class UpdateMyPreferencesDto {
   @IsIn(["ask", "everyone", "group"])
   standupScopePreference?: "ask" | "everyone" | "group";
 
+  @ApiPropertyOptional({ enum: ["card", "table"] })
+  @IsOptional()
+  @IsIn(["card", "table"])
+  standupLayoutPreference?: "card" | "table";
+
   @ApiPropertyOptional({
     nullable: true,
     description: "Required when preference is group; null clears preferred group",

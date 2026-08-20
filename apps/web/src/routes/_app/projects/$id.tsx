@@ -66,6 +66,7 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { useConfirmDialog } from "@/components/confirm-dialog"
+import { ProjectStandupsTab } from "@/components/standup/project-standups-tab"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -343,6 +344,7 @@ function ProjectDetailPage() {
           <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>
             <TabsList>
               <TabsTrigger value="team">Team</TabsTrigger>
+              <TabsTrigger value="standups">Stand-ups</TabsTrigger>
               <TabsTrigger value="extensions">Extensions</TabsTrigger>
               <TabsTrigger value="amc">AMC</TabsTrigger>
             </TabsList>
@@ -665,6 +667,10 @@ function ProjectDetailPage() {
               </Table>
             </CardContent>
           </Card>
+            </TabsContent>
+
+            <TabsContent value="standups" className="mt-4">
+              <ProjectStandupsTab projectId={id} />
             </TabsContent>
 
             <TabsContent value="extensions" className="mt-4 space-y-4">

@@ -71,6 +71,18 @@ enum StandupScopePreference {
   group
 }
 
+enum StandupLayoutPreference {
+  card
+  table
+}
+
+enum StandupTaskState {
+  open
+  done
+  tomorrow
+  progress
+}
+
 enum AuditAction {
   CLIENT_CREATED
   CLIENT_UPDATED
@@ -139,10 +151,11 @@ model User {
   isActive                 Boolean                @default(true)
   mustChangePassword       Boolean                @default(false)
   lastLoginAt              DateTime?
-  standupScopePreference   StandupScopePreference @default(ask)
+  standupScopePreference   StandupScopePreference   @default(ask)
+  standupLayoutPreference  StandupLayoutPreference  @default(card)
   standupPreferredGroupId  String?
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
 
   auditLogs               AuditLog[]               @relation("AuditActor")
   createdStandups         Standup[]                @relation("StandupCreator")
@@ -456,13 +469,13 @@ model Standup {
 }
 
 model StandupEntry {
-  id               String           @id @default(cuid())
-  standupId        String
-  employeeId       String
-  attendanceStatus AttendanceStatus @default(present)
-  notesMarkdown    String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
+  id                 String           @id @default(cuid())
+  standupId          String
+  employeeId         String
+  attendanceStatus   AttendanceStatus @default(present)
+  miscellaneousNotes String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
   standup     Standup             @relation(fields: [standupId], references: [id], onDelete: Cascade)
   employee    Employee            @relation(fields: [employeeId], references: [id])
@@ -473,17 +486,34 @@ model StandupEntry {
 }
 
 model ProjectAllocation {
-  id             String @id @default(cuid())
+  id             String  @id @default(cuid())
   standupEntryId String
   projectId      String
   percentage     Int
   isNonBillable  Boolean @default(false)
 
-  standupEntry StandupEntry @relation(fields: [standupEntryId], references: [id], onDelete: Cascade)
-  project      Project      @relation(fields: [projectId], references: [id])
+  standupEntry StandupEntry  @relation(fields: [standupEntryId], references: [id], onDelete: Cascade)
+  project      Project       @relation(fields: [projectId], references: [id])
+  tasks        StandupTask[]
 
   @@unique([standupEntryId, projectId])
   @@map("project_allocations")
+}
+
+model StandupTask {
+  id           String           @id @default(cuid())
+  allocationId String
+  text         String           @default("")
+  state        StandupTaskState @default(open)
+  blocker      String?
+  sortOrder    Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  allocation ProjectAllocation @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+
+  @@index([allocationId, sortOrder])
+  @@map("standup_tasks")
 }
 
 model AttendanceRecord {

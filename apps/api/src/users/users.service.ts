@@ -278,17 +278,18 @@ export class UsersService {
     userId: string,
     dto: {
       standupScopePreference?: "ask" | "everyone" | "group";
+      standupLayoutPreference?: "card" | "table";
       standupPreferredGroupId?: string | null;
     },
   ): Promise<UserResponseDto> {
+    const current = await this.findById(userId);
     const preference =
-      dto.standupScopePreference ??
-      (await this.findById(userId)).standupScopePreference;
+      dto.standupScopePreference ?? current.standupScopePreference;
 
     let preferredGroupId =
       dto.standupPreferredGroupId !== undefined
         ? dto.standupPreferredGroupId
-        : (await this.findById(userId)).standupPreferredGroupId;
+        : current.standupPreferredGroupId;
 
     if (preference === "ask" || preference === "everyone") {
       preferredGroupId = null;
@@ -313,6 +314,9 @@ export class UsersService {
       data: {
         standupScopePreference: preference,
         standupPreferredGroupId: preferredGroupId,
+        ...(dto.standupLayoutPreference
+          ? { standupLayoutPreference: dto.standupLayoutPreference }
+          : {}),
       },
       include: {
         standupPreferredGroup: { select: { id: true, name: true } },
@@ -351,6 +355,7 @@ export class UsersService {
       lastLoginAt: user.lastLoginAt,
       role: role ?? null,
       standupScopePreference: user.standupScopePreference,
+      standupLayoutPreference: user.standupLayoutPreference,
       standupPreferredGroupId: user.standupPreferredGroupId,
       standupPreferredGroup: user.standupPreferredGroup ?? null,
       createdAt: user.createdAt,

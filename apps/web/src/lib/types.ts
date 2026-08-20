@@ -180,7 +180,7 @@ export type Employee = {
   standupEntries?: Array<{
     id: string
     attendanceStatus: AttendanceStatus
-    notesMarkdown: string | null
+    miscellaneousNotes: string | null
     standup: { id: string; date: string; status: string }
     allocations: Array<{
       id: string
@@ -188,12 +188,23 @@ export type Employee = {
       percentage: number
       isNonBillable?: boolean
       project?: { id: string; name: string; status: string }
+      tasks?: StandupTask[]
     }>
   }>
   groups?: Array<{ id: string; name: string }>
 }
 
 export type StandupScopePreference = "ask" | "everyone" | "group"
+export type StandupLayoutPreference = "card" | "table"
+export type StandupTaskState = "open" | "done" | "tomorrow" | "progress"
+
+export type StandupTask = {
+  id: string
+  text: string
+  state: StandupTaskState
+  blocker: string | null
+  sortOrder?: number
+}
 
 export type EmployeeGroupMember = {
   employeeId: string
@@ -266,7 +277,7 @@ export type Standup = {
 export type StandupEntry = {
   id: string
   attendanceStatus: AttendanceStatus
-  notesMarkdown: string | null
+  miscellaneousNotes: string | null
   employee: {
     id: string
     name: string
@@ -285,6 +296,7 @@ export type StandupEntry = {
     percentage: number
     isNonBillable?: boolean
     project?: { id: string; name: string; status: string }
+    tasks?: StandupTask[]
   }>
 }
 
@@ -478,6 +490,7 @@ export type SystemUser = {
   lastLoginAt: string | null
   role: UserRole | string | null
   standupScopePreference?: "ask" | "everyone" | "group"
+  standupLayoutPreference?: StandupLayoutPreference
   standupPreferredGroupId?: string | null
   standupPreferredGroup?: { id: string; name: string } | null
   createdAt: string

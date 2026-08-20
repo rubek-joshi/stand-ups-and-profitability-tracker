@@ -20,6 +20,7 @@ export type {
   Standup,
   StandupEntry,
   ProjectAllocation,
+  StandupTask,
   AttendanceRecord,
   AmcRecord,
   VatClearance,
@@ -40,5 +41,7 @@ export {
   AmcType,
   AmcRenewalDecision,
   StandupScopePreference,
+  StandupLayoutPreference,
+  StandupTaskState,
   AuditAction,
 } from "./generated/prisma/client";

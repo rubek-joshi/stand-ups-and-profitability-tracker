@@ -177,12 +177,22 @@ export function ProjectAllocations({
   disabled,
   onChange,
 }: Props) {
+  const [query, setQuery] = React.useState("")
+  const [pickerOpen, setPickerOpen] = React.useState(false)
   const total = totalPercent(allocations)
   const selectedIds = new Set(allocations.map((a) => a.projectId))
   const projectById = React.useMemo(
     () => new Map(projects.map((p) => [p.id, p])),
     [projects],
   )
+  const filteredProjects = React.useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return projects
+    return projects.filter((project) => {
+      const hay = `${project.name} ${project.status}`.toLowerCase()
+      return hay.includes(q)
+    })
+  }, [projects, query])
 
   const toggleProject = (projectId: string) => {
     if (selectedIds.has(projectId)) {
@@ -235,7 +245,13 @@ export function ProjectAllocations({
         ) : null}
       </div>
 
-      <Popover>
+      <Popover
+        open={pickerOpen}
+        onOpenChange={(open) => {
+          setPickerOpen(open)
+          if (!open) setQuery("")
+        }}
+      >
         <PopoverTrigger
           disabled={disabled}
           className={cn(
@@ -249,11 +265,23 @@ export function ProjectAllocations({
             : `${allocations.length} project${allocations.length > 1 ? "s" : ""} · click to change`}
         </PopoverTrigger>
         <PopoverContent align="start" className="w-72 gap-0 p-1.5">
+          <div className="p-1 pb-1.5">
+            <Input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search projects…"
+              aria-label="Search projects"
+              className="h-8"
+              autoFocus
+            />
+          </div>
           <div className="max-h-64 space-y-0.5 overflow-y-auto">
-            {projects.length === 0 ? (
-              <p className="px-2 py-3 text-sm text-muted-foreground">No projects available</p>
+            {filteredProjects.length === 0 ? (
+              <p className="px-2 py-3 text-sm text-muted-foreground">
+                {projects.length === 0 ? "No projects available" : "No matching projects"}
+              </p>
             ) : (
-              projects.map((project) => {
+              filteredProjects.map((project) => {
                 const active = selectedIds.has(project.id)
                 const canSelect = active || canAddProject(allocations)
                 return (
@@ -297,90 +325,106 @@ export function ProjectAllocations({
             ))}
           </div>
 
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {allocations.map((a, i) => {
               const project = projectById.get(a.projectId)
               return (
-                <div key={a.projectId} className="flex items-center gap-2.5">
-                  <span
-                    className={cn(
-                      "size-2 shrink-0 rounded-full",
-                      barColors[i % barColors.length],
-                    )}
-                  />
-                  <span className="w-28 shrink-0 truncate text-sm sm:w-32">
-                    {project?.name ?? a.projectId}
-                  </span>
-                  <Slider
-                    value={[a.percentage]}
-                    min={0}
-                    max={100}
+                <div key={a.projectId} className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={cn(
+                        "size-2 shrink-0 rounded-full",
+                        barColors[i % barColors.length],
+                      )}
+                    />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                      {project?.name ?? a.projectId}
+                    </span>
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      disabled={disabled}
+                      title="Remove project"
+                      className="shrink-0 text-muted-foreground hover:text-destructive"
+                      onClick={() => toggleProject(a.projectId)}
+                    >
+                      <IconX className="size-3.5" />
+                    </Button>
+                  </div>
+                  <AllocationSlider
+                    percentage={a.percentage}
+                    locked={Boolean(a.locked)}
                     disabled={disabled}
-                    className="flex-1"
-                    onValueChange={(value) => {
-                      const next = Array.isArray(value) ? value[0] : value
-                      onChange(
-                        setAllocationPercent(allocations, a.projectId, Number(next) || 0),
-                      )
-                    }}
-                  />
-                  <Input
-                    type="number"
-                    min={MIN_ALLOCATION}
-                    max={100}
-                    disabled={disabled}
-                    value={a.percentage}
-                    onChange={(e) =>
-                      onChange(
-                        setAllocationPercent(
-                          allocations,
-                          a.projectId,
-                          Number(e.target.value),
-                        ),
-                      )
+                    onPercentageChange={(pctValue) =>
+                      onChange(setAllocationPercent(allocations, a.projectId, pctValue))
                     }
-                    className="h-8 w-16 text-center font-mono text-xs"
-                  />
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={disabled}
-                    title={a.locked ? "Unlock this percentage" : "Lock this percentage"}
-                    className={cn(a.locked && "text-primary")}
-                    onClick={() =>
+                    onLockedChange={(locked) =>
                       onChange(
                         allocations.map((x) =>
-                          x.projectId === a.projectId
-                            ? { ...x, locked: !x.locked }
-                            : x,
+                          x.projectId === a.projectId ? { ...x, locked } : x,
                         ),
                       )
                     }
-                  >
-                    {a.locked ? (
-                      <IconLock className="size-3.5" />
-                    ) : (
-                      <IconLockOpen className="size-3.5" />
-                    )}
-                  </Button>
-                  <Button
-                    type="button"
-                    size="icon-sm"
-                    variant="ghost"
-                    disabled={disabled}
-                    title="Remove project"
-                    className="text-muted-foreground hover:text-destructive"
-                    onClick={() => toggleProject(a.projectId)}
-                  >
-                    <IconX className="size-3.5" />
-                  </Button>
+                  />
                 </div>
               )
             })}
           </div>
         </>
-      ) : null}
+      ) : (
+        <p className="text-xs text-muted-foreground">
+          No projects allocated. Add at least one if status is Present.
+        </p>
+      )}
+    </div>
+  )
+}
+
+function AllocationSlider({
+  percentage,
+  locked,
+  disabled = false,
+  onPercentageChange,
+  onLockedChange,
+}: {
+  percentage: number
+  locked: boolean
+  disabled?: boolean
+  onPercentageChange: (percentage: number) => void
+  onLockedChange: (locked: boolean) => void
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-2 pl-4">
+      <Slider
+        value={[percentage]}
+        min={0}
+        max={100}
+        disabled={disabled}
+        className="min-w-0 flex-1"
+        onValueChange={(value) => {
+          const next = Array.isArray(value) ? value[0] : value
+          onPercentageChange(Number(next) || 0)
+        }}
+      />
+      <span className="w-9 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+        {percentage}%
+      </span>
+      <Button
+        type="button"
+        size="icon-sm"
+        variant="ghost"
+        disabled={disabled}
+        title={locked ? "Unlock this percentage" : "Lock this percentage"}
+        className={cn("shrink-0", locked && "text-primary")}
+        onClick={() => onLockedChange(!locked)}
+      >
+        {locked ? (
+          <IconLock className="size-3.5" />
+        ) : (
+          <IconLockOpen className="size-3.5" />
+        )}
+      </Button>
     </div>
   )
 }
