@@ -9,16 +9,58 @@ import {
   DialogTitle,
 } from "@workspace/ui/components/dialog"
 import { Kbd, KbdGroup } from "@workspace/ui/components/kbd"
+import {
+  formatShortcutKey,
+  isApplePlatform,
+  primaryModifierPressed,
+} from "@/lib/keyboard"
 import { useTheme } from "@/lib/theme"
 
 export const SHORTCUTS_FAB_BOTTOM_CLASS = "bottom-20 md:bottom-20"
 
-const SHORTCUTS: Array<{ keys: string[]; description: string }> = [
+const GLOBAL_SHORTCUTS: Array<{ keys: string[]; description: string }> = [
   { keys: ["Ctrl", "K"], description: "Open command palette" },
   { keys: ["Ctrl", "B"], description: "Toggle sidebar" },
   { keys: ["Ctrl", "J"], description: "Toggle light / dark mode" },
   { keys: ["Shift", "/"], description: "Show keyboard shortcuts" },
 ]
+
+const STANDUP_SHORTCUTS: Array<{ keys: string[]; description: string }> = [
+  { keys: ["Ctrl", "Enter"], description: "Next project / employee" },
+  { keys: ["Ctrl", "Shift", "V"], description: "Toggle card / table view" },
+  { keys: ["Ctrl", "Shift", "A"], description: "Toggle Absent / Present" },
+  { keys: ["Ctrl", "Shift", "N"], description: "Toggle miscellaneous notes" },
+  { keys: ["Ctrl", "Shift", "B"], description: "Add blocker to focused task" },
+  { keys: ["Alt", "P"], description: "Mark task in progress" },
+  { keys: ["Alt", "T"], description: "Move task to tomorrow" },
+  { keys: ["Alt", "Enter"], description: "Mark task complete" },
+]
+
+function ShortcutList({
+  shortcuts,
+  apple,
+}: {
+  shortcuts: Array<{ keys: string[]; description: string }>
+  apple: boolean
+}) {
+  return (
+    <ul className="flex flex-col gap-3">
+      {shortcuts.map((shortcut) => (
+        <li
+          key={shortcut.description}
+          className="flex items-center justify-between gap-4"
+        >
+          <span className="text-sm">{shortcut.description}</span>
+          <KbdGroup>
+            {shortcut.keys.map((key) => (
+              <Kbd key={key}>{formatShortcutKey(key, apple)}</Kbd>
+            ))}
+          </KbdGroup>
+        </li>
+      ))}
+    </ul>
+  )
+}
 
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false
@@ -27,24 +69,19 @@ function isEditableTarget(target: EventTarget | null) {
   return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT"
 }
 
-function modifierLabel() {
-  if (typeof navigator === "undefined") return "Ctrl"
-  return /Mac|iPhone|iPod|iPad/.test(navigator.platform) ? "⌘" : "Ctrl"
-}
-
 export function KeyboardShortcuts() {
   const { toggleTheme } = useTheme()
   const [open, setOpen] = React.useState(false)
-  const [modifier, setModifier] = React.useState("Ctrl")
+  const [apple, setApple] = React.useState(false)
 
   React.useEffect(() => {
-    setModifier(modifierLabel())
+    setApple(isApplePlatform())
   }, [])
 
   React.useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
-      const withModifier = event.ctrlKey || event.metaKey
+      const withModifier = primaryModifierPressed(event)
 
       if (withModifier && !event.altKey && !event.shiftKey && key === "j") {
         event.preventDefault()
@@ -90,24 +127,25 @@ export function KeyboardShortcuts() {
           <DialogHeader>
             <DialogTitle>Keyboard shortcuts</DialogTitle>
             <DialogDescription>
-              Global shortcuts available throughout the app.
+              {apple
+                ? "On Mac, Ctrl is ⌘, Alt is ⌥, and Shift is ⇧."
+                : "Shortcuts available in the app and on stand-up pages."}
             </DialogDescription>
           </DialogHeader>
-          <ul className="flex flex-col gap-3">
-            {SHORTCUTS.map((shortcut) => (
-              <li
-                key={shortcut.description}
-                className="flex items-center justify-between gap-4"
-              >
-                <span className="text-sm">{shortcut.description}</span>
-                <KbdGroup>
-                  {shortcut.keys.map((key) => (
-                    <Kbd key={key}>{key === "Ctrl" ? modifier : key}</Kbd>
-                  ))}
-                </KbdGroup>
-              </li>
-            ))}
-          </ul>
+          <div className="flex flex-col gap-5">
+            <section className="space-y-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Global
+              </h3>
+              <ShortcutList shortcuts={GLOBAL_SHORTCUTS} apple={apple} />
+            </section>
+            <section className="space-y-3">
+              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Stand-up page
+              </h3>
+              <ShortcutList shortcuts={STANDUP_SHORTCUTS} apple={apple} />
+            </section>
+          </div>
         </DialogContent>
       </Dialog>
     </>

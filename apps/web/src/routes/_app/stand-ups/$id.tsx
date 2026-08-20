@@ -47,12 +47,16 @@ import {
 } from "@/components/standup/entry-draft"
 import { StandupCardView } from "@/components/standup/standup-card-view"
 import { StandupTableView } from "@/components/standup/table-view"
+import { advanceStandupFocus } from "@/components/standup/standup-focus-nav"
+import { toggleMiscellaneousNotes } from "@/components/standup/miscellaneous-notes-toggle"
 import {
   rebalance,
   type DraftAlloc,
 } from "@/components/standup/project-allocations"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { primaryModifierPressed } from "@/lib/keyboard"
+import { toast } from "@workspace/ui/components/toast"
 import * as Y from "yjs"
 import {
   connectStandupCollab,
@@ -476,6 +480,7 @@ function StandupDetailPage() {
   const entriesMapRef = React.useRef<Y.Map<string> | null>(null)
   const draftsRef = React.useRef(drafts)
   draftsRef.current = drafts
+  const visibleEntriesRef = React.useRef<Array<{ id: string }>>([])
 
   const readonly = standup?.status === "completed"
   const isDirty =
@@ -681,6 +686,8 @@ function StandupDetailPage() {
     },
     [],
   )
+  const handleDraftChangeRef = React.useRef(handleDraftChange)
+  handleDraftChangeRef.current = handleDraftChange
 
   const changeLayout = React.useCallback(
     async (next: StandupLayoutPreference) => {
@@ -697,6 +704,90 @@ function StandupDetailPage() {
     },
     [refreshUser],
   )
+  const layoutRef = React.useRef(layout)
+  layoutRef.current = layout
+  const changeLayoutRef = React.useRef(changeLayout)
+  changeLayoutRef.current = changeLayout
+
+  React.useEffect(() => {
+    const isDialogTarget = (target: EventTarget | null) =>
+      target instanceof Element &&
+      Boolean(
+        target.closest('[role="dialog"], [data-slot="alert-dialog-content"]'),
+      )
+
+    const currentEntryId = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return null
+      return target.closest("[data-standup-entry]")?.getAttribute("data-standup-entry")
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.repeat) return
+      if (event.altKey) return
+      if (isDialogTarget(event.target)) return
+
+      const mod = primaryModifierPressed(event)
+      const key = event.key.toLowerCase()
+
+      // Ctrl+Shift+V → toggle card / table view (works even when readonly)
+      if (mod && event.shiftKey && key === "v") {
+        event.preventDefault()
+        event.stopPropagation()
+        void changeLayoutRef.current(
+          layoutRef.current === "table" ? "card" : "table",
+        )
+        return
+      }
+
+      if (readonly) return
+
+      // Ctrl+Enter → next project / employee
+      if (mod && !event.shiftKey && event.key === "Enter") {
+        event.preventDefault()
+        event.stopPropagation()
+        const moved = advanceStandupFocus(
+          visibleEntriesRef.current,
+          draftsRef.current,
+          event.target,
+        )
+        if (!moved) {
+          toast.add({
+            title: "Reached the end",
+            type: "info",
+          })
+        }
+        return
+      }
+
+      // Ctrl+Shift+A → toggle Absent / Present for current employee
+      if (mod && event.shiftKey && key === "a") {
+        const entryId = currentEntryId(event.target)
+        if (!entryId) return
+        const draft = draftsRef.current[entryId]
+        if (!draft) return
+        event.preventDefault()
+        event.stopPropagation()
+        handleDraftChangeRef.current(entryId, {
+          ...draft,
+          attendanceStatus:
+            draft.attendanceStatus === "absent" ? "present" : "absent",
+        })
+        return
+      }
+
+      // Ctrl+Shift+N → toggle miscellaneous notes for current employee
+      if (mod && event.shiftKey && key === "n") {
+        const entryId = currentEntryId(event.target)
+        if (!entryId) return
+        event.preventDefault()
+        event.stopPropagation()
+        toggleMiscellaneousNotes(entryId)
+      }
+    }
+
+    window.addEventListener("keydown", onKeyDown, true)
+    return () => window.removeEventListener("keydown", onKeyDown, true)
+  }, [readonly])
 
   const leaveDialog = (
     <AlertDialog
@@ -887,6 +978,8 @@ function StandupDetailPage() {
   const hiddenGroupCount = groupFilterActive
     ? entries.filter((e) => !groupMemberIds.has(e.employee.id)).length
     : 0
+
+  visibleEntriesRef.current = visible
 
   const scopedEntries = groupFilterActive
     ? entries.filter((e) => groupMemberIds.has(e.employee.id))

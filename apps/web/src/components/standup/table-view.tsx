@@ -102,7 +102,7 @@ export function StandupTableView({
                     draft.allocations.map((a) => {
                       const project = projects.find((p) => p.id === a.projectId)
                       return (
-                        <section key={a.projectId}>
+                        <section key={a.projectId} data-standup-project={a.projectId}>
                           <div className="mb-1 flex items-center gap-2 border-b pb-1">
                             <span
                               className="size-2 rounded-full"

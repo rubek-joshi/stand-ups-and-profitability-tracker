@@ -48,9 +48,9 @@ type Props = {
 
 const standupNotesEditors = new Map<string, LexicalEditor>()
 
-export function focusStandupNotes(entryId: string) {
+export function focusStandupNotes(entryId: string): boolean {
   const editor = standupNotesEditors.get(entryId)
-  if (!editor) return
+  if (!editor) return false
   editor.getRootElement()?.scrollIntoView({ block: "center", behavior: "auto" })
   const focusEditor = () => {
     editor.focus(
@@ -63,6 +63,7 @@ export function focusStandupNotes(entryId: string) {
     )
   }
   window.setTimeout(focusEditor, 0)
+  return true
 }
 
 function RegisterStandupNotesEditor({ editorKey }: { editorKey: string }) {

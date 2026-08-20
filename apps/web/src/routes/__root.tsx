@@ -3,6 +3,7 @@ import { AuthProvider } from "@/lib/auth"
 import { PAGE_CONTAINER_CLASS } from "@/lib/layout"
 import { ThemeProvider, themeInitScript } from "@/lib/theme"
 import { cn } from "@workspace/ui/lib/utils"
+import { Toaster } from "@workspace/ui/components/toast"
 
 import appCss from "@workspace/ui/globals.css?url"
 
@@ -28,9 +29,11 @@ export const Route = createRootRoute({
 function RootComponent() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <Outlet />
-      </AuthProvider>
+      <Toaster>
+        <AuthProvider>
+          <Outlet />
+        </AuthProvider>
+      </Toaster>
     </ThemeProvider>
   )
 }
