@@ -11,6 +11,7 @@ export type AuthUser = {
   role?: string | null
   standupScopePreference?: "ask" | "everyone" | "group"
   standupLayoutPreference?: "card" | "table"
+  standupProjectAccentPreference?: "off" | "muted" | "on"
   standupPreferredGroupId?: string | null
   standupPreferredGroup?: { id: string; name: string } | null
   createdAt?: string

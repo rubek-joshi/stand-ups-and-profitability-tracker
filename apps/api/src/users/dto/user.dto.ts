@@ -118,6 +118,11 @@ export class UpdateMyPreferencesDto {
   @IsIn(["card", "table"])
   standupLayoutPreference?: "card" | "table";
 
+  @ApiPropertyOptional({ enum: ["off", "muted", "on"] })
+  @IsOptional()
+  @IsIn(["off", "muted", "on"])
+  standupProjectAccentPreference?: "off" | "muted" | "on";
+
   @ApiPropertyOptional({
     nullable: true,
     description: "Required when preference is group; null clears preferred group",

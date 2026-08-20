@@ -32,6 +32,7 @@ import { useTheme } from "@/lib/theme"
 import type {
   EmployeeGroup,
   StandupLayoutPreference,
+  StandupProjectAccentPreference,
   StandupScopePreference,
 } from "@/lib/types"
 
@@ -71,6 +72,8 @@ function ProfilePage() {
     React.useState<StandupScopePreference>("ask")
   const [layoutPreference, setLayoutPreference] =
     React.useState<StandupLayoutPreference>("card")
+  const [accentPreference, setAccentPreference] =
+    React.useState<StandupProjectAccentPreference>("muted")
   const [groupId, setGroupId] = React.useState("")
   const [loadingGroups, setLoadingGroups] = React.useState(true)
   const [savingName, setSavingName] = React.useState(false)
@@ -84,6 +87,7 @@ function ProfilePage() {
     if (!editingName) setName(user.name)
     setPreference(user.standupScopePreference ?? "ask")
     setLayoutPreference(user.standupLayoutPreference ?? "card")
+    setAccentPreference(user.standupProjectAccentPreference ?? "muted")
     setGroupId(user.standupPreferredGroupId ?? "")
   }, [user, editingName])
 
@@ -324,6 +328,7 @@ function ProfilePage() {
                         body: {
                           standupScopePreference: preference,
                           standupLayoutPreference: layoutPreference,
+                          standupProjectAccentPreference: accentPreference,
                           standupPreferredGroupId:
                             preference === "group" ? groupId : null,
                         },
@@ -412,6 +417,47 @@ function ProfilePage() {
                           }`}
                         >
                           {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-2">
+                    <Label>Project accents</Label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(
+                        [
+                          {
+                            id: "off" as const,
+                            label: "Off",
+                            hint: "Dots only",
+                          },
+                          {
+                            id: "muted" as const,
+                            label: "Muted",
+                            hint: "Soft hues",
+                          },
+                          {
+                            id: "on" as const,
+                            label: "On",
+                            hint: "Full colors",
+                          },
+                        ] as const
+                      ).map((opt) => (
+                        <button
+                          key={opt.id}
+                          type="button"
+                          onClick={() => setAccentPreference(opt.id)}
+                          className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
+                            accentPreference === opt.id
+                              ? "border-primary bg-primary/10 font-medium"
+                              : "border-border hover:bg-muted"
+                          }`}
+                        >
+                          <span className="block">{opt.label}</span>
+                          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                            {opt.hint}
+                          </span>
                         </button>
                       ))}
                     </div>

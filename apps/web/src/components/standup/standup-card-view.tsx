@@ -1,5 +1,6 @@
 import { cn } from "@workspace/ui/lib/utils"
 import type { AttendanceStatus, Project, StandupEntry } from "@/lib/types"
+import { useAuth } from "@/lib/auth"
 import {
   ATTENDANCE_META,
   isWorking,
@@ -27,6 +28,8 @@ export function StandupCardView({
   readonly,
   onDraftChange,
 }: Props) {
+  const { user } = useAuth()
+  const accentPreference = user?.standupProjectAccentPreference ?? "muted"
   return (
     <div className="space-y-5">
       {entries.map((entry) => {
@@ -96,7 +99,11 @@ export function StandupCardView({
                         <span
                           className="size-2 rounded-full"
                           style={{
-                            backgroundColor: projectColor(a.projectId, projects),
+                            backgroundColor: projectColor(
+                              a.projectId,
+                              projects,
+                              accentPreference,
+                            ),
                           }}
                           aria-hidden
                         />

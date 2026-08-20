@@ -76,6 +76,12 @@ enum StandupLayoutPreference {
   table
 }
 
+enum StandupProjectAccentPreference {
+  off
+  muted
+  on
+}
+
 enum StandupTaskState {
   open
   done
@@ -153,6 +159,7 @@ model User {
   lastLoginAt              DateTime?
   standupScopePreference   StandupScopePreference   @default(ask)
   standupLayoutPreference  StandupLayoutPreference  @default(card)
+  standupProjectAccentPreference StandupProjectAccentPreference @default(muted)
   standupPreferredGroupId  String?
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt

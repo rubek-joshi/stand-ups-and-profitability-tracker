@@ -22,7 +22,11 @@ import {
 } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import type { Project } from "@/lib/types"
-import { DEFAULT_PROJECT_THEME_COLOR } from "./entry-draft"
+import { useAuth } from "@/lib/auth"
+import {
+  DEFAULT_PROJECT_THEME_COLOR,
+  resolveProjectAccent,
+} from "./entry-draft"
 
 export type DraftAlloc = {
   projectId: string
@@ -40,8 +44,16 @@ type Props = {
 
 const MIN_ALLOCATION = 1
 
-function projectAccent(project: Project | undefined) {
-  return project?.themeColor?.trim() || DEFAULT_PROJECT_THEME_COLOR
+function projectAccent(
+  project: Project | undefined,
+  preference: "off" | "muted" | "on",
+  surface: "dot" | "bar" = "dot",
+) {
+  return resolveProjectAccent(
+    project?.themeColor?.trim() || DEFAULT_PROJECT_THEME_COLOR,
+    preference,
+    surface,
+  )
 }
 
 function pct(allocation: DraftAlloc) {
@@ -198,6 +210,8 @@ export function ProjectAllocations({
   disabled,
   onChange,
 }: Props) {
+  const { user } = useAuth()
+  const accentPreference = user?.standupProjectAccentPreference ?? "muted"
   const [query, setQuery] = React.useState("")
   const [pickerOpen, setPickerOpen] = React.useState(false)
   const total = totalPercent(allocations)
@@ -352,7 +366,7 @@ export function ProjectAllocations({
 
       {allocations.length > 0 ? (
         <>
-          <div className="flex h-2 overflow-hidden rounded-full bg-muted">
+          <div className="flex h-1.5 overflow-hidden rounded-full bg-muted">
             {allocations.map((a) => {
               const project = projectById.get(a.projectId)
               return (
@@ -361,7 +375,11 @@ export function ProjectAllocations({
                   className="h-full transition-all"
                   style={{
                     width: `${Math.max(0, a.percentage)}%`,
-                    backgroundColor: projectAccent(project),
+                    backgroundColor: projectAccent(
+                      project,
+                      accentPreference,
+                      "bar",
+                    ),
                   }}
                 />
               )
@@ -376,7 +394,13 @@ export function ProjectAllocations({
                   <div className="flex items-center gap-2">
                     <span
                       className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: projectAccent(project) }}
+                      style={{
+                        backgroundColor: projectAccent(
+                          project,
+                          accentPreference,
+                          "dot",
+                        ),
+                      }}
                     />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {project?.name ?? a.projectId}
@@ -397,7 +421,6 @@ export function ProjectAllocations({
                     percentage={a.percentage}
                     locked={Boolean(a.locked)}
                     disabled={disabled}
-                    accentColor={projectAccent(project)}
                     onPercentageChange={(pctValue) =>
                       onChange(
                         setAllocationPercent(allocations, a.projectId, pctValue)
@@ -429,14 +452,12 @@ function AllocationSlider({
   percentage,
   locked,
   disabled = false,
-  accentColor,
   onPercentageChange,
   onLockedChange,
 }: {
   percentage: number
   locked: boolean
   disabled?: boolean
-  accentColor: string
   onPercentageChange: (percentage: number) => void
   onLockedChange: (locked: boolean) => void
 }) {
@@ -448,14 +469,6 @@ function AllocationSlider({
         max={100}
         disabled={disabled}
         className="min-w-0 flex-1"
-        style={
-          {
-            "--primary": accentColor,
-            "--color-primary": accentColor,
-            "--ring": accentColor,
-            "--color-ring": accentColor,
-          } as React.CSSProperties
-        }
         onValueChange={(value) => {
           const next = Array.isArray(value) ? value[0] : value
           onPercentageChange(Number(next) || 0)
@@ -471,14 +484,6 @@ function AllocationSlider({
         disabled={disabled}
         title={locked ? "Unlock this percentage" : "Lock this percentage"}
         className={cn("shrink-0", locked && "text-primary")}
-        style={
-          locked
-            ? ({
-                "--primary": accentColor,
-                "--color-primary": accentColor,
-              } as React.CSSProperties)
-            : undefined
-        }
         onClick={() => onLockedChange(!locked)}
       >
         {locked ? (

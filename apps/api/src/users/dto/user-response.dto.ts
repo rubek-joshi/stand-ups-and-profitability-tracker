@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
   StandupLayoutPreference,
+  StandupProjectAccentPreference,
   StandupScopePreference,
 } from "@workspace/database";
 
@@ -31,6 +32,9 @@ export class UserResponseDto {
 
   @ApiProperty({ enum: StandupLayoutPreference })
   standupLayoutPreference!: StandupLayoutPreference;
+
+  @ApiProperty({ enum: StandupProjectAccentPreference })
+  standupProjectAccentPreference!: StandupProjectAccentPreference;
 
   @ApiPropertyOptional({ nullable: true, type: String })
   standupPreferredGroupId!: string | null;

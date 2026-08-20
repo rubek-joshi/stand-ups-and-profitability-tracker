@@ -1,4 +1,9 @@
-import type { AttendanceStatus, Project, StandupEntry } from "@/lib/types"
+import type {
+  AttendanceStatus,
+  Project,
+  StandupEntry,
+  StandupProjectAccentPreference,
+} from "@/lib/types"
 import { type DraftAlloc } from "./project-allocations"
 import { tasksFromApi, type TaskDraft } from "./task-editor"
 
@@ -156,7 +161,34 @@ export function withPreservedTasks(
 /** App primary teal as hex — default project accent for stand-ups. */
 export const DEFAULT_PROJECT_THEME_COLOR = "#168A6F"
 
-export function projectColor(projectId: string, projects: Project[]) {
+/**
+ * Soften a stored theme hex for stand-up UI: keep hue, pull lightness toward a
+ * calm mid tone and cut chroma so accents stay identifiable without shouting.
+ */
+export function softProjectAccent(color: string) {
+  const hex = color.trim() || DEFAULT_PROJECT_THEME_COLOR
+  return `oklch(from ${hex} 0.6 calc(c * 0.7) h)`
+}
+
+export function resolveProjectAccent(
+  color: string | null | undefined,
+  preference: StandupProjectAccentPreference = "muted",
+  surface: "dot" | "bar" = "dot",
+) {
+  const hex = color?.trim() || DEFAULT_PROJECT_THEME_COLOR
+  if (preference === "off") {
+    // Dots keep project identity; the allocation bar stays on semantic primary.
+    return surface === "bar" ? "var(--primary)" : hex
+  }
+  if (preference === "on") return hex
+  return softProjectAccent(hex)
+}
+
+export function projectColor(
+  projectId: string,
+  projects: Project[],
+  preference: StandupProjectAccentPreference = "muted",
+) {
   const project = projects.find((p) => p.id === projectId)
-  return project?.themeColor?.trim() || DEFAULT_PROJECT_THEME_COLOR
+  return resolveProjectAccent(project?.themeColor, preference, "dot")
 }

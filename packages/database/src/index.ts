@@ -42,6 +42,7 @@ export {
   AmcRenewalDecision,
   StandupScopePreference,
   StandupLayoutPreference,
+  StandupProjectAccentPreference,
   StandupTaskState,
   AuditAction,
 } from "./generated/prisma/client";

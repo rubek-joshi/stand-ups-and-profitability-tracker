@@ -198,6 +198,7 @@ export type Employee = {
 
 export type StandupScopePreference = "ask" | "everyone" | "group"
 export type StandupLayoutPreference = "card" | "table"
+export type StandupProjectAccentPreference = "off" | "muted" | "on"
 export type StandupTaskState = "open" | "done" | "tomorrow" | "progress"
 
 export type StandupTask = {
@@ -493,6 +494,7 @@ export type SystemUser = {
   role: UserRole | string | null
   standupScopePreference?: "ask" | "everyone" | "group"
   standupLayoutPreference?: StandupLayoutPreference
+  standupProjectAccentPreference?: StandupProjectAccentPreference
   standupPreferredGroupId?: string | null
   standupPreferredGroup?: { id: string; name: string } | null
   createdAt: string

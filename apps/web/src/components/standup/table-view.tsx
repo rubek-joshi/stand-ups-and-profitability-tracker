@@ -1,5 +1,6 @@
 import { cn } from "@workspace/ui/lib/utils"
 import type { AttendanceStatus, Project, StandupEntry } from "@/lib/types"
+import { useAuth } from "@/lib/auth"
 import {
   ATTENDANCE_META,
   isWorking,
@@ -27,11 +28,13 @@ export function StandupTableView({
   readonly,
   onDraftChange,
 }: Props) {
+  const { user } = useAuth()
+  const accentPreference = user?.standupProjectAccentPreference ?? "muted"
   return (
     <div className="overflow-x-auto rounded-xl border border-border bg-card">
-      <table className="w-full min-w-[48rem] border-collapse text-left">
+      <table className="w-full min-w-3xl border-collapse text-left">
         <thead>
-          <tr className="border-b border-border bg-secondary/60 text-[0.7rem] uppercase tracking-widest text-muted-foreground">
+          <tr className="border-b border-border bg-secondary/60 text-[0.7rem] tracking-widest text-muted-foreground uppercase">
             <th className="w-48 px-4 py-3 font-medium">Employee</th>
             <th className="w-44 px-4 py-3 font-medium">Status</th>
             <th className="w-52 px-3 py-3 font-medium">Projects</th>
@@ -48,7 +51,7 @@ export function StandupTableView({
               <tr
                 key={entry.id}
                 data-standup-entry={entry.id}
-                className="align-top border-t-2 border-border"
+                className="border-t-2 border-border align-top"
               >
                 <td className="border-r px-4 py-3">
                   <p className="text-base leading-tight font-semibold text-foreground">
@@ -60,8 +63,8 @@ export function StandupTableView({
                   {disabled && !readonly && (
                     <span
                       className={cn(
-                        "mt-2 inline-block rounded-full px-2 py-0.5 text-[0.65rem] font-medium uppercase tracking-wide text-background",
-                        meta.colorClass,
+                        "mt-2 inline-block rounded-full px-2 py-0.5 text-[0.65rem] font-medium tracking-wide text-background uppercase",
+                        meta.colorClass
                       )}
                     >
                       {meta.label}
@@ -88,7 +91,10 @@ export function StandupTableView({
                     onChange={(next) =>
                       onDraftChange(entry.id, {
                         ...draft,
-                        allocations: withPreservedTasks(draft.allocations, next),
+                        allocations: withPreservedTasks(
+                          draft.allocations,
+                          next
+                        ),
                       })
                     }
                   />
@@ -102,12 +108,19 @@ export function StandupTableView({
                     draft.allocations.map((a) => {
                       const project = projects.find((p) => p.id === a.projectId)
                       return (
-                        <section key={a.projectId} data-standup-project={a.projectId}>
+                        <section
+                          key={a.projectId}
+                          data-standup-project={a.projectId}
+                        >
                           <div className="mb-1 flex items-center gap-2 border-b pb-1">
                             <span
                               className="size-2 rounded-full"
                               style={{
-                                backgroundColor: projectColor(a.projectId, projects),
+                                backgroundColor: projectColor(
+                                  a.projectId,
+                                  projects,
+                                  accentPreference,
+                                ),
                               }}
                               aria-hidden
                             />
@@ -127,7 +140,7 @@ export function StandupTableView({
                                 allocations: draft.allocations.map((item) =>
                                   item.projectId === a.projectId
                                     ? { ...item, tasks }
-                                    : item,
+                                    : item
                                 ),
                               })
                             }

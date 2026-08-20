@@ -279,6 +279,7 @@ export class UsersService {
     dto: {
       standupScopePreference?: "ask" | "everyone" | "group";
       standupLayoutPreference?: "card" | "table";
+      standupProjectAccentPreference?: "off" | "muted" | "on";
       standupPreferredGroupId?: string | null;
     },
   ): Promise<UserResponseDto> {
@@ -316,6 +317,12 @@ export class UsersService {
         standupPreferredGroupId: preferredGroupId,
         ...(dto.standupLayoutPreference
           ? { standupLayoutPreference: dto.standupLayoutPreference }
+          : {}),
+        ...(dto.standupProjectAccentPreference
+          ? {
+              standupProjectAccentPreference:
+                dto.standupProjectAccentPreference,
+            }
           : {}),
       },
       include: {
@@ -356,6 +363,7 @@ export class UsersService {
       role: role ?? null,
       standupScopePreference: user.standupScopePreference,
       standupLayoutPreference: user.standupLayoutPreference,
+      standupProjectAccentPreference: user.standupProjectAccentPreference,
       standupPreferredGroupId: user.standupPreferredGroupId,
       standupPreferredGroup: user.standupPreferredGroup ?? null,
       createdAt: user.createdAt,
