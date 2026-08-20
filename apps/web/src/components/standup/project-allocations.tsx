@@ -1,5 +1,11 @@
 import * as React from "react"
-import { IconCheck, IconLock, IconLockOpen, IconRotate, IconX } from "@tabler/icons-react"
+import {
+  IconCheck,
+  IconLock,
+  IconLockOpen,
+  IconSeparatorVertical,
+  IconX,
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Badge } from "@workspace/ui/components/badge"
 import { Input } from "@workspace/ui/components/input"
@@ -9,6 +15,11 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
 import { Slider } from "@workspace/ui/components/slider"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
 import type { Project } from "@/lib/types"
 import { DEFAULT_PROJECT_THEME_COLOR } from "./entry-draft"
@@ -73,7 +84,7 @@ export function rebalance(allocations: DraftAlloc[]): DraftAlloc[] {
 function takeFromUnlocked(
   allocations: DraftAlloc[],
   amount: number,
-  exceptId?: string,
+  exceptId?: string
 ): { allocations: DraftAlloc[]; taken: number } {
   if (amount <= 0) return { allocations, taken: 0 }
 
@@ -86,7 +97,10 @@ function takeFromUnlocked(
   while (taken < amount) {
     const donors = donorIds
       .filter((id) => (percents.get(id) ?? 0) > MIN_ALLOCATION)
-      .sort((a, b) => (percents.get(b) ?? 0) - (percents.get(a) ?? 0) || a.localeCompare(b))
+      .sort(
+        (a, b) =>
+          (percents.get(b) ?? 0) - (percents.get(a) ?? 0) || a.localeCompare(b)
+      )
     if (donors.length === 0) break
     const donor = donors[0]!
     percents.set(donor, (percents.get(donor) ?? 0) - 1)
@@ -105,7 +119,7 @@ function takeFromUnlocked(
 export function setAllocationPercent(
   allocations: DraftAlloc[],
   projectId: string,
-  percent: number,
+  percent: number
 ): DraftAlloc[] {
   const current = allocations.find((a) => a.projectId === projectId)
   if (!current) return allocations
@@ -116,13 +130,13 @@ export function setAllocationPercent(
     MIN_ALLOCATION,
     Math.min(
       maxPercentFor(allocations, projectId),
-      Number.isFinite(raw) ? Math.round(raw) : from,
-    ),
+      Number.isFinite(raw) ? Math.round(raw) : from
+    )
   )
 
   if (desired <= from) {
     return allocations.map((a) =>
-      a.projectId === projectId ? { ...a, percentage: desired } : a,
+      a.projectId === projectId ? { ...a, percentage: desired } : a
     )
   }
 
@@ -130,17 +144,17 @@ export function setAllocationPercent(
   const want = desired - from
   const fromPool = Math.min(want, unallocated)
   const raised = allocations.map((a) =>
-    a.projectId === projectId ? { ...a, percentage: from + fromPool } : a,
+    a.projectId === projectId ? { ...a, percentage: from + fromPool } : a
   )
   const { allocations: stolen, taken } = takeFromUnlocked(
     raised,
     want - fromPool,
-    projectId,
+    projectId
   )
   return stolen.map((a) =>
     a.projectId === projectId
       ? { ...a, percentage: from + fromPool + taken }
-      : a,
+      : a
   )
 }
 
@@ -154,15 +168,26 @@ function canAddProject(allocations: DraftAlloc[]) {
   return allocations.some((a) => !a.locked && pct(a) > MIN_ALLOCATION)
 }
 
-function addProject(allocations: DraftAlloc[], projectId: string): DraftAlloc[] {
-  const next = [...allocations, { projectId, percentage: MIN_ALLOCATION, locked: false }]
+function addProject(
+  allocations: DraftAlloc[],
+  projectId: string
+): DraftAlloc[] {
+  const next = [
+    ...allocations,
+    { projectId, percentage: MIN_ALLOCATION, locked: false },
+  ]
   const unlockedCount = next.filter((a) => !a.locked).length
-  const lockedTotal = next.filter((a) => a.locked).reduce((sum, a) => sum + pct(a), 0)
+  const lockedTotal = next
+    .filter((a) => a.locked)
+    .reduce((sum, a) => sum + pct(a), 0)
   const remaining = Math.max(0, 100 - lockedTotal)
   if (unlockedCount > 0 && remaining >= unlockedCount * MIN_ALLOCATION) {
     return rebalance(next)
   }
-  const { allocations: reduced, taken } = takeFromUnlocked(allocations, MIN_ALLOCATION)
+  const { allocations: reduced, taken } = takeFromUnlocked(
+    allocations,
+    MIN_ALLOCATION
+  )
   if (taken < MIN_ALLOCATION) return allocations
   return [...reduced, { projectId, percentage: MIN_ALLOCATION, locked: false }]
 }
@@ -179,7 +204,7 @@ export function ProjectAllocations({
   const selectedIds = new Set(allocations.map((a) => a.projectId))
   const projectById = React.useMemo(
     () => new Map(projects.map((p) => [p.id, p])),
-    [projects],
+    [projects]
   )
   const filteredProjects = React.useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -199,9 +224,11 @@ export function ProjectAllocations({
   }
 
   return (
-    <div className={cn("space-y-3", disabled && "pointer-events-none opacity-50")}>
+    <div
+      className={cn("space-y-3", disabled && "pointer-events-none opacity-50")}
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <span className="text-[11px] font-medium tracking-wide text-muted-foreground uppercase">
           Projects
         </span>
         <Badge
@@ -214,7 +241,7 @@ export function ProjectAllocations({
                 ? "border-emerald-600/30 text-emerald-700 dark:text-emerald-400"
                 : total > 100
                   ? "border-destructive/40 text-destructive"
-                  : "border-amber-600/30 text-amber-700 dark:text-amber-400",
+                  : "border-amber-600/30 text-amber-700 dark:text-amber-400"
           )}
         >
           {allocations.length === 0
@@ -226,18 +253,29 @@ export function ProjectAllocations({
                 : `${total}% allocated`}
         </Badge>
         {allocations.some((a) => a.locked) ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="ghost"
-            className="h-7 gap-1 px-1.5 text-[11px]"
-            onClick={() =>
-              onChange(rebalance(allocations.map((a) => ({ ...a, locked: false }))))
-            }
-          >
-            <IconRotate className="size-3" />
-            Split evenly
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  aria-label="Split evenly"
+                  className="size-7 px-0"
+                  onClick={() =>
+                    onChange(
+                      rebalance(
+                        allocations.map((a) => ({ ...a, locked: false })),
+                      ),
+                    )
+                  }
+                />
+              }
+            >
+              <IconSeparatorVertical className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>Split evenly</TooltipContent>
+          </Tooltip>
         ) : null}
       </div>
 
@@ -253,7 +291,7 @@ export function ProjectAllocations({
           className={cn(
             "flex w-full rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-left text-sm text-muted-foreground transition-colors",
             "hover:border-primary/50 hover:text-foreground",
-            "disabled:pointer-events-none disabled:opacity-50",
+            "disabled:pointer-events-none disabled:opacity-50"
           )}
         >
           {allocations.length === 0
@@ -274,7 +312,9 @@ export function ProjectAllocations({
           <div className="max-h-64 space-y-0.5 overflow-y-auto">
             {filteredProjects.length === 0 ? (
               <p className="px-2 py-3 text-sm text-muted-foreground">
-                {projects.length === 0 ? "No projects available" : "No matching projects"}
+                {projects.length === 0
+                  ? "No projects available"
+                  : "No matching projects"}
               </p>
             ) : (
               filteredProjects.map((project) => {
@@ -289,13 +329,14 @@ export function ProjectAllocations({
                     className={cn(
                       "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted",
                       active && "bg-muted",
-                      !canSelect && "cursor-not-allowed opacity-50",
+                      !canSelect && "cursor-not-allowed opacity-50"
                     )}
                   >
                     <span
                       className={cn(
                         "flex size-4 items-center justify-center rounded border",
-                        active && "border-primary bg-primary text-primary-foreground",
+                        active &&
+                          "border-primary bg-primary text-primary-foreground"
                       )}
                     >
                       {active ? <IconCheck className="size-3" /> : null}
@@ -357,13 +398,15 @@ export function ProjectAllocations({
                     locked={Boolean(a.locked)}
                     disabled={disabled}
                     onPercentageChange={(pctValue) =>
-                      onChange(setAllocationPercent(allocations, a.projectId, pctValue))
+                      onChange(
+                        setAllocationPercent(allocations, a.projectId, pctValue)
+                      )
                     }
                     onLockedChange={(locked) =>
                       onChange(
                         allocations.map((x) =>
-                          x.projectId === a.projectId ? { ...x, locked } : x,
-                        ),
+                          x.projectId === a.projectId ? { ...x, locked } : x
+                        )
                       )
                     }
                   />
@@ -407,7 +450,7 @@ function AllocationSlider({
           onPercentageChange(Number(next) || 0)
         }}
       />
-      <span className="w-9 shrink-0 text-right font-mono text-xs tabular-nums text-muted-foreground">
+      <span className="w-9 shrink-0 text-right font-mono text-xs text-muted-foreground tabular-nums">
         {percentage}%
       </span>
       <Button
