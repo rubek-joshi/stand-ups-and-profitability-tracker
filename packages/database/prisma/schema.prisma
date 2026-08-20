@@ -265,6 +265,8 @@ model Project {
   id              String        @id @default(cuid())
   clientId        String
   name            String
+  /** Hex color (#RRGGBB) used as the project accent in stand-ups. */
+  themeColor      String        @default("#168A6F")
   budgetPaisa     BigInt
   startDate       DateTime      @db.Date
   endDate         DateTime      @db.Date

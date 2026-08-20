@@ -17,6 +17,8 @@ import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import { parseNprInput, paisaToNpr } from "@/lib/money"
 import type { Category, Project } from "@/lib/types"
 import { Switch } from "@workspace/ui/components/switch"
+import { ProjectThemeColorField } from "@/components/project-theme-color-field"
+import { DEFAULT_PROJECT_THEME_COLOR } from "@/components/standup/entry-draft"
 
 export const Route = createFileRoute("/_app/projects/$id_/edit")({
   component: ProjectEditPage,
@@ -33,6 +35,7 @@ function ProjectEditPage() {
   const [edit, setEdit] = React.useState({
     name: "",
     categoryIds: [] as string[],
+    themeColor: DEFAULT_PROJECT_THEME_COLOR,
     budgetNpr: "",
     startDate: "",
     endDate: "",
@@ -53,6 +56,7 @@ function ProjectEditPage() {
         name: p.data.name,
         categoryIds:
           p.data.categoryIds ?? p.data.categories?.map((c) => c.id) ?? [],
+        themeColor: p.data.themeColor || DEFAULT_PROJECT_THEME_COLOR,
         budgetNpr: String(paisaToNpr(p.data.budgetPaisa)),
         startDate: String(p.data.startDate).slice(0, 10),
         endDate: String(p.data.endDate).slice(0, 10),
@@ -110,6 +114,9 @@ function ProjectEditPage() {
                   body: {
                     name: edit.name.trim(),
                     categoryIds: edit.categoryIds,
+                    themeColor: /^#[0-9A-Fa-f]{6}$/i.test(edit.themeColor)
+                      ? edit.themeColor.toUpperCase()
+                      : DEFAULT_PROJECT_THEME_COLOR,
                     budgetNpr: parseNprInput(edit.budgetNpr),
                     startDate: edit.startDate,
                     endDate: edit.endDate,
@@ -134,6 +141,10 @@ function ProjectEditPage() {
                 }
               />
             </div>
+            <ProjectThemeColorField
+              value={edit.themeColor}
+              onChange={(themeColor) => setEdit((f) => ({ ...f, themeColor }))}
+            />
             <div className="space-y-2">
               <Label>Categories</Label>
               <div className="max-h-40 space-y-2 overflow-y-auto rounded-md border p-3">

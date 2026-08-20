@@ -15,6 +15,8 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
+    "culori": "^4.0.2",
+    "lucide-react": "^1.33.0",
     "react-day-picker": "10.0.1",
     "recharts": "3.8.0",
     "shadcn": "^4.17.0",
@@ -30,6 +32,7 @@
     "@tailwindcss/vite": "^4",
     "@tanstack/eslint-config": "latest",
     "@turbo/gen": "^2.9.15",
+    "@types/culori": "^4.0.1",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -43,6 +46,8 @@
     "./globals.css": "./src/styles/globals.css",
     "./lib/*": "./src/lib/*.ts",
     "./components/*": "./src/components/*.tsx",
+    "./components/fill-picker/*": "./src/components/fill-picker/*",
+    "./components/fill-picker-base/*": "./src/components/fill-picker-base/*",
     "./hooks/*": "./src/hooks/*.ts"
   }
 }

@@ -11,6 +11,7 @@ import {
 import { Slider } from "@workspace/ui/components/slider"
 import { cn } from "@workspace/ui/lib/utils"
 import type { Project } from "@/lib/types"
+import { DEFAULT_PROJECT_THEME_COLOR } from "./entry-draft"
 
 export type DraftAlloc = {
   projectId: string
@@ -26,16 +27,11 @@ type Props = {
   onChange: (allocations: DraftAlloc[]) => void
 }
 
-const barColors = [
-  "bg-primary",
-  "bg-primary/70",
-  "bg-primary/45",
-  "bg-foreground/35",
-  "bg-foreground/20",
-  "bg-muted-foreground/40",
-]
-
 const MIN_ALLOCATION = 1
+
+function projectAccent(project: Project | undefined) {
+  return project?.themeColor?.trim() || DEFAULT_PROJECT_THEME_COLOR
+}
 
 function pct(allocation: DraftAlloc) {
   return Number(allocation.percentage) || 0
@@ -316,26 +312,30 @@ export function ProjectAllocations({
       {allocations.length > 0 ? (
         <>
           <div className="flex h-2 overflow-hidden rounded-full bg-muted">
-            {allocations.map((a, i) => (
-              <div
-                key={a.projectId}
-                className={cn("h-full transition-all", barColors[i % barColors.length])}
-                style={{ width: `${Math.max(0, a.percentage)}%` }}
-              />
-            ))}
+            {allocations.map((a) => {
+              const project = projectById.get(a.projectId)
+              return (
+                <div
+                  key={a.projectId}
+                  className="h-full transition-all"
+                  style={{
+                    width: `${Math.max(0, a.percentage)}%`,
+                    backgroundColor: projectAccent(project),
+                  }}
+                />
+              )
+            })}
           </div>
 
           <div className="space-y-3">
-            {allocations.map((a, i) => {
+            {allocations.map((a) => {
               const project = projectById.get(a.projectId)
               return (
                 <div key={a.projectId} className="space-y-1.5">
                   <div className="flex items-center gap-2">
                     <span
-                      className={cn(
-                        "size-2 shrink-0 rounded-full",
-                        barColors[i % barColors.length],
-                      )}
+                      className="size-2 shrink-0 rounded-full"
+                      style={{ backgroundColor: projectAccent(project) }}
                     />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
                       {project?.name ?? a.projectId}

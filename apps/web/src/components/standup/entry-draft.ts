@@ -153,11 +153,10 @@ export function withPreservedTasks(
   })
 }
 
+/** App primary teal as hex — default project accent for stand-ups. */
+export const DEFAULT_PROJECT_THEME_COLOR = "#168A6F"
+
 export function projectColor(projectId: string, projects: Project[]) {
-  const index = Math.max(
-    0,
-    projects.findIndex((p) => p.id === projectId),
-  )
-  const hues = [165, 250, 35, 300, 200, 80]
-  return `oklch(0.55 0.12 ${hues[index % hues.length]})`
+  const project = projects.find((p) => p.id === projectId)
+  return project?.themeColor?.trim() || DEFAULT_PROJECT_THEME_COLOR
 }

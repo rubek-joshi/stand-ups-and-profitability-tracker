@@ -28,6 +28,7 @@ import {
   AssignEmployeesBulkDto,
   CreateExtensionDto,
   CreateProjectDto,
+  DEFAULT_PROJECT_THEME_COLOR,
   UpdateProjectDto,
 } from "./dto/project.dto";
 
@@ -53,6 +54,7 @@ export class ProjectsService {
       data: {
         clientId: dto.clientId,
         name: dto.name,
+        themeColor: dto.themeColor ?? DEFAULT_PROJECT_THEME_COLOR,
         budgetPaisa: nprToPaisa(dto.budgetNpr),
         startDate: parseIsoDate(dto.startDate),
         endDate: parseIsoDate(dto.endDate),
@@ -168,6 +170,7 @@ export class ProjectsService {
         where: { id },
         data: {
           name: dto.name,
+          themeColor: dto.themeColor,
           budgetPaisa:
             dto.budgetNpr === undefined ? undefined : nprToPaisa(dto.budgetNpr),
           startDate: dto.startDate ? parseIsoDate(dto.startDate) : undefined,

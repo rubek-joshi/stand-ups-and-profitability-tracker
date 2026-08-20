@@ -34,6 +34,8 @@ export type Project = {
   id: string
   name: string
   clientId: string
+  /** Hex accent (#RRGGBB) used in stand-ups. */
+  themeColor?: string
   categoryIds?: string[]
   budgetPaisa: string
   startDate: string

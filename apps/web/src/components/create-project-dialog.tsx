@@ -21,11 +21,14 @@ import { Switch } from "@workspace/ui/components/switch"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { parseNprInput } from "@/lib/money"
 import type { Category, Client, Project } from "@/lib/types"
+import { ProjectThemeColorField } from "@/components/project-theme-color-field"
+import { DEFAULT_PROJECT_THEME_COLOR } from "@/components/standup/entry-draft"
 
 type CreateProjectForm = {
   name: string
   clientId: string
   categoryIds: string[]
+  themeColor: string
   budgetNpr: string
   startDate: string
   endDate: string
@@ -37,6 +40,7 @@ function emptyForm(clientId = ""): CreateProjectForm {
     name: "",
     clientId,
     categoryIds: [],
+    themeColor: DEFAULT_PROJECT_THEME_COLOR,
     budgetNpr: "",
     startDate: new Date().toISOString().slice(0, 10),
     endDate: "",
@@ -139,6 +143,9 @@ export function CreateProjectDialog({
                   startDate: form.startDate,
                   endDate: form.endDate,
                   isVatApplicable: form.isVatApplicable,
+                  themeColor: /^#[0-9A-Fa-f]{6}$/i.test(form.themeColor)
+                    ? form.themeColor.toUpperCase()
+                    : DEFAULT_PROJECT_THEME_COLOR,
                 },
               })
               onOpenChange(false)
@@ -159,6 +166,11 @@ export function CreateProjectDialog({
               onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
             />
           </div>
+          <ProjectThemeColorField
+            disabled={loadingOptions || saving}
+            value={form.themeColor}
+            onChange={(themeColor) => setForm((f) => ({ ...f, themeColor }))}
+          />
           {lockClient ? (
             <div className="space-y-2">
               <Label>Client</Label>

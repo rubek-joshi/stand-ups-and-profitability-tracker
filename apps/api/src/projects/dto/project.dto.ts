@@ -4,6 +4,7 @@ import {
   IsArray,
   IsBoolean,
   IsDateString,
+  IsHexColor,
   IsNotEmpty,
   IsNumber,
   IsOptional,
@@ -11,6 +12,9 @@ import {
   MaxLength,
   Min,
 } from "class-validator";
+
+/** Default project accent — matches app --primary teal as hex. */
+export const DEFAULT_PROJECT_THEME_COLOR = "#168A6F";
 
 export class CreateProjectDto {
   @ApiProperty()
@@ -29,6 +33,14 @@ export class CreateProjectDto {
   @IsNotEmpty()
   @MaxLength(200)
   name!: string;
+
+  @ApiPropertyOptional({
+    example: DEFAULT_PROJECT_THEME_COLOR,
+    description: "Hex accent color (#RRGGBB) used in stand-ups",
+  })
+  @IsOptional()
+  @IsHexColor()
+  themeColor?: string;
 
   @ApiProperty({ description: "Budget in NPR (converted to paisa)" })
   @IsNumber()
@@ -62,6 +74,14 @@ export class UpdateProjectDto {
   @ArrayMinSize(1)
   @IsString({ each: true })
   categoryIds?: string[];
+
+  @ApiPropertyOptional({
+    example: DEFAULT_PROJECT_THEME_COLOR,
+    description: "Hex accent color (#RRGGBB) used in stand-ups",
+  })
+  @IsOptional()
+  @IsHexColor()
+  themeColor?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
