@@ -247,7 +247,7 @@ function ProjectDetailPage() {
                   const ok = await confirm({
                     title: "Close project?",
                     description:
-                      "Closing the project will end all active employee assignments and preserve their history logs.",
+                      "Closing the project will end all active employee and core member assignments and preserve their history logs.",
                     confirmLabel: "Close project",
                     destructive: true,
                   })

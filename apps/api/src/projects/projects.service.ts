@@ -202,6 +202,10 @@ export class ProjectsService {
         where: { projectId: id, unassignedAt: null },
         data: { unassignedAt: closedAt },
       });
+      await tx.coreMemberAssignment.updateMany({
+        where: { projectId: id, unassignedAt: null },
+        data: { unassignedAt: closedAt },
+      });
       return tx.project.update({
         where: { id },
         data: { status: ProjectStatus.closed },
@@ -220,6 +224,9 @@ export class ProjectsService {
         autoReleasedEmployeeIds: before.employeeAssignments
           .filter((assignment) => !assignment.unassignedAt)
           .map((assignment) => assignment.employeeId),
+        autoReleasedCoreMemberIds: before.coreMemberAssignments
+          .filter((assignment) => !assignment.unassignedAt)
+          .map((assignment) => assignment.coreMemberId),
         closedAt,
       },
     });

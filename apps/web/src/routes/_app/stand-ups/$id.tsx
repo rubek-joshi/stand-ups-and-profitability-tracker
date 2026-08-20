@@ -113,8 +113,12 @@ function serializeDrafts(drafts: Record<string, EntryDraft>): string {
 function buildEntriesPayload(
   entries: Standup["entries"],
   drafts: Record<string, EntryDraft>,
+  employeeIds?: Set<string> | null,
 ) {
-  return (entries ?? []).map((entry) => {
+  const scoped = (entries ?? []).filter((entry) =>
+    employeeIds ? employeeIds.has(entry.employee.id) : true,
+  )
+  return scoped.map((entry) => {
     const d = drafts[entry.id]
     if (!d) {
       return {
@@ -402,12 +406,14 @@ function getMissingAssignmentsFromStandup(
   standup: Standup,
   drafts: Record<string, EntryDraft>,
   projects: Project[],
+  employeeIds?: Set<string> | null,
 ): MissingProjectAssignment[] {
   const seen = new Set<string>()
   const result: MissingProjectAssignment[] = []
   const standupDate = String(standup.date).slice(0, 10)
 
   for (const entry of standup.entries ?? []) {
+    if (employeeIds && !employeeIds.has(entry.employee.id)) continue
     const draft = drafts[entry.id]
     if (!draft || draft.attendanceStatus === "absent") continue
     for (const allocation of draft.allocations.filter((item) => item.projectId)) {
@@ -717,13 +723,25 @@ function StandupDetailPage() {
   }) => {
     if (!standup || readonly) return false
     const currentDrafts = draftsRef.current
-    const entries = buildEntriesPayload(standup.entries, currentDrafts)
+    const scopeEmployeeIds =
+      user?.standupScopePreference === "group" &&
+      user.standupPreferredGroupId &&
+      groupMemberIds &&
+      !showAllEmployees
+        ? groupMemberIds
+        : null
+    const entries = buildEntriesPayload(
+      standup.entries,
+      currentDrafts,
+      scopeEmployeeIds,
+    )
     if (entries.length === 0) return true
     if (!options?.assignmentResolutions) {
       const pendingAssignments = getMissingAssignmentsFromStandup(
         standup,
         currentDrafts,
         projects,
+        scopeEmployeeIds,
       )
       if (pendingAssignments.length > 0) {
         openMissingAssignmentDialog(pendingAssignments)
@@ -763,7 +781,7 @@ function StandupDetailPage() {
     } finally {
       setSaving(false)
     }
-  }, [id, standup, readonly, projects])
+  }, [id, standup, readonly, projects, user, groupMemberIds, showAllEmployees])
 
   const leaveDialog = (
     <AlertDialog
@@ -955,7 +973,10 @@ function StandupDetailPage() {
     ? entries.filter((e) => !groupMemberIds.has(e.employee.id)).length
     : 0
 
-  const working = entries.filter((e) => {
+  const scopedEntries = groupFilterActive
+    ? entries.filter((e) => groupMemberIds.has(e.employee.id))
+    : entries
+  const working = scopedEntries.filter((e) => {
     const d = drafts[e.id]
     return d ? isWorking(d.attendanceStatus) : e.attendanceStatus !== "absent"
   })
@@ -963,7 +984,7 @@ function StandupDetailPage() {
     const d = drafts[e.id]
     return d ? isEntryComplete(d) : false
   })
-  const absentCount = entries.length - working.length
+  const absentCount = scopedEntries.length - working.length
 
   tabNavRef.current = {
     readonly,
