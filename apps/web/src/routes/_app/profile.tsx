@@ -421,40 +421,6 @@ function ProfilePage() {
                     <Button type="submit" disabled={saving}>
                       {saving ? "Saving…" : "Save preference"}
                     </Button>
-                    {preference !== "ask" ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={saving}
-                        onClick={async () => {
-                          setSaving(true)
-                          setSavedMsg(null)
-                          try {
-                            await api("/auth/me", {
-                              method: "PATCH",
-                              body: {
-                                standupScopePreference: "ask",
-                                standupPreferredGroupId: null,
-                              },
-                            })
-                            setPreference("ask")
-                            setGroupId("")
-                            await refreshUser()
-                            setSavedMsg("Reset to ask every time.")
-                          } catch (err) {
-                            alert(
-                              err instanceof ApiError
-                                ? err.message
-                                : "Failed to reset"
-                            )
-                          } finally {
-                            setSaving(false)
-                          }
-                        }}
-                      >
-                        Reset to ask every time
-                      </Button>
-                    ) : null}
                   </div>
                   {savedMsg ? (
                     <p className="text-sm text-muted-foreground">{savedMsg}</p>
