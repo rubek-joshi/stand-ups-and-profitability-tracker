@@ -1,8 +1,18 @@
 import * as React from "react"
 import { createFileRoute } from "@tanstack/react-router"
-import { IconDeviceDesktop, IconMoon, IconPencil, IconSun } from "@tabler/icons-react"
+import {
+  IconDeviceDesktop,
+  IconMoon,
+  IconPencil,
+  IconSun,
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import {
@@ -19,7 +29,11 @@ import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useTheme } from "@/lib/theme"
-import type { EmployeeGroup, StandupLayoutPreference, StandupScopePreference } from "@/lib/types"
+import type {
+  EmployeeGroup,
+  StandupLayoutPreference,
+  StandupScopePreference,
+} from "@/lib/types"
 
 export const Route = createFileRoute("/_app/profile")({
   component: ProfilePage,
@@ -53,7 +67,8 @@ function ProfilePage() {
   const [name, setName] = React.useState("")
   const [editingName, setEditingName] = React.useState(false)
   const [groups, setGroups] = React.useState<EmployeeGroup[]>([])
-  const [preference, setPreference] = React.useState<StandupScopePreference>("ask")
+  const [preference, setPreference] =
+    React.useState<StandupScopePreference>("ask")
   const [layoutPreference, setLayoutPreference] =
     React.useState<StandupLayoutPreference>("card")
   const [groupId, setGroupId] = React.useState("")
@@ -77,9 +92,8 @@ function ProfilePage() {
     void (async () => {
       setLoadingGroups(true)
       try {
-        const res = await api<PaginatedEnvelope<EmployeeGroup[]>>(
-          "/employee-groups",
-        )
+        const res =
+          await api<PaginatedEnvelope<EmployeeGroup[]>>("/employee-groups")
         if (!cancelled) setGroups(res.data)
       } catch (e) {
         if (!cancelled) {
@@ -138,7 +152,7 @@ function ProfilePage() {
                         alert(
                           err instanceof ApiError
                             ? err.message
-                            : "Failed to update name",
+                            : "Failed to update name"
                         )
                       } finally {
                         setSavingName(false)
@@ -320,7 +334,7 @@ function ProfilePage() {
                       alert(
                         err instanceof ApiError
                           ? err.message
-                          : "Failed to save preference",
+                          : "Failed to save preference"
                       )
                     } finally {
                       setSaving(false)
@@ -347,6 +361,37 @@ function ProfilePage() {
                     ))}
                   </div>
 
+                  {preference === "group" ? (
+                    <div className="grid gap-2">
+                      <Label>Preferred group</Label>
+                      <Select
+                        value={groupId || null}
+                        onValueChange={(v) => setGroupId(v ?? "")}
+                        items={Object.fromEntries(
+                          groups.map((g) => [g.id, g.name])
+                        )}
+                        disabled={groups.length === 0}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue
+                            placeholder={
+                              groups.length === 0
+                                ? "No groups available"
+                                : "Choose a group"
+                            }
+                          />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groups.map((g) => (
+                            <SelectItem key={g.id} value={g.id}>
+                              {g.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : null}
+
                   <div className="grid gap-2">
                     <Label>Default layout</Label>
                     <div className="grid grid-cols-2 gap-2">
@@ -371,37 +416,6 @@ function ProfilePage() {
                       ))}
                     </div>
                   </div>
-
-                  {preference === "group" ? (
-                    <div className="grid gap-2">
-                      <Label>Preferred group</Label>
-                      <Select
-                        value={groupId || null}
-                        onValueChange={(v) => setGroupId(v ?? "")}
-                        items={Object.fromEntries(
-                          groups.map((g) => [g.id, g.name]),
-                        )}
-                        disabled={groups.length === 0}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue
-                            placeholder={
-                              groups.length === 0
-                                ? "No groups available"
-                                : "Choose a group"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {groups.map((g) => (
-                            <SelectItem key={g.id} value={g.id}>
-                              {g.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : null}
 
                   <div className="flex flex-wrap items-center gap-3">
                     <Button type="submit" disabled={saving}>
@@ -431,7 +445,7 @@ function ProfilePage() {
                             alert(
                               err instanceof ApiError
                                 ? err.message
-                                : "Failed to reset",
+                                : "Failed to reset"
                             )
                           } finally {
                             setSaving(false)

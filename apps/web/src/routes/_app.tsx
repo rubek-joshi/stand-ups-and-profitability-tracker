@@ -1,9 +1,9 @@
 import * as React from "react"
 import { Outlet, createFileRoute, redirect, useRouterState } from "@tanstack/react-router"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@workspace/ui/components/sidebar"
-import { Separator } from "@workspace/ui/components/separator"
+import { SidebarInset, SidebarProvider } from "@workspace/ui/components/sidebar"
 import { TooltipProvider } from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
+import { AppHeader } from "@/components/app-header"
 import { AppSidebar } from "@/components/app-sidebar"
 import { CommandPalette } from "@/components/command-palette"
 import { KeyboardShortcuts } from "@/components/keyboard-shortcuts"
@@ -65,11 +65,7 @@ function AppLayout() {
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3 md:hidden">
-            <SidebarTrigger />
-            <Separator orientation="vertical" className="h-4" />
-            <span className="text-sm font-medium">Tracker</span>
-          </header>
+          <AppHeader />
           <div className={cn("flex-1 p-4 md:p-6", PAGE_CONTAINER_CLASS)}>
             <Outlet />
           </div>
