@@ -104,7 +104,7 @@ export class StandupsService {
         employeeGroup: { select: { id: true, name: true } },
       },
     });
-    await this.carryForwardTasksFromPreviousDay(standup.id, date);
+    await this.carryForwardTasksFromPreviousStandup(standup.id, date);
     await this.auditService.write({
       actorId,
       action: AuditAction.STANDUP_CREATED,
@@ -888,20 +888,27 @@ export class StandupsService {
       })),
       skipDuplicates: true,
     });
-    await this.carryForwardTasksFromPreviousDay(
+    await this.carryForwardTasksFromPreviousStandup(
       standup.id,
       standup.date,
       missing.map((employee) => employee.id),
     );
   }
 
-  private async carryForwardTasksFromPreviousDay(
+  /**
+   * Copy `tomorrow` / `progress` tasks from the most recent prior stand-up
+   * (not strictly yesterday). Gaps with no stand-up — weekends, public
+   * holidays, or any skipped day — are skipped so Monday can pick up Friday
+   * unless Sat/Sun (or a holiday) had its own stand-up in between.
+   */
+  private async carryForwardTasksFromPreviousStandup(
     standupId: string,
     date: Date,
     employeeIds?: string[],
   ) {
     const previous = await this.prismaService.standup.findFirst({
-      where: { date: dayBefore(date) },
+      where: { date: { lt: date } },
+      orderBy: { date: "desc" },
       include: {
         entries: {
           where: employeeIds?.length
