@@ -39,7 +39,6 @@ import { Route as AppEmployeesIdEditRouteImport } from './routes/_app/employees/
 import { Route as AppCoreMembersIdEditRouteImport } from './routes/_app/core-members/$id_.edit'
 import { Route as AppClientsIdEditRouteImport } from './routes/_app/clients/$id_.edit'
 import { Route as AppCategoriesIdEditRouteImport } from './routes/_app/categories/$id_.edit'
-import { Route as AppEmployeesIdSalaryEditRouteImport } from './routes/_app/employees/$id_.salary.edit'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -190,12 +189,6 @@ const AppCategoriesIdEditRoute = AppCategoriesIdEditRouteImport.update({
   path: '/categories/$id/edit',
   getParentRoute: () => AppRoute,
 } as any)
-const AppEmployeesIdSalaryEditRoute =
-  AppEmployeesIdSalaryEditRouteImport.update({
-    id: '/employees/$id_/salary/edit',
-    path: '/employees/$id/salary/edit',
-    getParentRoute: () => AppRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
@@ -227,7 +220,6 @@ export interface FileRoutesByFullPath {
   '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
   '/employees/$id/edit': typeof AppEmployeesIdEditRoute
   '/projects/$id/edit': typeof AppProjectsIdEditRoute
-  '/employees/$id/salary/edit': typeof AppEmployeesIdSalaryEditRoute
 }
 export interface FileRoutesByTo {
   '/change-password': typeof ChangePasswordRoute
@@ -259,7 +251,6 @@ export interface FileRoutesByTo {
   '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
   '/employees/$id/edit': typeof AppEmployeesIdEditRoute
   '/projects/$id/edit': typeof AppProjectsIdEditRoute
-  '/employees/$id/salary/edit': typeof AppEmployeesIdSalaryEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -293,7 +284,6 @@ export interface FileRoutesById {
   '/_app/core-members/$id_/edit': typeof AppCoreMembersIdEditRoute
   '/_app/employees/$id_/edit': typeof AppEmployeesIdEditRoute
   '/_app/projects/$id_/edit': typeof AppProjectsIdEditRoute
-  '/_app/employees/$id_/salary/edit': typeof AppEmployeesIdSalaryEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -327,7 +317,6 @@ export interface FileRouteTypes {
     | '/core-members/$id/edit'
     | '/employees/$id/edit'
     | '/projects/$id/edit'
-    | '/employees/$id/salary/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/change-password'
@@ -359,7 +348,6 @@ export interface FileRouteTypes {
     | '/core-members/$id/edit'
     | '/employees/$id/edit'
     | '/projects/$id/edit'
-    | '/employees/$id/salary/edit'
   id:
     | '__root__'
     | '/_app'
@@ -392,7 +380,6 @@ export interface FileRouteTypes {
     | '/_app/core-members/$id_/edit'
     | '/_app/employees/$id_/edit'
     | '/_app/projects/$id_/edit'
-    | '/_app/employees/$id_/salary/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -613,13 +600,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppCategoriesIdEditRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/employees/$id_/salary/edit': {
-      id: '/_app/employees/$id_/salary/edit'
-      path: '/employees/$id/salary/edit'
-      fullPath: '/employees/$id/salary/edit'
-      preLoaderRoute: typeof AppEmployeesIdSalaryEditRouteImport
-      parentRoute: typeof AppRoute
-    }
   }
 }
 
@@ -651,7 +631,6 @@ interface AppRouteChildren {
   AppCoreMembersIdEditRoute: typeof AppCoreMembersIdEditRoute
   AppEmployeesIdEditRoute: typeof AppEmployeesIdEditRoute
   AppProjectsIdEditRoute: typeof AppProjectsIdEditRoute
-  AppEmployeesIdSalaryEditRoute: typeof AppEmployeesIdSalaryEditRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -682,7 +661,6 @@ const AppRouteChildren: AppRouteChildren = {
   AppCoreMembersIdEditRoute: AppCoreMembersIdEditRoute,
   AppEmployeesIdEditRoute: AppEmployeesIdEditRoute,
   AppProjectsIdEditRoute: AppProjectsIdEditRoute,
-  AppEmployeesIdSalaryEditRoute: AppEmployeesIdSalaryEditRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)

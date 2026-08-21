@@ -1,6 +1,13 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
-import { IconEye, IconPencil, IconTrash, IconUserMinus, IconUserPlus } from "@tabler/icons-react"
+import {
+  IconDotsVertical,
+  IconEye,
+  IconPencil,
+  IconTrash,
+  IconUserMinus,
+  IconUserPlus,
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
@@ -10,6 +17,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
@@ -189,40 +203,49 @@ function EmployeeGroupDetailPage() {
           { label: group.name },
         ]}
         actions={
-          <>
-            <Button
-              variant="outline"
+          <DropdownMenu>
+            <DropdownMenuTrigger
               render={
-                <Link to="/employee-groups" search={{ page: 1, pageSize: 25 }} />
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Group actions"
+                />
               }
             >
-              Back
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                const ok = await confirm({
-                  title: "Delete group?",
-                  description: `Delete “${group.name}”?`,
-                  confirmLabel: "Delete",
-                  destructive: true,
-                })
-                if (!ok) return
-                try {
-                  await api(`/employee-groups/${id}`, { method: "DELETE" })
-                  void navigate({
-                    to: "/employee-groups",
-                    search: { page: 1, pageSize: 25 },
-                  })
-                } catch (e) {
-                  alert(e instanceof ApiError ? e.message : "Failed to delete")
-                }
-              }}
-            >
-              <IconTrash className="size-3.5" />
-              Delete
-            </Button>
-          </>
+              <IconDotsVertical />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuGroup>
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={async () => {
+                    const ok = await confirm({
+                      title: "Delete group?",
+                      description: `Delete “${group.name}”?`,
+                      confirmLabel: "Delete",
+                      destructive: true,
+                    })
+                    if (!ok) return
+                    try {
+                      await api(`/employee-groups/${id}`, { method: "DELETE" })
+                      void navigate({
+                        to: "/employee-groups",
+                        search: { page: 1, pageSize: 25 },
+                      })
+                    } catch (e) {
+                      alert(
+                        e instanceof ApiError ? e.message : "Failed to delete",
+                      )
+                    }
+                  }}
+                >
+                  <IconTrash />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
