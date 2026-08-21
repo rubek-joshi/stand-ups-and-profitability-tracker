@@ -26,6 +26,7 @@ import { StatusBadge } from "@/components/health-badge"
 import { MailLink, TelLink } from "@/components/contact-link"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
+  NavigableTableRow,
   TableActionLink,
   TableActionsCell,
   TableActionsHead,
@@ -132,12 +133,17 @@ function ClientsPage() {
               </TableHeader>
               <TableBody>
                 {clients.map((c) => (
-                  <TableRow key={c.id}>
+                  <NavigableTableRow
+                    key={c.id}
+                    to="/clients/$id"
+                    params={{ id: c.id }}
+                  >
                     <TableCell>
                       <Link
                         to="/clients/$id"
                         params={{ id: c.id }}
                         className="font-medium hover:underline"
+                        onClick={(event) => event.stopPropagation()}
                       >
                         {c.name}
                       </Link>
@@ -168,7 +174,7 @@ function ClientsPage() {
                         <IconPencil className="size-3.5" />
                       </TableActionLink>
                     </TableActionsCell>
-                  </TableRow>
+                  </NavigableTableRow>
                 ))}
               </TableBody>
             </Table>

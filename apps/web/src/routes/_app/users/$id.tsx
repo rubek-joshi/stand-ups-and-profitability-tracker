@@ -1,6 +1,13 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
-import { IconExternalLink, IconPencil } from "@tabler/icons-react"
+import {
+  IconDotsVertical,
+  IconExternalLink,
+  IconKey,
+  IconPencil,
+  IconPlayerPlay,
+  IconUserOff,
+} from "@tabler/icons-react"
 import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Checkbox } from "@workspace/ui/components/checkbox"
@@ -11,6 +18,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import {
@@ -163,72 +177,135 @@ function UserDetailPage() {
           { label: "Users", to: "/users", search: DEFAULT_LIST_SEARCH },
           { label: user.name },
         ]}
+        status={
+          <StatusBadge status={user.isActive ? "active" : "inactive"} />
+        }
         actions={
-          <>
-            <StatusBadge status={user.isActive ? "active" : "inactive"} />
-            <HintedButton
-              hint="You can change your password from Profile instead."
-              disabled={isSelf}
-              variant="outline"
-              onClick={() => {
-                if (isSelf) return
-                setFormError(null)
-                setPasswordForm({ password: "", mustChangePassword: true })
-                setPasswordOpen(true)
-              }}
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="User actions"
+                />
+              }
             >
-              Change password
-            </HintedButton>
-            {user.isActive ? (
-              <HintedButton
-                hint="You cannot deactivate your own account."
-                disabled={isSelf}
-                variant="outline"
-                onClick={async () => {
-                  if (isSelf) return
-                  const ok = await confirm({
-                    title: "Deactivate user?",
-                    description: `"${user.name}" will no longer be able to sign in.`,
-                    confirmLabel: "Deactivate",
-                    destructive: true,
-                  })
-                  if (!ok) return
-                  try {
-                    await api(`/users/${id}`, {
-                      method: "PATCH",
-                      body: { isActive: false },
-                    })
-                    await load()
-                    await loadAudit()
-                  } catch (err) {
-                    alert(err instanceof ApiError ? err.message : "Failed to deactivate user")
-                  }
-                }}
-              >
-                Deactivate
-              </HintedButton>
-            ) : (
-              <HintedButton
-                hint="You cannot reactivate your own account."
-                disabled={isSelf}
-                variant="outline"
-                onClick={async () => {
-                  try {
-                    await api(`/users/${id}`, {
-                      method: "PATCH",
-                      body: { isActive: true },
-                    })
-                    await load()
-                    await loadAudit()
-                  } catch (err) {
-                    alert(err instanceof ApiError ? err.message : "Failed to reactivate user")
-                  }
-                }}
-              >
-                Reactivate
-              </HintedButton>
-            )}
-          </>
+              <IconDotsVertical />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-44">
+              <DropdownMenuGroup>
+                {isSelf ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<div className="w-full cursor-not-allowed" />}
+                    >
+                      <DropdownMenuItem disabled>
+                        <IconKey />
+                        Change password
+                      </DropdownMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      You can change your password from Profile instead.
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setFormError(null)
+                      setPasswordForm({ password: "", mustChangePassword: true })
+                      setPasswordOpen(true)
+                    }}
+                  >
+                    <IconKey />
+                    Change password
+                  </DropdownMenuItem>
+                )}
+                {user.isActive ? (
+                  isSelf ? (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={<div className="w-full cursor-not-allowed" />}
+                      >
+                        <DropdownMenuItem disabled>
+                          <IconUserOff />
+                          Deactivate
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        You cannot deactivate your own account.
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Deactivate user?",
+                          description: `"${user.name}" will no longer be able to sign in.`,
+                          confirmLabel: "Deactivate",
+                          destructive: true,
+                        })
+                        if (!ok) return
+                        try {
+                          await api(`/users/${id}`, {
+                            method: "PATCH",
+                            body: { isActive: false },
+                          })
+                          await load()
+                          await loadAudit()
+                        } catch (err) {
+                          alert(
+                            err instanceof ApiError
+                              ? err.message
+                              : "Failed to deactivate user",
+                          )
+                        }
+                      }}
+                    >
+                      <IconUserOff />
+                      Deactivate
+                    </DropdownMenuItem>
+                  )
+                ) : isSelf ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<div className="w-full cursor-not-allowed" />}
+                    >
+                      <DropdownMenuItem disabled>
+                        <IconPlayerPlay />
+                        Reactivate
+                      </DropdownMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      You cannot reactivate your own account.
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      try {
+                        await api(`/users/${id}`, {
+                          method: "PATCH",
+                          body: { isActive: true },
+                        })
+                        await load()
+                        await loadAudit()
+                      } catch (err) {
+                        alert(
+                          err instanceof ApiError
+                            ? err.message
+                            : "Failed to reactivate user",
+                        )
+                      }
+                    }}
+                  >
+                    <IconPlayerPlay />
+                    Reactivate
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
@@ -325,16 +402,15 @@ function UserDetailPage() {
           <div className="hidden min-w-0 lg:block" />
         )}
 
-        <aside className="lg:sticky lg:top-6">
+        <aside className="lg:sticky lg:top-4">
           <Card>
-            <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-              <CardTitle className="text-base">Details</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-base">User details</CardTitle>
               {!editing ? (
                 <Button
                   type="button"
                   variant="ghost"
-                  size="icon"
-                  className="size-8 shrink-0"
+                  size="icon-xs"
                   aria-label="Edit details"
                   onClick={() => {
                     setFormError(null)
@@ -346,11 +422,11 @@ function UserDetailPage() {
                     setEditing(true)
                   }}
                 >
-                  <IconPencil className="size-4" />
+                  <IconPencil className="size-3.5" />
                 </Button>
               ) : null}
             </CardHeader>
-            <CardContent>
+            <CardContent className={editing ? undefined : "space-y-4 text-sm"}>
               {editing ? (
                 <form
                   className="flex flex-col gap-3"
@@ -444,23 +520,37 @@ function UserDetailPage() {
                   </div>
                 </form>
               ) : (
-                <div className="flex flex-col gap-1 text-sm">
-                  <DetailRow label="Name" value={isSelf ? `${user.name} (you)` : user.name} />
-                  <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
-                    <span className="text-muted-foreground">Email</span>
-                    <MailLink value={user.email} withCopy />
-                  </div>
-                  <DetailRow label="Role" value={roleLabel(user.role)} />
-                  <DetailRow label="Status" value={user.isActive ? "Active" : "Inactive"} />
-                  <DetailRow
+                <>
+                  <Detail
+                    label="Name"
+                    value={isSelf ? `${user.name} (you)` : user.name}
+                  />
+                  <Detail
+                    label="Email"
+                    value={<MailLink value={user.email} withCopy />}
+                  />
+                  <Detail label="Role" value={roleLabel(user.role)} />
+                  <Detail
                     label="Must change password"
                     value={user.mustChangePassword ? "Yes" : "No"}
                   />
-                  <DetailRow label="Last login" value={formatLastLogin(user.lastLoginAt)} />
-                  <DetailRow label="Stand-up scope" value={standupScopeLabel(user)} />
-                  <DetailRow label="Created" value={formatDateTime(user.createdAt)} />
-                  <DetailRow label="Updated" value={formatDateTime(user.updatedAt)} />
-                </div>
+                  <Detail
+                    label="Last login"
+                    value={formatLastLogin(user.lastLoginAt)}
+                  />
+                  <Detail
+                    label="Stand-up scope"
+                    value={standupScopeLabel(user)}
+                  />
+                  <Detail
+                    label="Created"
+                    value={formatDateTime(user.createdAt)}
+                  />
+                  <Detail
+                    label="Updated"
+                    value={formatDateTime(user.updatedAt)}
+                  />
+                </>
               )}
             </CardContent>
           </Card>
@@ -539,32 +629,17 @@ function UserDetailPage() {
   )
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function Detail({
+  label,
+  value,
+}: {
+  label: string
+  value: React.ReactNode
+}) {
   return (
-    <div className="flex justify-between gap-4 border-b py-2 last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium">{value}</span>
+    <div className="min-w-0">
+      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm font-medium">{value}</dd>
     </div>
-  )
-}
-
-/** Disabled buttons ignore hover; wrap them so the tooltip still appears. */
-function HintedButton({
-  hint,
-  disabled,
-  children,
-  ...props
-}: React.ComponentProps<typeof Button> & { hint: string }) {
-  const button = (
-    <Button disabled={disabled} {...props}>
-      {children}
-    </Button>
-  )
-  if (!disabled) return button
-  return (
-    <Tooltip>
-      <TooltipTrigger render={<span className="inline-flex" />}>{button}</TooltipTrigger>
-      <TooltipContent>{hint}</TooltipContent>
-    </Tooltip>
   )
 }

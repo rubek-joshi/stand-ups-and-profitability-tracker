@@ -1,8 +1,14 @@
 import * as React from "react"
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
-import { IconChevronDown } from "@tabler/icons-react"
+import {
+  IconChevronDown,
+  IconDotsVertical,
+  IconPencil,
+  IconTrash,
+  IconUserOff,
+} from "@tabler/icons-react"
 import { formatDistanceStrict, isBefore, parseISO, startOfDay } from "date-fns"
-import { Button, buttonVariants } from "@workspace/ui/components/button"
+import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import {
   Collapsible,
@@ -15,11 +21,24 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import { PageHeader } from "@/components/page-header"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import { MailLink, TelLink } from "@/components/contact-link"
 import { CreateProjectDialog } from "@/components/create-project-dialog"
 import { useConfirmDialog } from "@/components/confirm-dialog"
+import { TableActionLink } from "@/components/table-row-actions"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
@@ -99,57 +118,85 @@ function ClientDetailPage() {
           { label: "Clients", to: "/clients", search: DEFAULT_LIST_SEARCH },
           { label: client.name },
         ]}
+        status={<StatusBadge status={client.status} />}
         actions={
-          <>
-            <StatusBadge status={client.status} />
-            <Link
-              to="/clients/$id/edit"
-              params={{ id }}
-              className={buttonVariants({ variant: "secondary" })}
-            >
-              Edit
-            </Link>
-            {client.status === "active" ? (
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  const ok = await confirm({
-                    title: "Deactivate client?",
-                    description: "The client will be marked inactive.",
-                    confirmLabel: "Deactivate",
-                    destructive: true,
-                  })
-                  if (!ok) return
-                  await api(`/clients/${id}/deactivate`, { method: "POST" })
-                  await load()
-                }}
-              >
-                Deactivate
-              </Button>
-            ) : null}
-            <Button
-              variant="destructive"
-              disabled={!canDelete}
-              title={canDelete ? undefined : "Cannot delete: client has projects"}
-              onClick={async () => {
-                const ok = await confirm({
-                  title: "Delete client?",
-                  description: "This permanently deletes the client.",
-                  confirmLabel: "Delete",
-                  destructive: true,
-                })
-                if (!ok) return
-                try {
-                  await api(`/clients/${id}`, { method: "DELETE" })
-                  void navigate({ to: "/clients", search: DEFAULT_LIST_SEARCH })
-                } catch (e) {
-                  alert(e instanceof ApiError ? e.message : "Delete failed")
+          <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Client actions"
+                  />
                 }
-              }}
-            >
-              Delete
-            </Button>
-          </>
+              >
+                <IconDotsVertical />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuGroup>
+                  {client.status === "active" ? (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Deactivate client?",
+                          description: "The client will be marked inactive.",
+                          confirmLabel: "Deactivate",
+                          destructive: true,
+                        })
+                        if (!ok) return
+                        await api(`/clients/${id}/deactivate`, { method: "POST" })
+                        await load()
+                      }}
+                    >
+                      <IconUserOff />
+                      Deactivate
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canDelete ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Delete client?",
+                          description: "This permanently deletes the client.",
+                          confirmLabel: "Delete",
+                          destructive: true,
+                        })
+                        if (!ok) return
+                        try {
+                          await api(`/clients/${id}`, { method: "DELETE" })
+                          void navigate({
+                            to: "/clients",
+                            search: DEFAULT_LIST_SEARCH,
+                          })
+                        } catch (e) {
+                          alert(
+                            e instanceof ApiError ? e.message : "Delete failed",
+                          )
+                        }
+                      }}
+                    >
+                      <IconTrash />
+                      Delete
+                    </DropdownMenuItem>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={<div className="w-full cursor-not-allowed" />}
+                      >
+                        <DropdownMenuItem disabled variant="destructive">
+                          <IconTrash />
+                          Delete
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Cannot delete: client has projects
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
         }
       />
 
@@ -235,32 +282,40 @@ function ClientDetailPage() {
 
         <aside className="lg:sticky lg:top-4">
           <Card>
-            <CardHeader>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">Client details</CardTitle>
+              <TableActionLink
+                label="Edit details"
+                to="/clients/$id/edit"
+                params={{ id }}
+              >
+                <IconPencil className="size-3.5" />
+              </TableActionLink>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-sm">
-              <DetailRow label="Name" value={client.name} />
-              <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
-                <span className="text-muted-foreground">Email</span>
-                {client.email ? <MailLink value={client.email} withCopy /> : <span>—</span>}
-              </div>
-              <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
-                <span className="text-muted-foreground">Phone</span>
-                {client.phone ? <TelLink value={client.phone} withCopy /> : <span>—</span>}
-              </div>
-              <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
-                <span className="text-muted-foreground">Status</span>
-                <StatusBadge status={client.status} />
-              </div>
-              <div className="flex flex-col gap-1 border-b py-2 last:border-0">
-                <span className="text-muted-foreground">Additional info</span>
-                <p className="whitespace-pre-wrap font-medium">
-                  {client.additionalInfo?.trim() || client.contactInfo?.trim() || "—"}
-                </p>
-              </div>
-              <DetailRow label="Projects" value={String(projects.length)} />
-              <DetailRow label="Open" value={String(openProjects.length)} />
-              <DetailRow label="Closed" value={String(closedProjects.length)} />
+            <CardContent className="space-y-4 text-sm">
+              <Detail label="Name" value={client.name} />
+              <Detail
+                label="Email"
+                value={
+                  client.email ? <MailLink value={client.email} withCopy /> : "—"
+                }
+              />
+              <Detail
+                label="Phone"
+                value={
+                  client.phone ? <TelLink value={client.phone} withCopy /> : "—"
+                }
+              />
+              <Detail
+                label="Additional info"
+                value={
+                  <p className="whitespace-pre-wrap">
+                    {client.additionalInfo?.trim() ||
+                      client.contactInfo?.trim() ||
+                      "—"}
+                  </p>
+                }
+              />
             </CardContent>
           </Card>
         </aside>
@@ -380,15 +435,14 @@ function ProjectCard({
             <CardTitle className="line-clamp-2 text-base leading-snug">
               {project.name}
             </CardTitle>
-            <StatusBadge status={project.status} />
+            {profit ? (
+              <HealthBadge marginPercent={profit.marginPercent} settings={settings} />
+            ) : null}
           </div>
           <p className="line-clamp-1 text-xs text-muted-foreground">{categories}</p>
         </CardHeader>
         <CardContent className="space-y-3 text-sm">
           <div className="flex flex-wrap items-center gap-2">
-            {profit ? (
-              <HealthBadge marginPercent={profit.marginPercent} settings={settings} />
-            ) : null}
             {project.amcRecord ? (
               <span className="inline-flex items-center gap-1.5 text-xs">
                 <span className="text-muted-foreground">AMC</span>
@@ -497,17 +551,17 @@ function projectDurationSoFar(startDate: string, endDate: string): string | null
   return formatDistanceStrict(start, until)
 }
 
-function DetailRow({
+function Detail({
   label,
   value,
 }: {
   label: string
-  value: string
+  value: React.ReactNode
 }) {
   return (
-    <div className="flex justify-between gap-4 border-b py-2 last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className="text-right font-medium">{value}</span>
+    <div className="min-w-0">
+      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm font-medium">{value}</dd>
     </div>
   )
 }

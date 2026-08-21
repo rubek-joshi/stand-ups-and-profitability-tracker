@@ -24,6 +24,7 @@ import { StatusBadge } from "@/components/health-badge"
 import { MailLink, TelLink } from "@/components/contact-link"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
+  NavigableTableRow,
   TableActionLink,
   TableActionsCell,
   TableActionsHead,
@@ -100,12 +101,17 @@ function CoreMembersPage() {
             </TableHeader>
             <TableBody>
               {items.map((m) => (
-                <TableRow key={m.id}>
+                <NavigableTableRow
+                  key={m.id}
+                  to="/core-members/$id"
+                  params={{ id: m.id }}
+                >
                   <TableCell>
                     <Link
                       to="/core-members/$id"
                       params={{ id: m.id }}
                       className="font-medium hover:underline"
+                      onClick={(event) => event.stopPropagation()}
                     >
                       {m.name}
                     </Link>
@@ -140,7 +146,7 @@ function CoreMembersPage() {
                       <IconPencil className="size-3.5" />
                     </TableActionLink>
                   </TableActionsCell>
-                </TableRow>
+                </NavigableTableRow>
               ))}
             </TableBody>
           </Table>

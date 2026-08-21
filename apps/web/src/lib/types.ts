@@ -26,6 +26,8 @@ export type Category = {
   name: string
   isActive: boolean
   isSeeded?: boolean
+  _count?: { projectCategories: number }
+  projects?: Project[]
 }
 
 export type ProjectStatus = "active" | "extended" | "closed" | "under_amc"

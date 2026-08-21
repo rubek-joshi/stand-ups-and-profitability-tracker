@@ -1089,9 +1089,9 @@ function StandupDetailPage() {
           { label: "Stand-ups", to: "/stand-ups", search: { page: 1, pageSize: 25 } },
           { label: dateLabel },
         ]}
+        status={<StatusBadge status={standup.status} />}
         actions={
           <>
-            <StatusBadge status={standup.status} />
             {standup.status === "completed" ? (
               <Button
                 variant="outline"

@@ -23,6 +23,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import { EntityLink } from "@/components/resource-link"
 import {
+  NavigableTableRow,
   TableActionLink,
   TableActionsCell,
   TableActionsHead,
@@ -328,8 +329,12 @@ function AuditPage() {
                   const entityRoute = entityId ? ENTITY_ROUTES[type] : undefined
                   const label = `${type} · ${entityId.slice(0, 8)}…`
 
-                  return (
-                    <TableRow key={log.id}>
+                  return entityRoute ? (
+                    <NavigableTableRow
+                      key={log.id}
+                      to={entityRoute}
+                      params={{ id: entityId }}
+                    >
                       <TableCell className="text-sm whitespace-nowrap">
                         {new Date(log.createdAt).toLocaleString()}
                       </TableCell>
@@ -352,16 +357,39 @@ function AuditPage() {
                         {log.summary || "—"}
                       </TableCell>
                       <TableActionsCell>
-                        {entityRoute ? (
-                          <TableActionLink
-                            label="Open entity"
-                            to={entityRoute}
-                            params={{ id: entityId }}
-                          >
-                            <IconExternalLink className="size-3.5" />
-                          </TableActionLink>
-                        ) : null}
+                        <TableActionLink
+                          label="Open entity"
+                          to={entityRoute}
+                          params={{ id: entityId }}
+                        >
+                          <IconExternalLink className="size-3.5" />
+                        </TableActionLink>
                       </TableActionsCell>
+                    </NavigableTableRow>
+                  ) : (
+                    <TableRow key={log.id}>
+                      <TableCell className="text-sm whitespace-nowrap">
+                        {new Date(log.createdAt).toLocaleString()}
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">
+                        {log.action}
+                      </TableCell>
+                      <TableCell>
+                        {log.actor?.name ?? log.actor?.email ?? "—"}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {entityId ? (
+                          <EntityLink type={type} id={entityId}>
+                            {label}
+                          </EntityLink>
+                        ) : (
+                          label
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-md truncate text-sm text-muted-foreground">
+                        {log.summary || "—"}
+                      </TableCell>
+                      <TableActionsCell />
                     </TableRow>
                   )
                 })}

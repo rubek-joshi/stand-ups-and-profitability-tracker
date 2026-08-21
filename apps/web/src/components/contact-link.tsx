@@ -32,6 +32,7 @@ function ContactLink({
       <a
         href={href}
         className="truncate font-medium text-primary underline-offset-4 hover:underline"
+        onClick={(event) => event.stopPropagation()}
       >
         {value}
       </a>
@@ -43,6 +44,7 @@ function ContactLink({
       <a
         href={href}
         className="truncate font-medium text-primary underline-offset-4 hover:underline"
+        onClick={(event) => event.stopPropagation()}
       >
         {value}
       </a>
@@ -53,7 +55,10 @@ function ContactLink({
         className="size-7 shrink-0"
         data-slot={withCopy === "hover" ? "row-actions" : undefined}
         aria-label={copied ? "Copied" : `Copy ${value}`}
-        onClick={() => void copy()}
+        onClick={(event) => {
+          event.stopPropagation()
+          void copy()
+        }}
       >
         {copied ? <IconCheck className="size-3.5" /> : <IconCopy className="size-3.5" />}
       </Button>

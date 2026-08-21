@@ -2,6 +2,8 @@ import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
 import {
   IconCalendarStats,
+  IconEye,
+  IconPencil,
   IconTrendingUp,
   IconUserMinus,
   IconUserPlus,
@@ -10,7 +12,7 @@ import {
 } from "@tabler/icons-react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { Badge } from "@workspace/ui/components/badge"
-import { Button, buttonVariants } from "@workspace/ui/components/button"
+import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
   ChartContainer,
@@ -61,7 +63,9 @@ import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
 import { CoreMemberLink, EmployeeLink } from "@/components/resource-link"
 import {
+  NavigableTableRow,
   TableActionButton,
+  TableActionLink,
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
@@ -230,18 +234,14 @@ function ProjectDetailPage() {
           { label: "Projects", to: "/projects", search: DEFAULT_LIST_SEARCH },
           { label: project.name },
         ]}
-        actions={
+        status={
           <>
             <StatusBadge status={project.status} />
             {profit ? <HealthBadge marginPercent={profit.marginPercent} /> : null}
-            <Link
-              to="/projects/$id/edit"
-              params={{ id }}
-              className={buttonVariants({ variant: "outline" })}
-            >
-              Edit
-            </Link>
-            {canManageAssignments ? (
+          </>
+        }
+        actions={
+          canManageAssignments ? (
               <Button
                 variant="outline"
                 onClick={async () => {
@@ -259,8 +259,7 @@ function ProjectDetailPage() {
               >
                 Close
               </Button>
-            ) : null}
-          </>
+          ) : null
         }
       />
 
@@ -515,7 +514,11 @@ function ProjectDetailPage() {
                   </TableHeader>
                   <TableBody>
                     {pagedAssignmentLog.map((assignment) => (
-                      <TableRow key={assignment.id}>
+                      <NavigableTableRow
+                        key={assignment.id}
+                        to="/employees/$id"
+                        params={{ id: assignment.employeeId }}
+                      >
                         <TableCell>
                           <EmployeeLink id={assignment.employeeId}>
                             {assignment.employee?.name ?? assignment.employeeId}
@@ -528,6 +531,13 @@ function ProjectDetailPage() {
                             : "Present"}
                         </TableCell>
                         <TableActionsCell>
+                          <TableActionLink
+                            label="View"
+                            to="/employees/$id"
+                            params={{ id: assignment.employeeId }}
+                          >
+                            <IconEye className="size-3.5" />
+                          </TableActionLink>
                           {!assignment.unassignedAt ? (
                             <TableActionButton
                               label="Unassign"
@@ -543,7 +553,7 @@ function ProjectDetailPage() {
                             </TableActionButton>
                           ) : null}
                         </TableActionsCell>
-                      </TableRow>
+                      </NavigableTableRow>
                     ))}
                     {assignmentLog.length === 0 ? (
                       <TableRow>
@@ -625,7 +635,11 @@ function ProjectDetailPage() {
                 </TableHeader>
                 <TableBody>
                   {assignments.coreMembers.map((assignment) => (
-                    <TableRow key={assignment.id}>
+                    <NavigableTableRow
+                      key={assignment.id}
+                      to="/core-members/$id"
+                      params={{ id: assignment.coreMemberId }}
+                    >
                       <TableCell>
                         <CoreMemberLink id={assignment.coreMemberId}>
                           {assignment.coreMember?.name ?? assignment.coreMemberId}
@@ -638,6 +652,13 @@ function ProjectDetailPage() {
                           : "Present"}
                       </TableCell>
                       <TableActionsCell>
+                        <TableActionLink
+                          label="View"
+                          to="/core-members/$id"
+                          params={{ id: assignment.coreMemberId }}
+                        >
+                          <IconEye className="size-3.5" />
+                        </TableActionLink>
                         {!assignment.unassignedAt ? (
                           <TableActionButton
                             label="Unassign"
@@ -654,7 +675,7 @@ function ProjectDetailPage() {
                           </TableActionButton>
                         ) : null}
                       </TableActionsCell>
-                    </TableRow>
+                    </NavigableTableRow>
                   ))}
                   {assignments.coreMembers.length === 0 ? (
                     <TableRow>
@@ -888,11 +909,18 @@ function ProjectDetailPage() {
 
         <aside className="xl:sticky xl:top-4 xl:self-start">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Project details</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-base">Project details</CardTitle>
+              <TableActionLink
+                label="Edit details"
+                to="/projects/$id/edit"
+                params={{ id }}
+              >
+                <IconPencil className="size-3.5" />
+              </TableActionLink>
             </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-sm">
-              <DetailRow
+            <CardContent className="space-y-4 text-sm">
+              <Detail
                 label="Client"
                 value={
                   project.client ? (
@@ -908,15 +936,16 @@ function ProjectDetailPage() {
                   )
                 }
               />
-              <DetailRow
+              <Detail
                 label="Categories"
                 value={
                   (project.categories ?? []).length > 0 ? (
-                    <span className="flex flex-wrap justify-end gap-x-2 gap-y-1">
+                    <span className="flex flex-wrap gap-x-2 gap-y-1">
                       {(project.categories ?? []).map((category) => (
                         <Link
                           key={category.id}
-                          to="/categories"
+                          to="/categories/$id"
+                          params={{ id: category.id }}
                           className="text-primary underline-offset-4 hover:underline"
                         >
                           {category.name}
@@ -928,12 +957,12 @@ function ProjectDetailPage() {
                   )
                 }
               />
-              <DetailRow label="Base budget" value={formatNpr(project.budgetPaisa)} />
-              <DetailRow
+              <Detail label="Base budget" value={formatNpr(project.budgetPaisa)} />
+              <Detail
                 label="VAT"
                 value={project.isVatApplicable ? `Yes (${project.vatRateApplied}%)` : "No"}
               />
-              <DetailRow
+              <Detail
                 label="Total incl. VAT"
                 value={
                   profit
@@ -941,14 +970,13 @@ function ProjectDetailPage() {
                     : formatNpr(project.budgetPaisa)
                 }
               />
-              <DetailRow label="Start date" value={String(project.startDate).slice(0, 10)} />
-              <DetailRow label="End date" value={String(project.endDate).slice(0, 10)} />
-              <DetailRow label="Status" value={project.status.replaceAll("_", " ")} capitalize />
-              <DetailRow
+              <Detail label="Start date" value={String(project.startDate).slice(0, 10)} />
+              <Detail label="End date" value={String(project.endDate).slice(0, 10)} />
+              <Detail
                 label="Core members"
                 value={String(summary?.activeCoreMemberCount ?? assignedCoreMemberIds.size)}
               />
-              <DetailRow
+              <Detail
                 label="Extensions"
                 value={`${summary?.extensionCount ?? project.extensions?.length ?? 0} total`}
               />
@@ -1176,19 +1204,17 @@ function ProjectLaborCostChart({
   )
 }
 
-function DetailRow({
+function Detail({
   label,
   value,
-  capitalize,
 }: {
   label: string
   value: React.ReactNode
-  capitalize?: boolean
 }) {
   return (
-    <div className="flex justify-between gap-4 border-b py-2 last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`text-right font-medium${capitalize ? " capitalize" : ""}`}>{value}</span>
+    <div className="min-w-0">
+      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm font-medium">{value}</dd>
     </div>
   )
 }

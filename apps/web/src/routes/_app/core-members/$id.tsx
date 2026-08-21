@@ -1,8 +1,20 @@
 import * as React from "react"
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
-import { IconPencil } from "@tabler/icons-react"
-import { Button, buttonVariants } from "@workspace/ui/components/button"
+import { createFileRoute, useNavigate } from "@tanstack/react-router"
+import {
+  IconDotsVertical,
+  IconPencil,
+  IconTrash,
+  IconUserOff,
+} from "@tabler/icons-react"
+import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import {
   Table,
   TableBody,
@@ -11,17 +23,18 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { MailLink, TelLink } from "@/components/contact-link"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { MarkLeftDialog } from "@/components/mark-left-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
-import {
-  TableActionLink,
-  TableActionsCell,
-  TableActionsHead,
-} from "@/components/table-row-actions"
+import { TableActionLink } from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { formatNpr } from "@/lib/money"
 import type { CoreMember } from "@/lib/types"
@@ -61,6 +74,7 @@ function CoreMemberDetailPage() {
   if (!member) return null
 
   const entries = member.salaryEntries ?? []
+  const canDelete = entries.length === 0
 
   return (
     <div>
@@ -71,114 +85,147 @@ function CoreMemberDetailPage() {
           { label: "Core Members", to: "/core-members" },
           { label: member.name },
         ]}
+        status={<StatusBadge status={member.status} />}
         actions={
-          <>
-            <StatusBadge status={member.status} />
-            <Link
-              to="/core-members/$id/edit"
-              params={{ id }}
-              className={buttonVariants()}
-            >
-              Edit
-            </Link>
-            {member.status === "active" ? (
-              <Button variant="outline" onClick={() => setMarkLeftOpen(true)}>
-                Mark left
-              </Button>
-            ) : null}
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                const ok = await confirm({
-                  title: "Delete core member?",
-                  description: "Only allowed if there is no history.",
-                  confirmLabel: "Delete",
-                  destructive: true,
-                })
-                if (!ok) return
-                try {
-                  await api(`/core-members/${id}`, { method: "DELETE" })
-                  void navigate({ to: "/core-members" })
-                } catch (e) {
-                  alert(e instanceof ApiError ? e.message : "Delete failed")
+          <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Core member actions"
+                  />
                 }
-              }}
-            >
-              Delete
-            </Button>
-          </>
+              >
+                <IconDotsVertical />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuGroup>
+                  {member.status === "active" ? (
+                    <DropdownMenuItem onClick={() => setMarkLeftOpen(true)}>
+                      <IconUserOff />
+                      Mark left
+                    </DropdownMenuItem>
+                  ) : null}
+                  {canDelete ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Delete core member?",
+                          description: "Only allowed if there is no history.",
+                          confirmLabel: "Delete",
+                          destructive: true,
+                        })
+                        if (!ok) return
+                        try {
+                          await api(`/core-members/${id}`, { method: "DELETE" })
+                          void navigate({ to: "/core-members" })
+                        } catch (e) {
+                          alert(e instanceof ApiError ? e.message : "Delete failed")
+                        }
+                      }}
+                    >
+                      <IconTrash />
+                      Delete
+                    </DropdownMenuItem>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={<div className="w-full cursor-not-allowed" />}
+                      >
+                        <DropdownMenuItem disabled variant="destructive">
+                          <IconTrash />
+                          Delete
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Cannot delete: core member has salary history
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Profile</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3 text-sm">
-            <DetailRow label="Name" value={member.name} />
-            <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
-              <span className="text-muted-foreground">Email</span>
-              <MailLink value={member.email} withCopy />
-            </div>
-            <div className="flex items-center justify-between gap-4 border-b py-2 last:border-0">
-              <span className="text-muted-foreground">Contact number</span>
-              {member.contactNumber ? (
-                <TelLink value={member.contactNumber} withCopy />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        <section className="min-w-0">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Salary entries</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {entries.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No salary entries</p>
               ) : (
-                <span>—</span>
-              )}
-            </div>
-            <DetailRow label="Joined" value={String(member.dateJoined).slice(0, 10)} />
-            <DetailRow
-              label="Left"
-              value={member.dateLeft ? String(member.dateLeft).slice(0, 10) : "—"}
-            />
-            <DetailRow label="Status" value={member.status} capitalize />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Salary entries</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {entries.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No salary entries</p>
-            ) : (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Effective</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Reason</TableHead>
-                    <TableActionsHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {entries.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>{String(entry.effectiveDate).slice(0, 10)}</TableCell>
-                      <TableCell>{formatNpr(entry.salaryPaisa)}</TableCell>
-                      <TableCell className="max-w-48 truncate text-muted-foreground">
-                        {entry.reason?.trim() || "—"}
-                      </TableCell>
-                      <TableActionsCell>
-                        <TableActionLink
-                          label="Edit"
-                          to="/core-members/$id/edit"
-                          params={{ id }}
-                        >
-                          <IconPencil className="size-3.5" />
-                        </TableActionLink>
-                      </TableActionsCell>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Effective</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Reason</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            )}
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {entries.map((entry) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>{String(entry.effectiveDate).slice(0, 10)}</TableCell>
+                        <TableCell>{formatNpr(entry.salaryPaisa)}</TableCell>
+                        <TableCell className="max-w-48 truncate text-muted-foreground">
+                          {entry.reason?.trim() || "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        <aside className="lg:sticky lg:top-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <CardTitle className="text-base">Profile</CardTitle>
+              <TableActionLink
+                label="Edit details"
+                to="/core-members/$id/edit"
+                params={{ id }}
+              >
+                <IconPencil className="size-3.5" />
+              </TableActionLink>
+            </CardHeader>
+            <CardContent className="space-y-4 text-sm">
+              <Detail label="Name" value={member.name} />
+              <Detail
+                label="Email"
+                value={<MailLink value={member.email} withCopy />}
+              />
+              <Detail
+                label="Contact number"
+                value={
+                  member.contactNumber ? (
+                    <TelLink value={member.contactNumber} withCopy />
+                  ) : (
+                    "—"
+                  )
+                }
+              />
+              <Detail
+                label="Joined"
+                value={String(member.dateJoined).slice(0, 10)}
+              />
+              <Detail
+                label="Left"
+                value={
+                  member.dateLeft ? String(member.dateLeft).slice(0, 10) : "—"
+                }
+              />
+            </CardContent>
+          </Card>
+        </aside>
       </div>
       {dialog}
       <MarkLeftDialog
@@ -202,19 +249,17 @@ function CoreMemberDetailPage() {
   )
 }
 
-function DetailRow({
+function Detail({
   label,
   value,
-  capitalize,
 }: {
   label: string
-  value: string
-  capitalize?: boolean
+  value: React.ReactNode
 }) {
   return (
-    <div className="flex justify-between gap-4 border-b py-2 last:border-0">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`text-right font-medium${capitalize ? " capitalize" : ""}`}>{value}</span>
+    <div className="min-w-0">
+      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-sm font-medium">{value}</dd>
     </div>
   )
 }

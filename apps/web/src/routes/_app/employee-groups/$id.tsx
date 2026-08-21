@@ -1,6 +1,6 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
-import { IconPencil, IconTrash, IconUserMinus, IconUserPlus } from "@tabler/icons-react"
+import { IconEye, IconPencil, IconTrash, IconUserMinus, IconUserPlus } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Checkbox } from "@workspace/ui/components/checkbox"
 import {
@@ -29,7 +29,9 @@ import { ErrorState, LoadingState } from "@/components/ui-states"
 import { MailLink, TelLink } from "@/components/contact-link"
 import { EmployeeLink } from "@/components/resource-link"
 import {
+  NavigableTableRow,
   TableActionButton,
+  TableActionLink,
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
@@ -322,7 +324,11 @@ function EmployeeGroupDetailPage() {
               </TableHeader>
               <TableBody>
                 {pageMembers.map((m) => (
-                  <TableRow key={m.employeeId}>
+                  <NavigableTableRow
+                    key={m.employeeId}
+                    to="/employees/$id"
+                    params={{ id: m.employeeId }}
+                  >
                     <TableCell>
                       <EmployeeLink id={m.employeeId}>{m.employee.name}</EmployeeLink>
                     </TableCell>
@@ -337,6 +343,13 @@ function EmployeeGroupDetailPage() {
                       )}
                     </TableCell>
                     <TableActionsCell>
+                      <TableActionLink
+                        label="View"
+                        to="/employees/$id"
+                        params={{ id: m.employeeId }}
+                      >
+                        <IconEye className="size-3.5" />
+                      </TableActionLink>
                       <TableActionButton
                         label="Remove"
                         variant="destructive"
@@ -357,7 +370,7 @@ function EmployeeGroupDetailPage() {
                         <IconUserMinus className="size-3.5" />
                       </TableActionButton>
                     </TableActionsCell>
-                  </TableRow>
+                  </NavigableTableRow>
                 ))}
                 {members.length === 0 ? (
                   <TableRow>

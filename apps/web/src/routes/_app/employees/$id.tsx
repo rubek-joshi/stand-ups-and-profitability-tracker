@@ -2,7 +2,6 @@ import * as React from "react"
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router"
 import {
   IconAlertTriangle,
-  IconCalendar,
   IconCalendarEvent,
   IconCake,
   IconClock,
@@ -295,7 +294,7 @@ function EmployeeDetailPage() {
           { label: "Employees", to: "/employees", search: DEFAULT_LIST_SEARCH },
           { label: employee.name },
         ]}
-        actions={
+        status={
           <>
             <StatusBadge status={employee.status} />
             {(employee.groups ?? []).map((g) => (
@@ -307,6 +306,10 @@ function EmployeeDetailPage() {
                 <Badge variant="secondary">{g.name}</Badge>
               </Link>
             ))}
+          </>
+        }
+        actions={
+          <>
             {employee.status === "active" ? (
               <Button variant="outline" onClick={() => setMarkLeftOpen(true)}>
                 Mark left
@@ -625,29 +628,6 @@ function EmployeeDetailPage() {
                   )
                 }
               />
-              <div className="flex gap-3">
-                <IconUser className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0">
-                  <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                    Status
-                  </dt>
-                  <dd className="mt-1">
-                    <StatusBadge status={employee.status} />
-                  </dd>
-                </div>
-              </div>
-              <Detail
-                icon={IconCalendar}
-                label="Date joined"
-                value={`${format(parseISO(joinedKey), "d MMM yyyy")} · ${tenureYears} yr tenure`}
-              />
-              {employee.dateOfBirth ? (
-                <Detail
-                  icon={IconCake}
-                  label="Date of birth"
-                  value={format(parseISO(toDateKey(employee.dateOfBirth)), "d MMM yyyy")}
-                />
-              ) : null}
               {employee.dateLeft ? (
                 <Detail
                   icon={IconUserOff}
@@ -662,6 +642,7 @@ function EmployeeDetailPage() {
                 <Milestone
                   icon={IconCalendarEvent}
                   label={`${tenureYears + 1}-year work anniversary`}
+                  detail={`${tenureYears} yr tenure · joined ${format(parseISO(joinedKey), "d MMM yyyy")}`}
                   date={format(anniversary, "d MMM yyyy")}
                   countdown={countdownLabel(anniversary, today)}
                 />
@@ -747,11 +728,13 @@ function Detail({
 function Milestone({
   icon: Icon,
   label,
+  detail,
   date,
   countdown,
 }: {
   icon: React.ElementType
   label: string
+  detail?: string
   date: string
   countdown: string
 }) {
@@ -761,7 +744,12 @@ function Milestone({
         <Icon className="size-4 text-primary" />
         {label}
       </div>
-      <p className="mt-2 text-sm text-muted-foreground">{date}</p>
+      {detail ? (
+        <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+      ) : null}
+      <p className={`text-sm text-muted-foreground ${detail ? "mt-1" : "mt-2"}`}>
+        {date}
+      </p>
       <p className="text-sm font-semibold text-primary">{countdown}</p>
     </div>
   )

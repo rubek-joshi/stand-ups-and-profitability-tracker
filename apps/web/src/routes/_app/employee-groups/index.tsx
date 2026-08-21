@@ -25,6 +25,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
+  NavigableTableRow,
   TableActionButton,
   TableActionLink,
   TableActionsCell,
@@ -135,12 +136,17 @@ function EmployeeGroupsPage() {
               </TableHeader>
               <TableBody>
                 {groups.map((g) => (
-                  <TableRow key={g.id}>
+                  <NavigableTableRow
+                    key={g.id}
+                    to="/employee-groups/$id"
+                    params={{ id: g.id }}
+                  >
                     <TableCell>
                       <Link
                         to="/employee-groups/$id"
                         params={{ id: g.id }}
                         className="font-medium hover:underline"
+                        onClick={(event) => event.stopPropagation()}
                       >
                         {g.name}
                       </Link>
@@ -185,7 +191,7 @@ function EmployeeGroupsPage() {
                         <IconTrash className="size-3.5" />
                       </TableActionButton>
                     </TableActionsCell>
-                  </TableRow>
+                  </NavigableTableRow>
                 ))}
               </TableBody>
             </Table>

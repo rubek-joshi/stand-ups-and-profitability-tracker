@@ -40,6 +40,7 @@ import { StandupCalendar, utcIsoDate } from "@/components/standup/standup-calend
 import { StandupHistoryView } from "@/components/standup/standup-history-view"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
+  NavigableTableRow,
   TableActionLink,
   TableActionsCell,
   TableActionsHead,
@@ -254,12 +255,17 @@ function StandupsPage() {
                   </TableHeader>
                   <TableBody>
                     {items.map((s) => (
-                      <TableRow key={s.id}>
+                      <NavigableTableRow
+                        key={s.id}
+                        to="/stand-ups/$id"
+                        params={{ id: s.id }}
+                      >
                         <TableCell>
                           <Link
                             to="/stand-ups/$id"
                             params={{ id: s.id }}
                             className="font-medium hover:underline"
+                            onClick={(event) => event.stopPropagation()}
                           >
                             {formatStandupDate(String(s.date))}
                           </Link>
@@ -278,7 +284,7 @@ function StandupsPage() {
                             <IconEye className="size-3.5" />
                           </TableActionLink>
                         </TableActionsCell>
-                      </TableRow>
+                      </NavigableTableRow>
                     ))}
                   </TableBody>
                 </Table>

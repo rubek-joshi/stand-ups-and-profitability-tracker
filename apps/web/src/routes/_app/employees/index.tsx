@@ -26,6 +26,7 @@ import { StatusBadge } from "@/components/health-badge"
 import { MailLink, TelLink } from "@/components/contact-link"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
+  NavigableTableRow,
   TableActionLink,
   TableActionsCell,
   TableActionsHead,
@@ -137,12 +138,17 @@ function EmployeesPage() {
               </TableHeader>
               <TableBody>
                 {items.map((e) => (
-                  <TableRow key={e.id}>
+                  <NavigableTableRow
+                    key={e.id}
+                    to="/employees/$id"
+                    params={{ id: e.id }}
+                  >
                     <TableCell>
                       <Link
                         to="/employees/$id"
                         params={{ id: e.id }}
                         className="font-medium hover:underline"
+                        onClick={(event) => event.stopPropagation()}
                       >
                         {e.name}
                       </Link>
@@ -165,6 +171,7 @@ function EmployeesPage() {
                               key={g.id}
                               to="/employee-groups/$id"
                               params={{ id: g.id }}
+                              onClick={(event) => event.stopPropagation()}
                             >
                               <Badge variant="secondary">{g.name}</Badge>
                             </Link>
@@ -196,7 +203,7 @@ function EmployeesPage() {
                         <IconPencil className="size-3.5" />
                       </TableActionLink>
                     </TableActionsCell>
-                  </TableRow>
+                  </NavigableTableRow>
                 ))}
               </TableBody>
             </Table>

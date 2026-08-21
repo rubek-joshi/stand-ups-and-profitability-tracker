@@ -16,7 +16,6 @@ import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as AppVatRouteImport } from './routes/_app/vat'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppProfileRouteImport } from './routes/_app/profile'
-import { Route as AppCategoriesRouteImport } from './routes/_app/categories'
 import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppUsersIndexRouteImport } from './routes/_app/users/index'
 import { Route as AppStandUpsIndexRouteImport } from './routes/_app/stand-ups/index'
@@ -25,6 +24,7 @@ import { Route as AppEmployeesIndexRouteImport } from './routes/_app/employees/i
 import { Route as AppEmployeeGroupsIndexRouteImport } from './routes/_app/employee-groups/index'
 import { Route as AppCoreMembersIndexRouteImport } from './routes/_app/core-members/index'
 import { Route as AppClientsIndexRouteImport } from './routes/_app/clients/index'
+import { Route as AppCategoriesIndexRouteImport } from './routes/_app/categories/index'
 import { Route as AppAmcIndexRouteImport } from './routes/_app/amc/index'
 import { Route as AppUsersIdRouteImport } from './routes/_app/users/$id'
 import { Route as AppStandUpsIdRouteImport } from './routes/_app/stand-ups/$id'
@@ -33,10 +33,12 @@ import { Route as AppEmployeesIdRouteImport } from './routes/_app/employees/$id'
 import { Route as AppEmployeeGroupsIdRouteImport } from './routes/_app/employee-groups/$id'
 import { Route as AppCoreMembersIdRouteImport } from './routes/_app/core-members/$id'
 import { Route as AppClientsIdRouteImport } from './routes/_app/clients/$id'
+import { Route as AppCategoriesIdRouteImport } from './routes/_app/categories/$id'
 import { Route as AppProjectsIdEditRouteImport } from './routes/_app/projects/$id_.edit'
 import { Route as AppEmployeesIdEditRouteImport } from './routes/_app/employees/$id_.edit'
 import { Route as AppCoreMembersIdEditRouteImport } from './routes/_app/core-members/$id_.edit'
 import { Route as AppClientsIdEditRouteImport } from './routes/_app/clients/$id_.edit'
+import { Route as AppCategoriesIdEditRouteImport } from './routes/_app/categories/$id_.edit'
 import { Route as AppEmployeesIdSalaryEditRouteImport } from './routes/_app/employees/$id_.salary.edit'
 
 const LoginRoute = LoginRouteImport.update({
@@ -71,11 +73,6 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
 const AppProfileRoute = AppProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppCategoriesRoute = AppCategoriesRouteImport.update({
-  id: '/categories',
-  path: '/categories',
   getParentRoute: () => AppRoute,
 } as any)
 const AppAuditRoute = AppAuditRouteImport.update({
@@ -118,6 +115,11 @@ const AppClientsIndexRoute = AppClientsIndexRouteImport.update({
   path: '/clients/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCategoriesIndexRoute = AppCategoriesIndexRouteImport.update({
+  id: '/categories/',
+  path: '/categories/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppAmcIndexRoute = AppAmcIndexRouteImport.update({
   id: '/amc/',
   path: '/amc/',
@@ -158,6 +160,11 @@ const AppClientsIdRoute = AppClientsIdRouteImport.update({
   path: '/clients/$id',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCategoriesIdRoute = AppCategoriesIdRouteImport.update({
+  id: '/categories/$id',
+  path: '/categories/$id',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppProjectsIdEditRoute = AppProjectsIdEditRouteImport.update({
   id: '/projects/$id_/edit',
   path: '/projects/$id/edit',
@@ -178,6 +185,11 @@ const AppClientsIdEditRoute = AppClientsIdEditRouteImport.update({
   path: '/clients/$id/edit',
   getParentRoute: () => AppRoute,
 } as any)
+const AppCategoriesIdEditRoute = AppCategoriesIdEditRouteImport.update({
+  id: '/categories/$id_/edit',
+  path: '/categories/$id/edit',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppEmployeesIdSalaryEditRoute =
   AppEmployeesIdSalaryEditRouteImport.update({
     id: '/employees/$id_/salary/edit',
@@ -190,10 +202,10 @@ export interface FileRoutesByFullPath {
   '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
   '/audit': typeof AppAuditRoute
-  '/categories': typeof AppCategoriesRoute
   '/profile': typeof AppProfileRoute
   '/settings': typeof AppSettingsRoute
   '/vat': typeof AppVatRoute
+  '/categories/$id': typeof AppCategoriesIdRoute
   '/clients/$id': typeof AppClientsIdRoute
   '/core-members/$id': typeof AppCoreMembersIdRoute
   '/employee-groups/$id': typeof AppEmployeeGroupsIdRoute
@@ -202,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/stand-ups/$id': typeof AppStandUpsIdRoute
   '/users/$id': typeof AppUsersIdRoute
   '/amc/': typeof AppAmcIndexRoute
+  '/categories/': typeof AppCategoriesIndexRoute
   '/clients/': typeof AppClientsIndexRoute
   '/core-members/': typeof AppCoreMembersIndexRoute
   '/employee-groups/': typeof AppEmployeeGroupsIndexRoute
@@ -209,6 +222,7 @@ export interface FileRoutesByFullPath {
   '/projects/': typeof AppProjectsIndexRoute
   '/stand-ups/': typeof AppStandUpsIndexRoute
   '/users/': typeof AppUsersIndexRoute
+  '/categories/$id/edit': typeof AppCategoriesIdEditRoute
   '/clients/$id/edit': typeof AppClientsIdEditRoute
   '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
   '/employees/$id/edit': typeof AppEmployeesIdEditRoute
@@ -219,11 +233,11 @@ export interface FileRoutesByTo {
   '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
   '/audit': typeof AppAuditRoute
-  '/categories': typeof AppCategoriesRoute
   '/profile': typeof AppProfileRoute
   '/settings': typeof AppSettingsRoute
   '/vat': typeof AppVatRoute
   '/': typeof AppIndexRoute
+  '/categories/$id': typeof AppCategoriesIdRoute
   '/clients/$id': typeof AppClientsIdRoute
   '/core-members/$id': typeof AppCoreMembersIdRoute
   '/employee-groups/$id': typeof AppEmployeeGroupsIdRoute
@@ -232,6 +246,7 @@ export interface FileRoutesByTo {
   '/stand-ups/$id': typeof AppStandUpsIdRoute
   '/users/$id': typeof AppUsersIdRoute
   '/amc': typeof AppAmcIndexRoute
+  '/categories': typeof AppCategoriesIndexRoute
   '/clients': typeof AppClientsIndexRoute
   '/core-members': typeof AppCoreMembersIndexRoute
   '/employee-groups': typeof AppEmployeeGroupsIndexRoute
@@ -239,6 +254,7 @@ export interface FileRoutesByTo {
   '/projects': typeof AppProjectsIndexRoute
   '/stand-ups': typeof AppStandUpsIndexRoute
   '/users': typeof AppUsersIndexRoute
+  '/categories/$id/edit': typeof AppCategoriesIdEditRoute
   '/clients/$id/edit': typeof AppClientsIdEditRoute
   '/core-members/$id/edit': typeof AppCoreMembersIdEditRoute
   '/employees/$id/edit': typeof AppEmployeesIdEditRoute
@@ -251,11 +267,11 @@ export interface FileRoutesById {
   '/change-password': typeof ChangePasswordRoute
   '/login': typeof LoginRoute
   '/_app/audit': typeof AppAuditRoute
-  '/_app/categories': typeof AppCategoriesRoute
   '/_app/profile': typeof AppProfileRoute
   '/_app/settings': typeof AppSettingsRoute
   '/_app/vat': typeof AppVatRoute
   '/_app/': typeof AppIndexRoute
+  '/_app/categories/$id': typeof AppCategoriesIdRoute
   '/_app/clients/$id': typeof AppClientsIdRoute
   '/_app/core-members/$id': typeof AppCoreMembersIdRoute
   '/_app/employee-groups/$id': typeof AppEmployeeGroupsIdRoute
@@ -264,6 +280,7 @@ export interface FileRoutesById {
   '/_app/stand-ups/$id': typeof AppStandUpsIdRoute
   '/_app/users/$id': typeof AppUsersIdRoute
   '/_app/amc/': typeof AppAmcIndexRoute
+  '/_app/categories/': typeof AppCategoriesIndexRoute
   '/_app/clients/': typeof AppClientsIndexRoute
   '/_app/core-members/': typeof AppCoreMembersIndexRoute
   '/_app/employee-groups/': typeof AppEmployeeGroupsIndexRoute
@@ -271,6 +288,7 @@ export interface FileRoutesById {
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/stand-ups/': typeof AppStandUpsIndexRoute
   '/_app/users/': typeof AppUsersIndexRoute
+  '/_app/categories/$id_/edit': typeof AppCategoriesIdEditRoute
   '/_app/clients/$id_/edit': typeof AppClientsIdEditRoute
   '/_app/core-members/$id_/edit': typeof AppCoreMembersIdEditRoute
   '/_app/employees/$id_/edit': typeof AppEmployeesIdEditRoute
@@ -284,10 +302,10 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/login'
     | '/audit'
-    | '/categories'
     | '/profile'
     | '/settings'
     | '/vat'
+    | '/categories/$id'
     | '/clients/$id'
     | '/core-members/$id'
     | '/employee-groups/$id'
@@ -296,6 +314,7 @@ export interface FileRouteTypes {
     | '/stand-ups/$id'
     | '/users/$id'
     | '/amc/'
+    | '/categories/'
     | '/clients/'
     | '/core-members/'
     | '/employee-groups/'
@@ -303,6 +322,7 @@ export interface FileRouteTypes {
     | '/projects/'
     | '/stand-ups/'
     | '/users/'
+    | '/categories/$id/edit'
     | '/clients/$id/edit'
     | '/core-members/$id/edit'
     | '/employees/$id/edit'
@@ -313,11 +333,11 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/login'
     | '/audit'
-    | '/categories'
     | '/profile'
     | '/settings'
     | '/vat'
     | '/'
+    | '/categories/$id'
     | '/clients/$id'
     | '/core-members/$id'
     | '/employee-groups/$id'
@@ -326,6 +346,7 @@ export interface FileRouteTypes {
     | '/stand-ups/$id'
     | '/users/$id'
     | '/amc'
+    | '/categories'
     | '/clients'
     | '/core-members'
     | '/employee-groups'
@@ -333,6 +354,7 @@ export interface FileRouteTypes {
     | '/projects'
     | '/stand-ups'
     | '/users'
+    | '/categories/$id/edit'
     | '/clients/$id/edit'
     | '/core-members/$id/edit'
     | '/employees/$id/edit'
@@ -344,11 +366,11 @@ export interface FileRouteTypes {
     | '/change-password'
     | '/login'
     | '/_app/audit'
-    | '/_app/categories'
     | '/_app/profile'
     | '/_app/settings'
     | '/_app/vat'
     | '/_app/'
+    | '/_app/categories/$id'
     | '/_app/clients/$id'
     | '/_app/core-members/$id'
     | '/_app/employee-groups/$id'
@@ -357,6 +379,7 @@ export interface FileRouteTypes {
     | '/_app/stand-ups/$id'
     | '/_app/users/$id'
     | '/_app/amc/'
+    | '/_app/categories/'
     | '/_app/clients/'
     | '/_app/core-members/'
     | '/_app/employee-groups/'
@@ -364,6 +387,7 @@ export interface FileRouteTypes {
     | '/_app/projects/'
     | '/_app/stand-ups/'
     | '/_app/users/'
+    | '/_app/categories/$id_/edit'
     | '/_app/clients/$id_/edit'
     | '/_app/core-members/$id_/edit'
     | '/_app/employees/$id_/edit'
@@ -428,13 +452,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
-    '/_app/categories': {
-      id: '/_app/categories'
-      path: '/categories'
-      fullPath: '/categories'
-      preLoaderRoute: typeof AppCategoriesRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/audit': {
       id: '/_app/audit'
       path: '/audit'
@@ -489,6 +506,13 @@ declare module '@tanstack/react-router' {
       path: '/clients'
       fullPath: '/clients/'
       preLoaderRoute: typeof AppClientsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/categories/': {
+      id: '/_app/categories/'
+      path: '/categories'
+      fullPath: '/categories/'
+      preLoaderRoute: typeof AppCategoriesIndexRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/amc/': {
@@ -547,6 +571,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientsIdRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/categories/$id': {
+      id: '/_app/categories/$id'
+      path: '/categories/$id'
+      fullPath: '/categories/$id'
+      preLoaderRoute: typeof AppCategoriesIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/projects/$id_/edit': {
       id: '/_app/projects/$id_/edit'
       path: '/projects/$id/edit'
@@ -575,6 +606,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppClientsIdEditRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/categories/$id_/edit': {
+      id: '/_app/categories/$id_/edit'
+      path: '/categories/$id/edit'
+      fullPath: '/categories/$id/edit'
+      preLoaderRoute: typeof AppCategoriesIdEditRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/employees/$id_/salary/edit': {
       id: '/_app/employees/$id_/salary/edit'
       path: '/employees/$id/salary/edit'
@@ -587,11 +625,11 @@ declare module '@tanstack/react-router' {
 
 interface AppRouteChildren {
   AppAuditRoute: typeof AppAuditRoute
-  AppCategoriesRoute: typeof AppCategoriesRoute
   AppProfileRoute: typeof AppProfileRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppVatRoute: typeof AppVatRoute
   AppIndexRoute: typeof AppIndexRoute
+  AppCategoriesIdRoute: typeof AppCategoriesIdRoute
   AppClientsIdRoute: typeof AppClientsIdRoute
   AppCoreMembersIdRoute: typeof AppCoreMembersIdRoute
   AppEmployeeGroupsIdRoute: typeof AppEmployeeGroupsIdRoute
@@ -600,6 +638,7 @@ interface AppRouteChildren {
   AppStandUpsIdRoute: typeof AppStandUpsIdRoute
   AppUsersIdRoute: typeof AppUsersIdRoute
   AppAmcIndexRoute: typeof AppAmcIndexRoute
+  AppCategoriesIndexRoute: typeof AppCategoriesIndexRoute
   AppClientsIndexRoute: typeof AppClientsIndexRoute
   AppCoreMembersIndexRoute: typeof AppCoreMembersIndexRoute
   AppEmployeeGroupsIndexRoute: typeof AppEmployeeGroupsIndexRoute
@@ -607,6 +646,7 @@ interface AppRouteChildren {
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppStandUpsIndexRoute: typeof AppStandUpsIndexRoute
   AppUsersIndexRoute: typeof AppUsersIndexRoute
+  AppCategoriesIdEditRoute: typeof AppCategoriesIdEditRoute
   AppClientsIdEditRoute: typeof AppClientsIdEditRoute
   AppCoreMembersIdEditRoute: typeof AppCoreMembersIdEditRoute
   AppEmployeesIdEditRoute: typeof AppEmployeesIdEditRoute
@@ -616,11 +656,11 @@ interface AppRouteChildren {
 
 const AppRouteChildren: AppRouteChildren = {
   AppAuditRoute: AppAuditRoute,
-  AppCategoriesRoute: AppCategoriesRoute,
   AppProfileRoute: AppProfileRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppVatRoute: AppVatRoute,
   AppIndexRoute: AppIndexRoute,
+  AppCategoriesIdRoute: AppCategoriesIdRoute,
   AppClientsIdRoute: AppClientsIdRoute,
   AppCoreMembersIdRoute: AppCoreMembersIdRoute,
   AppEmployeeGroupsIdRoute: AppEmployeeGroupsIdRoute,
@@ -629,6 +669,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppStandUpsIdRoute: AppStandUpsIdRoute,
   AppUsersIdRoute: AppUsersIdRoute,
   AppAmcIndexRoute: AppAmcIndexRoute,
+  AppCategoriesIndexRoute: AppCategoriesIndexRoute,
   AppClientsIndexRoute: AppClientsIndexRoute,
   AppCoreMembersIndexRoute: AppCoreMembersIndexRoute,
   AppEmployeeGroupsIndexRoute: AppEmployeeGroupsIndexRoute,
@@ -636,6 +677,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppStandUpsIndexRoute: AppStandUpsIndexRoute,
   AppUsersIndexRoute: AppUsersIndexRoute,
+  AppCategoriesIdEditRoute: AppCategoriesIdEditRoute,
   AppClientsIdEditRoute: AppClientsIdEditRoute,
   AppCoreMembersIdEditRoute: AppCoreMembersIdEditRoute,
   AppEmployeesIdEditRoute: AppEmployeesIdEditRoute,

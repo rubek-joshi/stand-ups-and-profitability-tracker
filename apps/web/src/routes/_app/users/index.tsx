@@ -1,6 +1,7 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
 import {
+  IconEye,
   IconPlayerPlay,
   IconPlayerPause,
   IconSearch,
@@ -37,7 +38,9 @@ import { StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
+  NavigableTableRow,
   TableActionButton,
+  TableActionLink,
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
@@ -169,12 +172,17 @@ function UsersPage() {
                 {items.map((u) => {
                   const isSelf = currentUser?.id === u.id
                   return (
-                    <TableRow key={u.id}>
+                    <NavigableTableRow
+                      key={u.id}
+                      to="/users/$id"
+                      params={{ id: u.id }}
+                    >
                       <TableCell className="font-medium">
                         <Link
                           to="/users/$id"
                           params={{ id: u.id }}
                           className="hover:underline"
+                          onClick={(event) => event.stopPropagation()}
                         >
                           {u.name}
                         </Link>
@@ -191,6 +199,13 @@ function UsersPage() {
                         {formatLastLogin(u.lastLoginAt)}
                       </TableCell>
                       <TableActionsCell>
+                        <TableActionLink
+                          label="View"
+                          to="/users/$id"
+                          params={{ id: u.id }}
+                        >
+                          <IconEye className="size-3.5" />
+                        </TableActionLink>
                         {u.isActive ? (
                           <TableActionButton
                             label="Deactivate"
@@ -246,7 +261,7 @@ function UsersPage() {
                           </TableActionButton>
                         )}
                       </TableActionsCell>
-                    </TableRow>
+                    </NavigableTableRow>
                   )
                 })}
               </TableBody>

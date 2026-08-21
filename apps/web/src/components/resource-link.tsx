@@ -17,6 +17,7 @@ export function ProjectLink({
       to="/projects/$id"
       params={{ id }}
       className={cn("font-medium hover:underline", className)}
+      onClick={(event) => event.stopPropagation()}
     >
       {children}
     </Link>
@@ -33,6 +34,7 @@ export function ClientLink({
       to="/clients/$id"
       params={{ id }}
       className={cn("font-medium hover:underline", className)}
+      onClick={(event) => event.stopPropagation()}
     >
       {children}
     </Link>
@@ -49,6 +51,7 @@ export function EmployeeLink({
       to="/employees/$id"
       params={{ id }}
       className={cn("font-medium hover:underline", className)}
+      onClick={(event) => event.stopPropagation()}
     >
       {children}
     </Link>
@@ -65,6 +68,7 @@ export function CoreMemberLink({
       to="/core-members/$id"
       params={{ id }}
       className={cn("font-medium hover:underline", className)}
+      onClick={(event) => event.stopPropagation()}
     >
       {children}
     </Link>
@@ -81,6 +85,7 @@ export function StandupLink({
       to="/stand-ups/$id"
       params={{ id }}
       className={cn("font-medium hover:underline", className)}
+      onClick={(event) => event.stopPropagation()}
     >
       {children}
     </Link>
@@ -97,6 +102,7 @@ export function UserLink({
       to="/users/$id"
       params={{ id }}
       className={cn("font-medium hover:underline", className)}
+      onClick={(event) => event.stopPropagation()}
     >
       {children}
     </Link>

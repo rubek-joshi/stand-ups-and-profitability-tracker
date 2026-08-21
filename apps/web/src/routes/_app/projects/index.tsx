@@ -24,6 +24,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { StatusBadge } from "@/components/health-badge"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
+  NavigableTableRow,
   TableActionLink,
   TableActionsCell,
   TableActionsHead,
@@ -198,12 +199,17 @@ function ProjectsPage() {
               </TableHeader>
               <TableBody>
                 {projects.map((p) => (
-                  <TableRow key={p.id}>
+                  <NavigableTableRow
+                    key={p.id}
+                    to="/projects/$id"
+                    params={{ id: p.id }}
+                  >
                     <TableCell>
                       <Link
                         to="/projects/$id"
                         params={{ id: p.id }}
                         className="font-medium hover:underline"
+                        onClick={(event) => event.stopPropagation()}
                       >
                         {p.name}
                       </Link>
@@ -214,6 +220,7 @@ function ProjectsPage() {
                           to="/clients/$id"
                           params={{ id: p.client.id }}
                           className="hover:underline"
+                          onClick={(event) => event.stopPropagation()}
                         >
                           {p.client.name}
                         </Link>
@@ -244,7 +251,7 @@ function ProjectsPage() {
                         <IconPencil className="size-3.5" />
                       </TableActionLink>
                     </TableActionsCell>
-                  </TableRow>
+                  </NavigableTableRow>
                 ))}
               </TableBody>
             </Table>

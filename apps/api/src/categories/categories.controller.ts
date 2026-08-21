@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -40,6 +41,13 @@ export class CategoriesController {
     return this.categoriesService.findAll();
   }
 
+  @Get(":id")
+  @RequirePermission("categories", "read")
+  @ApiOperation({ summary: "Get category" })
+  async findOne(@Param("id") id: string) {
+    return this.categoriesService.findOne(id);
+  }
+
   @Patch(":id")
   @RequirePermission("categories", "*")
   @ApiOperation({ summary: "Update category" })
@@ -59,5 +67,12 @@ export class CategoriesController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.categoriesService.deactivate(id, user.id);
+  }
+
+  @Delete(":id")
+  @RequirePermission("categories", "*")
+  @ApiOperation({ summary: "Delete category (blocked if projects exist)" })
+  async remove(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    return this.categoriesService.remove(id, user.id);
   }
 }

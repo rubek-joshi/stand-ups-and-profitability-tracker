@@ -1,6 +1,6 @@
 import * as React from "react"
-import { createFileRoute } from "@tanstack/react-router"
-import { IconPencil, IconPlayerPause } from "@tabler/icons-react"
+import { Link, createFileRoute } from "@tanstack/react-router"
+import { IconEye, IconPencil } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
@@ -21,17 +21,17 @@ import {
 } from "@workspace/ui/components/table"
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
-import { useConfirmDialog } from "@/components/confirm-dialog"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import {
-  TableActionButton,
+  NavigableTableRow,
+  TableActionLink,
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import type { Category } from "@/lib/types"
 
-export const Route = createFileRoute("/_app/categories")({
+export const Route = createFileRoute("/_app/categories/")({
   component: CategoriesPage,
 })
 
@@ -41,9 +41,6 @@ function CategoriesPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [open, setOpen] = React.useState(false)
   const [name, setName] = React.useState("")
-  const [editId, setEditId] = React.useState<string | null>(null)
-  const [editName, setEditName] = React.useState("")
-  const { confirm, dialog } = useConfirmDialog()
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -79,74 +76,48 @@ function CategoriesPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead>Projects</TableHead>
                 <TableActionsHead />
               </TableRow>
             </TableHeader>
             <TableBody>
               {items.map((c) => (
-                <TableRow key={c.id}>
+                <NavigableTableRow
+                  key={c.id}
+                  to="/categories/$id"
+                  params={{ id: c.id }}
+                >
                   <TableCell>
-                    {editId === c.id ? (
-                      <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
-                    ) : (
-                      c.name
-                    )}
+                    <Link
+                      to="/categories/$id"
+                      params={{ id: c.id }}
+                      className="font-medium hover:underline"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {c.name}
+                    </Link>
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={c.isActive ? "active" : "inactive"} />
                   </TableCell>
-                  {editId === c.id ? (
-                    <TableCell className="space-x-2 text-right">
-                      <Button
-                        size="sm"
-                        onClick={async () => {
-                          await api(`/categories/${c.id}`, {
-                            method: "PATCH",
-                            body: { name: editName.trim() },
-                          })
-                          setEditId(null)
-                          await load()
-                        }}
-                      >
-                        Save
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => setEditId(null)}>
-                        Cancel
-                      </Button>
-                    </TableCell>
-                  ) : (
-                    <TableActionsCell>
-                      <TableActionButton
-                        label="Edit"
-                        onClick={() => {
-                          setEditId(c.id)
-                          setEditName(c.name)
-                        }}
-                      >
-                        <IconPencil className="size-3.5" />
-                      </TableActionButton>
-                      {c.isActive ? (
-                        <TableActionButton
-                          label="Deactivate"
-                          variant="destructive"
-                          onClick={async () => {
-                            const ok = await confirm({
-                              title: "Deactivate category?",
-                              description: `"${c.name}" will be marked inactive.`,
-                              confirmLabel: "Deactivate",
-                              destructive: true,
-                            })
-                            if (!ok) return
-                            await api(`/categories/${c.id}/deactivate`, { method: "POST" })
-                            await load()
-                          }}
-                        >
-                          <IconPlayerPause className="size-3.5" />
-                        </TableActionButton>
-                      ) : null}
-                    </TableActionsCell>
-                  )}
-                </TableRow>
+                  <TableCell>{c._count?.projectCategories ?? "—"}</TableCell>
+                  <TableActionsCell>
+                    <TableActionLink
+                      label="View"
+                      to="/categories/$id"
+                      params={{ id: c.id }}
+                    >
+                      <IconEye className="size-3.5" />
+                    </TableActionLink>
+                    <TableActionLink
+                      label="Edit"
+                      to="/categories/$id/edit"
+                      params={{ id: c.id }}
+                    >
+                      <IconPencil className="size-3.5" />
+                    </TableActionLink>
+                  </TableActionsCell>
+                </NavigableTableRow>
               ))}
             </TableBody>
           </Table>
@@ -190,7 +161,6 @@ function CategoriesPage() {
           </form>
         </DialogContent>
       </Dialog>
-      {dialog}
     </div>
   )
 }
