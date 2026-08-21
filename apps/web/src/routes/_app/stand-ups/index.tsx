@@ -44,28 +44,74 @@ import {
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
+import {
+  DEFAULT_PRESET_DAYS,
+  rangeFromDays,
+} from "@/components/dashboard/date-range-bar"
 import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { toIsoDateInput } from "@/lib/dashboard-metrics"
 import { buildListQuery, parsePage, parsePageSize, totalPagesFor } from "@/lib/list-query"
 import type { EmployeeGroup, Standup } from "@/lib/types"
 import { format, parseISO } from "date-fns"
 
+function defaultHistoryRange() {
+  const range = rangeFromDays(DEFAULT_PRESET_DAYS)
+  return {
+    from: toIsoDateInput(range.from),
+    to: toIsoDateInput(range.to),
+  }
+}
+
+function parseIsoSearchDate(value: unknown): string {
+  if (typeof value !== "string") return ""
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ""
+}
+
+function parseEmployeeIdsSearch(search: Record<string, unknown>): string[] {
+  const fromList =
+    typeof search.employeeIds === "string"
+      ? search.employeeIds
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : Array.isArray(search.employeeIds)
+        ? search.employeeIds.filter(
+            (value): value is string =>
+              typeof value === "string" && value.trim().length > 0,
+          )
+        : []
+  const single =
+    typeof search.employeeId === "string" && search.employeeId.trim()
+      ? search.employeeId.trim()
+      : null
+  const ids = [...fromList]
+  if (single && !ids.includes(single)) ids.push(single)
+  return [...new Set(ids)]
+}
+
 export const Route = createFileRoute("/_app/stand-ups/")({
-  validateSearch: (search: Record<string, unknown>) => ({
-    page: parsePage(search.page),
-    pageSize: parsePageSize(search.pageSize),
-    view:
-      search.view === "calendar"
-        ? ("calendar" as const)
-        : search.view === "history"
-          ? ("history" as const)
-          : ("list" as const),
-    q: typeof search.q === "string" ? search.q : "",
-    employeeId:
-      typeof search.employeeId === "string" ? search.employeeId : "",
-    projectId:
-      typeof search.projectId === "string" ? search.projectId : "",
-  }),
+  validateSearch: (search: Record<string, unknown>) => {
+    const defaults = defaultHistoryRange()
+    const from = parseIsoSearchDate(search.from)
+    const to = parseIsoSearchDate(search.to)
+    return {
+      page: parsePage(search.page),
+      pageSize: parsePageSize(search.pageSize),
+      view:
+        search.view === "calendar"
+          ? ("calendar" as const)
+          : search.view === "history"
+            ? ("history" as const)
+            : ("list" as const),
+      q: typeof search.q === "string" ? search.q : "",
+      employeeIds: parseEmployeeIdsSearch(search).join(","),
+      projectId:
+        typeof search.projectId === "string" ? search.projectId : "",
+      from: from && to ? from : defaults.from,
+      to: from && to ? to : defaults.to,
+    }
+  },
   component: StandupsPage,
 })
 
@@ -80,7 +126,16 @@ function formatStandupDate(value: string) {
 
 function StandupsPage() {
   const navigate = Route.useNavigate()
-  const { page, pageSize, view, q, employeeId, projectId } = Route.useSearch()
+  const { page, pageSize, view, q, employeeIds, projectId, from, to } =
+    Route.useSearch()
+  const employeeIdList = React.useMemo(
+    () =>
+      employeeIds
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    [employeeIds],
+  )
   const { user, refreshUser } = useAuth()
   const [items, setItems] = React.useState<Standup[]>([])
   const [total, setTotal] = React.useState(0)
@@ -255,8 +310,10 @@ function StandupsPage() {
         <TabsContent value="history" className="mt-4">
           <StandupHistoryView
             q={q}
-            employeeId={employeeId}
+            employeeIds={employeeIdList}
             projectId={projectId}
+            from={from}
+            to={to}
             onSearchChange={(value) => {
               void navigate({
                 search: (prev) => ({
@@ -265,11 +322,11 @@ function StandupsPage() {
                 }),
               })
             }}
-            onEmployeeChange={(value) => {
+            onEmployeeIdsChange={(ids) => {
               void navigate({
                 search: (prev) => ({
                   ...prev,
-                  employeeId: value,
+                  employeeIds: ids.join(","),
                 }),
               })
             }}
@@ -278,6 +335,15 @@ function StandupsPage() {
                 search: (prev) => ({
                   ...prev,
                   projectId: value,
+                }),
+              })
+            }}
+            onRangeChange={(nextFrom, nextTo) => {
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  from: nextFrom,
+                  to: nextTo,
                 }),
               })
             }}

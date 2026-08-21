@@ -105,7 +105,7 @@ function ClientDetailPage() {
             <Link
               to="/clients/$id/edit"
               params={{ id }}
-              className={buttonVariants()}
+              className={buttonVariants({ variant: "secondary" })}
             >
               Edit
             </Link>
@@ -201,7 +201,7 @@ function ClientDetailPage() {
 
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-medium text-muted-foreground">Projects</h2>
-            <Button size="sm" variant="outline" onClick={() => setCreateOpen(true)}>
+            <Button size="sm" onClick={() => setCreateOpen(true)}>
               Add project
             </Button>
           </div>

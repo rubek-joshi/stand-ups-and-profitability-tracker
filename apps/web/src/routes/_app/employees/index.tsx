@@ -148,10 +148,14 @@ function EmployeesPage() {
                       </Link>
                     </TableCell>
                     <TableCell>
-                      <MailLink value={e.email} />
+                      <MailLink value={e.email} withCopy="hover" />
                     </TableCell>
                     <TableCell>
-                      {e.contactNumber ? <TelLink value={e.contactNumber} /> : "—"}
+                      {e.contactNumber ? (
+                        <TelLink value={e.contactNumber} withCopy="hover" />
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell>
                       {(e.groups ?? []).length > 0 ? (

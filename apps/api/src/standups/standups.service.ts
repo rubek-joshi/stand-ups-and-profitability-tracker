@@ -176,16 +176,27 @@ export class StandupsService {
   async findHistory(query: StandupHistoryQueryDto) {
     const limit = Math.min(Math.max(query.limit ?? 10, 1), 50);
     const q = query.q?.trim() ?? "";
-    const employeeId = query.employeeId?.trim() || null;
+    const employeeIds = this.parseHistoryEmployeeIds(
+      query.employeeIds,
+      query.employeeId,
+    );
+    const employeeIdsParam = employeeIds.length > 0 ? employeeIds : null;
     const projectId = query.projectId?.trim() || null;
+    const from = query.from?.trim() || null;
+    const to = query.to?.trim() || null;
+    const fromDate = from ? parseIsoDate(from) : null;
+    const toDate = to ? parseIsoDate(to) : null;
+    if (fromDate && toDate && fromDate.getTime() > toDate.getTime()) {
+      throw new BadRequestException("`from` must be on or before `to`");
+    }
 
-    if (employeeId) {
-      const employee = await this.prismaService.employee.findUnique({
-        where: { id: employeeId },
+    if (employeeIds.length > 0) {
+      const found = await this.prismaService.employee.findMany({
+        where: { id: { in: employeeIds } },
         select: { id: true },
       });
-      if (!employee) {
-        throw new NotFoundException(`Employee ${employeeId} not found`);
+      if (found.length !== employeeIds.length) {
+        throw new NotFoundException("One or more employees were not found");
       }
     }
     if (projectId) {
@@ -208,8 +219,10 @@ export class StandupsService {
 
     const rows = await this.queryHistoryStandupIds(
       q || null,
-      employeeId,
+      employeeIdsParam,
       projectId,
+      fromDate,
+      toDate,
       cursorDate,
       cursorId,
       limit + 1,
@@ -231,7 +244,7 @@ export class StandupsService {
       include: {
         entries: {
           where: {
-            ...(employeeId ? { employeeId } : {}),
+            ...(employeeIdsParam ? { employeeId: { in: employeeIdsParam } } : {}),
             ...(projectId
               ? { allocations: { some: { projectId } } }
               : {}),
@@ -313,6 +326,8 @@ export class StandupsService {
       null,
       null,
       projectId,
+      null,
+      null,
       cursorDate,
       cursorId,
       limit + 1,
@@ -387,6 +402,22 @@ export class StandupsService {
     };
   }
 
+  private parseHistoryEmployeeIds(
+    employeeIds?: string,
+    employeeId?: string,
+  ): string[] {
+    const fromList = (employeeIds ?? "")
+      .split(",")
+      .map((value) => value.trim())
+      .filter(Boolean);
+    const single = employeeId?.trim();
+    const ids = [...fromList];
+    if (single && !ids.includes(single)) {
+      ids.push(single);
+    }
+    return [...new Set(ids)];
+  }
+
   private encodeHistoryCursor(date: string, id: string): string {
     return Buffer.from(JSON.stringify({ date, id }), "utf8").toString(
       "base64url",
@@ -409,23 +440,30 @@ export class StandupsService {
 
   private queryHistoryStandupIds(
     q: string | null,
-    employeeId: string | null,
+    employeeIds: string[] | null,
     projectId: string | null,
+    fromDate: Date | null,
+    toDate: Date | null,
     cursorDate: Date | null,
     cursorId: string | null,
     limit: number,
   ) {
-    const hasFilter = Boolean(q || employeeId || projectId);
+    const hasFilter = Boolean(q || employeeIds?.length || projectId);
     if (hasFilter) {
       if (cursorDate && cursorId) {
         return this.prismaService.$queryRaw<Array<{ id: string; date: Date }>>`
           SELECT s.id, s.date
           FROM standups s
           WHERE (s.date, s.id) < (${cursorDate}::date, ${cursorId})
+          AND (${fromDate}::date IS NULL OR s.date >= ${fromDate}::date)
+          AND (${toDate}::date IS NULL OR s.date <= ${toDate}::date)
           AND EXISTS (
             SELECT 1 FROM standup_entries se
             WHERE se."standupId" = s.id
-            AND (${employeeId}::text IS NULL OR se."employeeId" = ${employeeId})
+            AND (
+              ${employeeIds}::text[] IS NULL
+              OR se."employeeId" = ANY(${employeeIds})
+            )
             AND (
               ${projectId}::text IS NULL
               OR EXISTS (
@@ -445,10 +483,15 @@ export class StandupsService {
       return this.prismaService.$queryRaw<Array<{ id: string; date: Date }>>`
         SELECT s.id, s.date
         FROM standups s
-        WHERE EXISTS (
+        WHERE (${fromDate}::date IS NULL OR s.date >= ${fromDate}::date)
+        AND (${toDate}::date IS NULL OR s.date <= ${toDate}::date)
+        AND EXISTS (
           SELECT 1 FROM standup_entries se
           WHERE se."standupId" = s.id
-          AND (${employeeId}::text IS NULL OR se."employeeId" = ${employeeId})
+          AND (
+            ${employeeIds}::text[] IS NULL
+            OR se."employeeId" = ANY(${employeeIds})
+          )
           AND (
             ${projectId}::text IS NULL
             OR EXISTS (
@@ -471,6 +514,8 @@ export class StandupsService {
         SELECT s.id, s.date
         FROM standups s
         WHERE (s.date, s.id) < (${cursorDate}::date, ${cursorId})
+        AND (${fromDate}::date IS NULL OR s.date >= ${fromDate}::date)
+        AND (${toDate}::date IS NULL OR s.date <= ${toDate}::date)
         ORDER BY s.date DESC, s.id DESC
         LIMIT ${limit}
       `;
@@ -479,6 +524,8 @@ export class StandupsService {
     return this.prismaService.$queryRaw<Array<{ id: string; date: Date }>>`
       SELECT s.id, s.date
       FROM standups s
+      WHERE (${fromDate}::date IS NULL OR s.date >= ${fromDate}::date)
+      AND (${toDate}::date IS NULL OR s.date <= ${toDate}::date)
       ORDER BY s.date DESC, s.id DESC
       LIMIT ${limit}
     `;

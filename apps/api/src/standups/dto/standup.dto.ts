@@ -174,7 +174,16 @@ export class StandupHistoryQueryDto {
   q?: string;
 
   @ApiPropertyOptional({
-    description: "Limit history to this employee's entries",
+    description:
+      "Comma-separated employee IDs to limit history to those employees' entries",
+  })
+  @IsOptional()
+  @IsString()
+  employeeIds?: string;
+
+  @ApiPropertyOptional({
+    deprecated: true,
+    description: "Prefer employeeIds. Still accepted for a single employee.",
   })
   @IsOptional()
   @IsString()
@@ -188,6 +197,22 @@ export class StandupHistoryQueryDto {
   @IsString()
   @IsNotEmpty()
   projectId?: string;
+
+  @ApiPropertyOptional({
+    example: "2026-01-01",
+    description: "Inclusive start date (YYYY-MM-DD)",
+  })
+  @IsOptional()
+  @IsDateString()
+  from?: string;
+
+  @ApiPropertyOptional({
+    example: "2026-08-31",
+    description: "Inclusive end date (YYYY-MM-DD)",
+  })
+  @IsOptional()
+  @IsDateString()
+  to?: string;
 
   @ApiPropertyOptional({
     description: "Opaque cursor from a previous history response",

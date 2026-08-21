@@ -25,6 +25,13 @@ export type NavItem = {
   roles?: UserRole[]
 }
 
+export type NavGroup = {
+  id: string
+  title: string
+  collapsible?: boolean
+  items: NavItem[]
+}
+
 export const NAV_ITEMS: NavItem[] = [
   {
     title: "Dashboard",
@@ -59,10 +66,57 @@ export const NAV_ITEMS: NavItem[] = [
   { title: "Settings", to: "/settings", icon: IconSettings, roles: STAFF_ROLES },
 ]
 
+const byTo = Object.fromEntries(NAV_ITEMS.map((item) => [item.to, item])) as Record<
+  string,
+  NavItem
+>
+
+export const NAV_GROUPS: NavGroup[] = [
+  {
+    id: "overview",
+    title: "Overview",
+    items: [byTo["/"]!, byTo["/stand-ups"]!],
+  },
+  {
+    id: "work",
+    title: "Work",
+    collapsible: true,
+    items: [byTo["/clients"]!, byTo["/projects"]!, byTo["/amc"]!],
+  },
+  {
+    id: "Resources",
+    title: "Resources",
+    collapsible: true,
+    items: [
+      byTo["/employees"]!,
+      byTo["/employee-groups"]!,
+      byTo["/core-members"]!,
+      byTo["/categories"]!,
+    ],
+  },
+  {
+    id: "admin",
+    title: "Admin",
+    items: [byTo["/vat"]!, byTo["/users"]!, byTo["/audit"]!, byTo["/settings"]!],
+  },
+]
+
+function itemVisibleForRole(
+  item: NavItem,
+  role: string | null | undefined,
+): boolean {
+  return !item.roles || (role != null && item.roles.includes(role as UserRole))
+}
+
 export function navItemsForRole(role: string | null | undefined): NavItem[] {
-  return NAV_ITEMS.filter(
-    (item) => !item.roles || (role != null && item.roles.includes(role as UserRole)),
-  )
+  return NAV_ITEMS.filter((item) => itemVisibleForRole(item, role))
+}
+
+export function navGroupsForRole(role: string | null | undefined): NavGroup[] {
+  return NAV_GROUPS.map((group) => ({
+    ...group,
+    items: group.items.filter((item) => itemVisibleForRole(item, role)),
+  })).filter((group) => group.items.length > 0)
 }
 
 function matchingNavItem(pathname: string): NavItem | undefined {

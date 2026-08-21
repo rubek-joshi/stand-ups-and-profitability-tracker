@@ -111,10 +111,14 @@ function CoreMembersPage() {
                     </Link>
                   </TableCell>
                   <TableCell>
-                    <MailLink value={m.email} />
+                    <MailLink value={m.email} withCopy="hover" />
                   </TableCell>
                   <TableCell>
-                    {m.contactNumber ? <TelLink value={m.contactNumber} /> : "—"}
+                    {m.contactNumber ? (
+                      <TelLink value={m.contactNumber} withCopy="hover" />
+                    ) : (
+                      "—"
+                    )}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={m.status} />
