@@ -153,10 +153,10 @@ function ClientsPage() {
                     </TableCell>
                     <TableCell>{c._count?.projects ?? "—"}</TableCell>
                     <TableCell>
-                      {c.phone ? <TelLink value={c.phone} /> : "—"}
+                      {c.phone ? <TelLink value={c.phone} withCopy="hover" /> : "—"}
                     </TableCell>
                     <TableCell>
-                      {c.email ? <MailLink value={c.email} /> : "—"}
+                      {c.email ? <MailLink value={c.email} withCopy="hover" /> : "—"}
                     </TableCell>
                     <TableActionsCell>
                       <TableActionLink

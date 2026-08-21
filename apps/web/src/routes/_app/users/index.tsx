@@ -37,6 +37,7 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
+import { MailLink } from "@/components/contact-link"
 import {
   NavigableTableRow,
   TableActionButton,
@@ -190,7 +191,9 @@ function UsersPage() {
                           <span className="ml-2 text-xs text-muted-foreground">(you)</span>
                         ) : null}
                       </TableCell>
-                      <TableCell>{u.email}</TableCell>
+                      <TableCell>
+                        <MailLink value={u.email} withCopy="hover" />
+                      </TableCell>
                       <TableCell>{roleLabel(u.role)}</TableCell>
                       <TableCell>
                         <StatusBadge status={u.isActive ? "active" : "inactive"} />

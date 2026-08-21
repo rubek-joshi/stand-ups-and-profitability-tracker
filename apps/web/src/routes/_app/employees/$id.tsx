@@ -510,17 +510,18 @@ function EmployeeDetailPage() {
             </CardContent>
           </Card>
 
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {stats.map((s) => (
               <Card key={s.label} size="sm">
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">{s.label}</p>
-                    <s.icon className={`size-4 ${s.tone}`} />
+                <CardContent className="gap-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground">{s.label}</p>
+                    <s.icon className={`size-3.5 shrink-0 ${s.tone}`} />
                   </div>
-                  <p className="mt-3 text-3xl font-semibold tabular-nums">{s.value}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    in selected range ({attendanceInRange.length} attendance records)
+                  <p className="text-xl font-semibold tabular-nums">{s.value}</p>
+                  <p className="text-xs leading-tight text-muted-foreground">
+                    in selected range ({attendanceInRange.length} attendance
+                    records)
                   </p>
                 </CardContent>
               </Card>
