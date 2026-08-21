@@ -440,8 +440,8 @@ function EmployeeDetailPage() {
 
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {stats.map((s) => (
-              <Card key={s.label}>
-                <CardContent className="pt-5">
+              <Card key={s.label} size="sm">
+                <CardContent>
                   <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">{s.label}</p>
                     <s.icon className={`size-4 ${s.tone}`} />

@@ -225,7 +225,7 @@ function VatPage() {
 
           <div className="mt-10 grid gap-6 lg:grid-cols-[minmax(0,1fr)_1.2fr]">
             <Card>
-              <CardContent className="pt-6">
+              <CardContent>
                 <h2 className="text-xl font-semibold">Clear VAT</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Pay off any part of the outstanding balance.
@@ -289,7 +289,7 @@ function VatPage() {
             </Card>
 
             <Card>
-              <CardContent className="pt-6">
+              <CardContent>
                 <h2 className="text-xl font-semibold">Clearance history</h2>
                 <div className="mt-4">
                   {loading ? (
@@ -395,13 +395,14 @@ function StatCard({
 }) {
   return (
     <Card
+      size="sm"
       className={
         emphasis
           ? "border-primary/30 bg-primary text-primary-foreground"
           : undefined
       }
     >
-      <CardContent className="pt-5">
+      <CardContent>
         <p
           className={`text-xs font-medium uppercase tracking-wide ${
             emphasis ? "text-primary-foreground/75" : "text-muted-foreground"

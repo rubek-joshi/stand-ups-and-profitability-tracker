@@ -1,14 +1,12 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
 import {
-  IconCalendarStats,
   IconEye,
+  IconLock,
   IconPencil,
-  IconTrendingUp,
+  IconShieldCheck,
   IconUserMinus,
   IconUserPlus,
-  IconUsers,
-  IconWallet,
 } from "@tabler/icons-react"
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
 import { Badge } from "@workspace/ui/components/badge"
@@ -40,8 +38,25 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { Textarea } from "@workspace/ui/components/textarea"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@workspace/ui/components/tabs"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
+import {
+  Empty,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@workspace/ui/components/empty"
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@workspace/ui/components/tabs"
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -74,7 +89,12 @@ import { ProjectStandupsTab } from "@/components/standup/project-standups-tab"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { DEFAULT_LIST_SEARCH, clampPage, totalPagesFor, type PageSize } from "@/lib/list-query"
+import {
+  DEFAULT_LIST_SEARCH,
+  clampPage,
+  totalPagesFor,
+  type PageSize,
+} from "@/lib/list-query"
 import { formatNpr, paisaToNpr, parseNprInput } from "@/lib/money"
 import type {
   AmcRecord,
@@ -111,7 +131,9 @@ function ProjectDetailPage() {
   const [coreMemberId, setCoreMemberId] = React.useState("")
   const [employeeAddOpen, setEmployeeAddOpen] = React.useState(false)
   const [employeeQuery, setEmployeeQuery] = React.useState("")
-  const [selectedEmployeeIds, setSelectedEmployeeIds] = React.useState<string[]>([])
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = React.useState<
+    string[]
+  >([])
   const [addingEmployees, setAddingEmployees] = React.useState(false)
   const [amcCreateOpen, setAmcCreateOpen] = React.useState(false)
   const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
@@ -126,9 +148,12 @@ function ProjectDetailPage() {
     try {
       const [p, a, emps, cores] = await Promise.all([
         api<Envelope<Project>>(`/projects/${id}`),
-        api<Envelope<{ employees: ProjectAssignment[]; coreMembers: CoreMemberAssignment[] }>>(
-          `/projects/${id}/assignments`,
-        ),
+        api<
+          Envelope<{
+            employees: ProjectAssignment[]
+            coreMembers: CoreMemberAssignment[]
+          }>
+        >(`/projects/${id}/assignments`),
         api<Envelope<Employee[]>>("/employees"),
         api<Envelope<CoreMember[]>>("/core-members"),
       ])
@@ -166,16 +191,24 @@ function ProjectDetailPage() {
   const canManageAssignments =
     project.status !== "closed" && project.status !== "under_amc"
   const assignedEmployeeIds = new Set(
-    assignments.employees.filter((assignment) => !assignment.unassignedAt).map((assignment) => assignment.employeeId),
+    assignments.employees
+      .filter((assignment) => !assignment.unassignedAt)
+      .map((assignment) => assignment.employeeId)
   )
   const assignedCoreMemberIds = new Set(
     assignments.coreMembers
       .filter((assignment) => !assignment.unassignedAt)
-      .map((assignment) => assignment.coreMemberId),
+      .map((assignment) => assignment.coreMemberId)
   )
-  const activeAssignments = assignments.employees.filter((assignment) => !assignment.unassignedAt)
-  const availableEmployees = employees.filter((employee) => !assignedEmployeeIds.has(employee.id))
-  const availableCoreMembers = coreMembers.filter((member) => !assignedCoreMemberIds.has(member.id))
+  const activeAssignments = assignments.employees.filter(
+    (assignment) => !assignment.unassignedAt
+  )
+  const availableEmployees = employees.filter(
+    (employee) => !assignedEmployeeIds.has(employee.id)
+  )
+  const availableCoreMembers = coreMembers.filter(
+    (member) => !assignedCoreMemberIds.has(member.id)
+  )
   const filteredAvailableEmployees = availableEmployees.filter((employee) => {
     const query = employeeQuery.trim().toLowerCase()
     if (!query) return true
@@ -186,17 +219,21 @@ function ProjectDetailPage() {
   })
   const allFilteredSelected =
     filteredAvailableEmployees.length > 0 &&
-    filteredAvailableEmployees.every((employee) => selectedEmployeeIds.includes(employee.id))
+    filteredAvailableEmployees.every((employee) =>
+      selectedEmployeeIds.includes(employee.id)
+    )
   const vatAmountPaisa =
     project.isVatApplicable && profit
-      ? Math.round((Number(profit.revenuePaisa) * (project.vatRateApplied ?? 0)) / 100)
+      ? Math.round(
+          (Number(profit.revenuePaisa) * (project.vatRateApplied ?? 0)) / 100
+        )
       : 0
   const assignmentLog = assignments.employees
   const logTotalPages = totalPagesFor(assignmentLog.length, logPageSize)
   const logPageSafe = clampPage(logPage, logTotalPages)
   const pagedAssignmentLog = assignmentLog.slice(
     (logPageSafe - 1) * logPageSize,
-    logPageSafe * logPageSize,
+    logPageSafe * logPageSize
   )
 
   const openAddEmployees = () => {
@@ -207,14 +244,18 @@ function ProjectDetailPage() {
 
   const toggleEmployee = (employeeId: string, checked: boolean) => {
     setSelectedEmployeeIds((prev) =>
-      checked ? [...prev, employeeId] : prev.filter((id) => id !== employeeId),
+      checked ? [...prev, employeeId] : prev.filter((id) => id !== employeeId)
     )
   }
 
   const toggleAllFiltered = (checked: boolean) => {
     if (!checked) {
-      const filteredIds = new Set(filteredAvailableEmployees.map((employee) => employee.id))
-      setSelectedEmployeeIds((prev) => prev.filter((id) => !filteredIds.has(id)))
+      const filteredIds = new Set(
+        filteredAvailableEmployees.map((employee) => employee.id)
+      )
+      setSelectedEmployeeIds((prev) =>
+        prev.filter((id) => !filteredIds.has(id))
+      )
       return
     }
     setSelectedEmployeeIds((prev) => [
@@ -237,82 +278,100 @@ function ProjectDetailPage() {
         status={
           <>
             <StatusBadge status={project.status} />
-            {profit ? <HealthBadge marginPercent={profit.marginPercent} /> : null}
+            {profit ? (
+              <HealthBadge marginPercent={profit.marginPercent} />
+            ) : null}
           </>
         }
         actions={
           canManageAssignments ? (
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  const ok = await confirm({
-                    title: "Close project?",
-                    description:
-                      "Closing the project will end all active employee and core member assignments and preserve their history logs.",
-                    confirmLabel: "Close project",
-                    destructive: true,
-                  })
-                  if (!ok) return
-                  await api(`/projects/${id}/close`, { method: "POST" })
-                  await load()
-                }}
-              >
-                Close
-              </Button>
+            <Button
+              variant="outline"
+              onClick={async () => {
+                const ok = await confirm({
+                  title: "Close project?",
+                  description:
+                    "Closing the project will end all active employee and core member assignments and preserve their history logs.",
+                  confirmLabel: "Close project",
+                  destructive: true,
+                })
+                if (!ok) return
+                await api(`/projects/${id}/close`, { method: "POST" })
+                await load()
+              }}
+            >
+              Close
+            </Button>
           ) : null
         }
       />
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <ProjectMetricCard
-          label="Total budget"
-          value={profit ? formatNpr(profit.revenuePaisa) : formatNpr(project.budgetPaisa)}
-          hint={
-            profit
-              ? `Base ${formatNpr(profit.budgetPaisa)} + ${formatNpr(profit.extensionsPaisa)} extensions`
-              : "Project base budget"
-          }
-          icon={IconWallet}
-        />
-        <ProjectMetricCard
-          label="Labor cost accrued"
-          value={formatNpr(summary?.laborCostPaisa ?? profit?.employeeCostPaisa ?? "0")}
-          hint={
-            summary
-              ? `${summary.completedStandupCount} completed stand-ups across ${summary.standupEmployeeCount} employees`
-              : "Calculated from completed stand-up allocations"
-          }
-          icon={IconCalendarStats}
-        />
-        <ProjectMetricCard
-          label={
-            profit && Number(profit.profitLossPaisa) < 0 ? "Projected loss" : "Projected profit"
-          }
-          value={profit ? formatNpr(profit.profitLossPaisa, { signed: true }) : formatNpr("0")}
-          hint={profit ? `${profit.marginPercent.toFixed(1)}% margin` : "Profitability unavailable"}
-          icon={IconTrendingUp}
-          valueClassName={
-            profit
-              ? Number(profit.profitLossPaisa) >= 0
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-destructive"
-              : undefined
-          }
-        />
-        <ProjectMetricCard
-          label="Assigned employees"
-          value={String(summary?.activeEmployeeCount ?? activeAssignments.length)}
-          hint={`${summary?.employeeAssignmentCount ?? assignments.employees.length} assignment logs retained`}
-          icon={IconUsers}
-        />
-      </section>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="min-w-0 space-y-6">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <ProjectMetricCard
+              label="Total budget"
+              value={
+                profit
+                  ? formatNpr(profit.revenuePaisa)
+                  : formatNpr(project.budgetPaisa)
+              }
+              hint={
+                profit
+                  ? `Base ${formatNpr(profit.budgetPaisa)} + ${formatNpr(profit.extensionsPaisa)} extensions`
+                  : "Project base budget"
+              }
+            />
+            <ProjectMetricCard
+              label="Labor cost accrued"
+              value={formatNpr(
+                summary?.laborCostPaisa ?? profit?.employeeCostPaisa ?? "0"
+              )}
+              hint={
+                summary
+                  ? `${summary.completedStandupCount} completed stand-ups across ${summary.standupEmployeeCount} employees`
+                  : "Calculated from completed stand-up allocations"
+              }
+            />
+            <ProjectMetricCard
+              label={
+                profit && Number(profit.profitLossPaisa) < 0
+                  ? "Projected loss"
+                  : "Projected profit"
+              }
+              value={
+                profit
+                  ? formatNpr(profit.profitLossPaisa, { signed: true })
+                  : formatNpr("0")
+              }
+              hint={
+                profit
+                  ? `${profit.marginPercent.toFixed(1)}% margin`
+                  : "Profitability unavailable"
+              }
+              valueClassName={
+                profit
+                  ? Number(profit.profitLossPaisa) >= 0
+                    ? "text-emerald-600 dark:text-emerald-400"
+                    : "text-destructive"
+                  : undefined
+              }
+            />
+            <ProjectMetricCard
+              label="Assigned employees"
+              value={String(
+                summary?.activeEmployeeCount ?? activeAssignments.length
+              )}
+              hint={`${summary?.employeeAssignmentCount ?? assignments.employees.length} assignment logs retained`}
+            />
+          </section>
+
           <Card>
             <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="space-y-1">
-                <CardTitle className="text-lg">Labor cost from stand-ups</CardTitle>
+                <CardTitle className="text-lg">
+                  Labor cost from stand-ups
+                </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Stand-up labor against the duration-based budget run-rate.
                 </p>
@@ -349,345 +408,403 @@ function ProjectDetailPage() {
             </TabsList>
 
             <TabsContent value="team" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <CardTitle className="text-base">Assigned employees</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Active assignments appear above. Historical assignment logs stay preserved below.
-                </p>
-              </div>
-              <Button
-                disabled={!canManageAssignments || availableEmployees.length === 0}
-                onClick={openAddEmployees}
-              >
-                <IconUserPlus className="size-3.5" />
-                Add employees
-              </Button>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <Dialog open={employeeAddOpen} onOpenChange={setEmployeeAddOpen}>
-                <DialogContent className="sm:max-w-lg">
-                  <DialogHeader>
-                    <DialogTitle>Add employees to project</DialogTitle>
-                  </DialogHeader>
-                  <div className="space-y-3">
-                    <Input
-                      value={employeeQuery}
-                      onChange={(e) => setEmployeeQuery(e.target.value)}
-                      placeholder="Search by name or email…"
-                      aria-label="Search employees to add"
-                    />
-                    {filteredAvailableEmployees.length > 0 ? (
-                      <label className="flex items-center gap-2 border-b pb-2 text-sm">
-                        <Checkbox
-                          checked={allFilteredSelected}
-                          onCheckedChange={(checked) => toggleAllFiltered(Boolean(checked))}
+              <Card>
+                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle className="text-base">
+                      Assigned employees
+                    </CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Active assignments appear above. Historical assignment
+                      logs stay preserved below.
+                    </p>
+                  </div>
+                  <Button
+                    disabled={
+                      !canManageAssignments || availableEmployees.length === 0
+                    }
+                    onClick={openAddEmployees}
+                  >
+                    <IconUserPlus className="size-3.5" />
+                    Add employees
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <Dialog
+                    open={employeeAddOpen}
+                    onOpenChange={setEmployeeAddOpen}
+                  >
+                    <DialogContent className="sm:max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle>Add employees to project</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-3">
+                        <Input
+                          value={employeeQuery}
+                          onChange={(e) => setEmployeeQuery(e.target.value)}
+                          placeholder="Search by name or email…"
+                          aria-label="Search employees to add"
                         />
-                        Select all shown ({filteredAvailableEmployees.length})
-                      </label>
-                    ) : null}
-                    <div className="max-h-72 space-y-1 overflow-y-auto">
-                      {filteredAvailableEmployees.length === 0 ? (
-                        <p className="py-6 text-center text-sm text-muted-foreground">
-                          {availableEmployees.length === 0
-                            ? "All active employees are already assigned to this project."
-                            : "No employees match your search."}
-                        </p>
-                      ) : (
-                        filteredAvailableEmployees.map((employee) => (
-                          <label
-                            key={employee.id}
-                            className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-muted/60"
-                          >
+                        {filteredAvailableEmployees.length > 0 ? (
+                          <label className="flex items-center gap-2 border-b pb-2 text-sm">
                             <Checkbox
-                              checked={selectedEmployeeIds.includes(employee.id)}
+                              checked={allFilteredSelected}
                               onCheckedChange={(checked) =>
-                                toggleEmployee(employee.id, Boolean(checked))
+                                toggleAllFiltered(Boolean(checked))
                               }
                             />
-                            <span className="min-w-0">
-                              <span className="block text-sm font-medium">{employee.name}</span>
-                              <span className="block text-xs text-muted-foreground">
-                                {employee.email}
-                              </span>
-                            </span>
+                            Select all shown (
+                            {filteredAvailableEmployees.length})
                           </label>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button
-                      variant="outline"
-                      onClick={() => setEmployeeAddOpen(false)}
-                      disabled={addingEmployees}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      disabled={selectedEmployeeIds.length === 0 || addingEmployees}
-                      onClick={async () => {
-                        setAddingEmployees(true)
-                        try {
-                          await api(`/projects/${id}/assignments/employees/bulk`, {
-                            method: "POST",
-                            body: { employeeIds: selectedEmployeeIds },
-                          })
-                          setEmployeeAddOpen(false)
-                          setSelectedEmployeeIds([])
-                          setEmployeeQuery("")
-                          await load()
-                        } catch (e) {
-                          alert(e instanceof ApiError ? e.message : "Failed to add employees")
-                        } finally {
-                          setAddingEmployees(false)
-                        }
-                      }}
-                    >
-                      {addingEmployees
-                        ? "Adding…"
-                        : `Add ${selectedEmployeeIds.length || ""} employee${selectedEmployeeIds.length === 1 ? "" : "s"}`.trim()}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-
-              {activeAssignments.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No active employees assigned.</p>
-              ) : (
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {activeAssignments.map((assignment) => (
-                    <Card key={assignment.id} className="border-dashed">
-                      <CardContent className="pt-5">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="truncate font-medium">
-                              <EmployeeLink id={assignment.employeeId}>
-                                {assignment.employee?.name ?? assignment.employeeId}
-                              </EmployeeLink>
+                        ) : null}
+                        <div className="max-h-72 space-y-1 overflow-y-auto">
+                          {filteredAvailableEmployees.length === 0 ? (
+                            <p className="py-6 text-center text-sm text-muted-foreground">
+                              {availableEmployees.length === 0
+                                ? "All active employees are already assigned to this project."
+                                : "No employees match your search."}
                             </p>
-                            <p className="truncate text-xs text-muted-foreground">
-                              {assignment.employee?.email ?? "No email"}
-                            </p>
-                          </div>
-                          <Badge variant="secondary">Active</Badge>
+                          ) : (
+                            filteredAvailableEmployees.map((employee) => (
+                              <label
+                                key={employee.id}
+                                className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-muted/60"
+                              >
+                                <Checkbox
+                                  checked={selectedEmployeeIds.includes(
+                                    employee.id
+                                  )}
+                                  onCheckedChange={(checked) =>
+                                    toggleEmployee(
+                                      employee.id,
+                                      Boolean(checked)
+                                    )
+                                  }
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-medium">
+                                    {employee.name}
+                                  </span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    {employee.email}
+                                  </span>
+                                </span>
+                              </label>
+                            ))
+                          )}
                         </div>
-                        <p className="mt-3 text-xs text-muted-foreground">
-                          Assigned {String(assignment.assignedAt).slice(0, 10)}
-                        </p>
+                      </div>
+                      <DialogFooter>
                         <Button
                           variant="outline"
-                          size="sm"
-                          className="mt-4 w-full"
+                          onClick={() => setEmployeeAddOpen(false)}
+                          disabled={addingEmployees}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          disabled={
+                            selectedEmployeeIds.length === 0 || addingEmployees
+                          }
                           onClick={async () => {
-                            await api(`/projects/${id}/assignments/employees/${assignment.employeeId}`, {
-                              method: "DELETE",
-                            })
-                            await load()
+                            setAddingEmployees(true)
+                            try {
+                              await api(
+                                `/projects/${id}/assignments/employees/bulk`,
+                                {
+                                  method: "POST",
+                                  body: { employeeIds: selectedEmployeeIds },
+                                }
+                              )
+                              setEmployeeAddOpen(false)
+                              setSelectedEmployeeIds([])
+                              setEmployeeQuery("")
+                              await load()
+                            } catch (e) {
+                              alert(
+                                e instanceof ApiError
+                                  ? e.message
+                                  : "Failed to add employees"
+                              )
+                            } finally {
+                              setAddingEmployees(false)
+                            }
                           }}
                         >
-                          <IconUserMinus className="size-3.5" />
-                          Release
+                          {addingEmployees
+                            ? "Adding…"
+                            : `Add ${selectedEmployeeIds.length || ""} employee${selectedEmployeeIds.length === 1 ? "" : "s"}`.trim()}
                         </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
 
-              <div className="space-y-3">
-                <div>
-                  <h3 className="text-sm font-medium">Assignment log</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Every assignment period is retained, including auto-release on project close.
-                  </p>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Assigned</TableHead>
-                      <TableHead>Ended</TableHead>
-                      <TableActionsHead />
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {pagedAssignmentLog.map((assignment) => (
-                      <NavigableTableRow
-                        key={assignment.id}
-                        to="/employees/$id"
-                        params={{ id: assignment.employeeId }}
-                      >
-                        <TableCell>
-                          <EmployeeLink id={assignment.employeeId}>
-                            {assignment.employee?.name ?? assignment.employeeId}
-                          </EmployeeLink>
-                        </TableCell>
-                        <TableCell>{String(assignment.assignedAt).slice(0, 10)}</TableCell>
-                        <TableCell>
-                          {assignment.unassignedAt
-                            ? String(assignment.unassignedAt).slice(0, 10)
-                            : "Present"}
-                        </TableCell>
-                        <TableActionsCell>
-                          <TableActionLink
-                            label="View"
-                            to="/employees/$id"
-                            params={{ id: assignment.employeeId }}
-                          >
-                            <IconEye className="size-3.5" />
-                          </TableActionLink>
-                          {!assignment.unassignedAt ? (
-                            <TableActionButton
-                              label="Unassign"
-                              variant="destructive"
+                  {activeAssignments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No active employees assigned.
+                    </p>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {activeAssignments.map((assignment) => (
+                        <Card key={assignment.id} className="border-dashed">
+                          <CardContent>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">
+                                  <EmployeeLink id={assignment.employeeId}>
+                                    {assignment.employee?.name ??
+                                      assignment.employeeId}
+                                  </EmployeeLink>
+                                </p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {assignment.employee?.email ?? "No email"}
+                                </p>
+                              </div>
+                              <Badge variant="secondary">Active</Badge>
+                            </div>
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              Assigned{" "}
+                              {String(assignment.assignedAt).slice(0, 10)}
+                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mt-4 w-full"
                               onClick={async () => {
-                                await api(`/projects/${id}/assignments/employees/${assignment.employeeId}`, {
-                                  method: "DELETE",
-                                })
+                                await api(
+                                  `/projects/${id}/assignments/employees/${assignment.employeeId}`,
+                                  {
+                                    method: "DELETE",
+                                  }
+                                )
                                 await load()
                               }}
                             >
                               <IconUserMinus className="size-3.5" />
-                            </TableActionButton>
-                          ) : null}
-                        </TableActionsCell>
-                      </NavigableTableRow>
-                    ))}
-                    {assignmentLog.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="text-muted-foreground">
-                          No employee assignments yet.
-                        </TableCell>
-                      </TableRow>
-                    ) : null}
-                  </TableBody>
-                </Table>
-                {assignmentLog.length > 0 ? (
-                  <PaginationBar
-                    page={logPageSafe}
-                    totalPages={logTotalPages}
-                    total={assignmentLog.length}
-                    pageSize={logPageSize}
-                    onPageChange={setLogPage}
-                    onPageSizeChange={(size) => {
-                      setLogPageSize(size)
-                      setLogPage(1)
-                    }}
-                  />
-                ) : null}
-              </div>
-            </CardContent>
-          </Card>
+                              Release
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Core members</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                <Select
-                  value={coreMemberId || null}
-                  onValueChange={(value) => setCoreMemberId(value ?? "")}
-                  items={Object.fromEntries(availableCoreMembers.map((member) => [member.id, member.name]))}
-                  disabled={!canManageAssignments || availableCoreMembers.length === 0}
-                >
-                  <SelectTrigger className="w-72">
-                    <SelectValue
-                      placeholder={
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-sm font-medium">Assignment log</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Every assignment period is retained, including
+                        auto-release on project close.
+                      </p>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Assigned</TableHead>
+                          <TableHead>Ended</TableHead>
+                          <TableActionsHead />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {pagedAssignmentLog.map((assignment) => (
+                          <NavigableTableRow
+                            key={assignment.id}
+                            to="/employees/$id"
+                            params={{ id: assignment.employeeId }}
+                          >
+                            <TableCell>
+                              <EmployeeLink id={assignment.employeeId}>
+                                {assignment.employee?.name ??
+                                  assignment.employeeId}
+                              </EmployeeLink>
+                            </TableCell>
+                            <TableCell>
+                              {String(assignment.assignedAt).slice(0, 10)}
+                            </TableCell>
+                            <TableCell>
+                              {assignment.unassignedAt
+                                ? String(assignment.unassignedAt).slice(0, 10)
+                                : "Present"}
+                            </TableCell>
+                            <TableActionsCell>
+                              <TableActionLink
+                                label="View"
+                                to="/employees/$id"
+                                params={{ id: assignment.employeeId }}
+                              >
+                                <IconEye className="size-3.5" />
+                              </TableActionLink>
+                              {!assignment.unassignedAt ? (
+                                <TableActionButton
+                                  label="Unassign"
+                                  variant="destructive"
+                                  onClick={async () => {
+                                    await api(
+                                      `/projects/${id}/assignments/employees/${assignment.employeeId}`,
+                                      {
+                                        method: "DELETE",
+                                      }
+                                    )
+                                    await load()
+                                  }}
+                                >
+                                  <IconUserMinus className="size-3.5" />
+                                </TableActionButton>
+                              ) : null}
+                            </TableActionsCell>
+                          </NavigableTableRow>
+                        ))}
+                        {assignmentLog.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={4}
+                              className="text-muted-foreground"
+                            >
+                              No employee assignments yet.
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </TableBody>
+                    </Table>
+                    {assignmentLog.length > 0 ? (
+                      <PaginationBar
+                        page={logPageSafe}
+                        totalPages={logTotalPages}
+                        total={assignmentLog.length}
+                        pageSize={logPageSize}
+                        onPageChange={setLogPage}
+                        onPageSizeChange={(size) => {
+                          setLogPageSize(size)
+                          setLogPage(1)
+                        }}
+                      />
+                    ) : null}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Core members</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Select
+                      value={coreMemberId || null}
+                      onValueChange={(value) => setCoreMemberId(value ?? "")}
+                      items={Object.fromEntries(
+                        availableCoreMembers.map((member) => [
+                          member.id,
+                          member.name,
+                        ])
+                      )}
+                      disabled={
+                        !canManageAssignments ||
                         availableCoreMembers.length === 0
-                          ? "All core members assigned"
-                          : "Assign core member"
                       }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableCoreMembers.map((member) => (
-                      <SelectItem key={member.id} value={member.id}>
-                        {member.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  disabled={!coreMemberId || !canManageAssignments}
-                  onClick={async () => {
-                    await api(`/projects/${id}/assignments/core-members`, {
-                      method: "POST",
-                      body: { coreMemberId },
-                    })
-                    setCoreMemberId("")
-                    await load()
-                  }}
-                >
-                  Assign
-                </Button>
-              </div>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Assigned</TableHead>
-                    <TableHead>Ended</TableHead>
-                    <TableActionsHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {assignments.coreMembers.map((assignment) => (
-                    <NavigableTableRow
-                      key={assignment.id}
-                      to="/core-members/$id"
-                      params={{ id: assignment.coreMemberId }}
                     >
-                      <TableCell>
-                        <CoreMemberLink id={assignment.coreMemberId}>
-                          {assignment.coreMember?.name ?? assignment.coreMemberId}
-                        </CoreMemberLink>
-                      </TableCell>
-                      <TableCell>{String(assignment.assignedAt).slice(0, 10)}</TableCell>
-                      <TableCell>
-                        {assignment.unassignedAt
-                          ? String(assignment.unassignedAt).slice(0, 10)
-                          : "Present"}
-                      </TableCell>
-                      <TableActionsCell>
-                        <TableActionLink
-                          label="View"
+                      <SelectTrigger className="w-72">
+                        <SelectValue
+                          placeholder={
+                            availableCoreMembers.length === 0
+                              ? "All core members assigned"
+                              : "Assign core member"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableCoreMembers.map((member) => (
+                          <SelectItem key={member.id} value={member.id}>
+                            {member.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      disabled={!coreMemberId || !canManageAssignments}
+                      onClick={async () => {
+                        await api(`/projects/${id}/assignments/core-members`, {
+                          method: "POST",
+                          body: { coreMemberId },
+                        })
+                        setCoreMemberId("")
+                        await load()
+                      }}
+                    >
+                      Assign
+                    </Button>
+                  </div>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Assigned</TableHead>
+                        <TableHead>Ended</TableHead>
+                        <TableActionsHead />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {assignments.coreMembers.map((assignment) => (
+                        <NavigableTableRow
+                          key={assignment.id}
                           to="/core-members/$id"
                           params={{ id: assignment.coreMemberId }}
                         >
-                          <IconEye className="size-3.5" />
-                        </TableActionLink>
-                        {!assignment.unassignedAt ? (
-                          <TableActionButton
-                            label="Unassign"
-                            variant="destructive"
-                            onClick={async () => {
-                              await api(
-                                `/projects/${id}/assignments/core-members/${assignment.coreMemberId}`,
-                                { method: "DELETE" },
-                              )
-                              await load()
-                            }}
+                          <TableCell>
+                            <CoreMemberLink id={assignment.coreMemberId}>
+                              {assignment.coreMember?.name ??
+                                assignment.coreMemberId}
+                            </CoreMemberLink>
+                          </TableCell>
+                          <TableCell>
+                            {String(assignment.assignedAt).slice(0, 10)}
+                          </TableCell>
+                          <TableCell>
+                            {assignment.unassignedAt
+                              ? String(assignment.unassignedAt).slice(0, 10)
+                              : "Present"}
+                          </TableCell>
+                          <TableActionsCell>
+                            <TableActionLink
+                              label="View"
+                              to="/core-members/$id"
+                              params={{ id: assignment.coreMemberId }}
+                            >
+                              <IconEye className="size-3.5" />
+                            </TableActionLink>
+                            {!assignment.unassignedAt ? (
+                              <TableActionButton
+                                label="Unassign"
+                                variant="destructive"
+                                onClick={async () => {
+                                  await api(
+                                    `/projects/${id}/assignments/core-members/${assignment.coreMemberId}`,
+                                    { method: "DELETE" }
+                                  )
+                                  await load()
+                                }}
+                              >
+                                <IconUserMinus className="size-3.5" />
+                              </TableActionButton>
+                            ) : null}
+                          </TableActionsCell>
+                        </NavigableTableRow>
+                      ))}
+                      {assignments.coreMembers.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={4}
+                            className="text-muted-foreground"
                           >
-                            <IconUserMinus className="size-3.5" />
-                          </TableActionButton>
-                        ) : null}
-                      </TableActionsCell>
-                    </NavigableTableRow>
-                  ))}
-                  {assignments.coreMembers.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-muted-foreground">
-                        No core members assigned yet.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+                            No core members assigned yet.
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="standups" className="mt-4">
@@ -695,219 +812,260 @@ function ProjectDetailPage() {
             </TabsContent>
 
             <TabsContent value="extensions" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Add extension</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form
-                className="grid max-w-xl gap-3"
-                onSubmit={async (e) => {
-                  e.preventDefault()
-                  await api(`/projects/${id}/extensions`, {
-                    method: "POST",
-                    body: {
-                      reason: extReason.trim(),
-                      amountNpr: parseNprInput(extAmount || "0"),
-                      endDate: extEndDate,
-                    },
-                  })
-                  setExtReason("")
-                  setExtAmount("0")
-                  setExtEndDate("")
-                  await load()
-                }}
-              >
-                <div className="space-y-2">
-                  <Label>Reason</Label>
-                  <Textarea
-                    required
-                    value={extReason}
-                    onChange={(e) => setExtReason(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Amount (NPR)</Label>
-                  <Input value={extAmount} onChange={(e) => setExtAmount(e.target.value)} />
-                </div>
-                <div className="space-y-2">
-                  <Label>New end date</Label>
-                  <Input
-                    type="date"
-                    required
-                    min={(() => {
-                      const current = new Date(String(project.endDate).slice(0, 10))
-                      current.setUTCDate(current.getUTCDate() + 1)
-                      return current.toISOString().slice(0, 10)
-                    })()}
-                    value={extEndDate}
-                    onChange={(e) => setExtEndDate(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Current end date: {String(project.endDate).slice(0, 10)}
-                  </p>
-                </div>
-                <Button type="submit" className="w-fit" disabled={!extEndDate}>
-                  Add extension
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Add extension</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form
+                    className="grid max-w-xl gap-3"
+                    onSubmit={async (e) => {
+                      e.preventDefault()
+                      await api(`/projects/${id}/extensions`, {
+                        method: "POST",
+                        body: {
+                          reason: extReason.trim(),
+                          amountNpr: parseNprInput(extAmount || "0"),
+                          endDate: extEndDate,
+                        },
+                      })
+                      setExtReason("")
+                      setExtAmount("0")
+                      setExtEndDate("")
+                      await load()
+                    }}
+                  >
+                    <div className="space-y-2">
+                      <Label>Reason</Label>
+                      <Textarea
+                        required
+                        value={extReason}
+                        onChange={(e) => setExtReason(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Amount (NPR)</Label>
+                      <Input
+                        value={extAmount}
+                        onChange={(e) => setExtAmount(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>New end date</Label>
+                      <Input
+                        type="date"
+                        required
+                        min={(() => {
+                          const current = new Date(
+                            String(project.endDate).slice(0, 10)
+                          )
+                          current.setUTCDate(current.getUTCDate() + 1)
+                          return current.toISOString().slice(0, 10)
+                        })()}
+                        value={extEndDate}
+                        onChange={(e) => setExtEndDate(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Current end date: {String(project.endDate).slice(0, 10)}
+                      </p>
+                    </div>
+                    <Button
+                      type="submit"
+                      className="w-fit"
+                      disabled={!extEndDate}
+                    >
+                      Add extension
+                    </Button>
+                  </form>
+                </CardContent>
+              </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Extension history</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Reason</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>New end</TableHead>
-                    <TableHead>Logged</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {(project.extensions ?? []).map((extension) => (
-                    <TableRow key={extension.id}>
-                      <TableCell>
-                        {extension.reason}
-                        {extension.isAuto ? " (auto)" : ""}
-                      </TableCell>
-                      <TableCell>{formatNpr(extension.amountPaisa)}</TableCell>
-                      <TableCell>
-                        {extension.endDate ? String(extension.endDate).slice(0, 10) : "—"}
-                      </TableCell>
-                      <TableCell>{String(extension.createdAt).slice(0, 10)}</TableCell>
-                    </TableRow>
-                  ))}
-                  {(project.extensions ?? []).length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-muted-foreground">
-                        No extensions recorded yet.
-                      </TableCell>
-                    </TableRow>
-                  ) : null}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Extension history</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Reason</TableHead>
+                        <TableHead>Amount</TableHead>
+                        <TableHead>New end</TableHead>
+                        <TableHead>Logged</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(project.extensions ?? []).map((extension) => (
+                        <TableRow key={extension.id}>
+                          <TableCell>
+                            {extension.reason}
+                            {extension.isAuto ? " (auto)" : ""}
+                          </TableCell>
+                          <TableCell>
+                            {formatNpr(extension.amountPaisa)}
+                          </TableCell>
+                          <TableCell>
+                            {extension.endDate
+                              ? String(extension.endDate).slice(0, 10)
+                              : "—"}
+                          </TableCell>
+                          <TableCell>
+                            {String(extension.createdAt).slice(0, 10)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                      {(project.extensions ?? []).length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={4}
+                            className="text-muted-foreground"
+                          >
+                            No extensions recorded yet.
+                          </TableCell>
+                        </TableRow>
+                      ) : null}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="amc" className="mt-4 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-muted-foreground">Maintenance contracts</h2>
-            {project.status === "closed" || project.status === "under_amc" ? (
-              <Button size="sm" variant="outline" onClick={() => setAmcCreateOpen(true)}>
-                New AMC
-              </Button>
-            ) : null}
-          </div>
-          {project.status !== "closed" && project.status !== "under_amc" ? (
-            <Card>
-              <CardContent className="py-6 text-sm text-muted-foreground">
-                Close the project before setting AMC.
-              </CardContent>
-            </Card>
-          ) : amcs.length === 0 ? (
-            <Card>
-              <CardContent className="py-6 text-sm text-muted-foreground">
-                No AMC records yet.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2">
-              {amcs.map((amc) => (
-                <AmcCard
-                  key={amc.id}
-                  amc={{
-                    ...amc,
-                    projectName: project.name,
-                    clientName: project.client?.name,
-                  }}
-                  onRenew={async (record) => {
-                    await api(`/amc/${record.id}/renewal-decision`, {
-                      method: "POST",
-                      body: { decision: "renewed" },
-                    })
-                    setAmcCreateOpen(true)
-                    await load()
-                  }}
-                  onDecline={(record) => {
-                    setDeclineAmc({
-                      ...record,
-                      projectName: project.name,
-                      clientName: project.client?.name,
-                    })
-                  }}
-                  onEdit={(record) => {
-                    setEditAmc({
-                      ...record,
-                      projectName: project.name,
-                      clientName: project.client?.name,
-                    })
-                  }}
-                  canDelete={canDeleteAmc}
-                  onDelete={async (record) => {
-                    const ok = await confirm({
-                      title: "Delete AMC permanently?",
-                      description:
-                        "This cannot be undone. Prefer decline/cancel when the contract simply ended.",
-                      confirmLabel: "Delete",
-                      destructive: true,
-                    })
-                    if (!ok) return
-                    try {
-                      await api(`/amc/${record.id}`, { method: "DELETE" })
-                      await load()
-                    } catch (e) {
-                      alert(e instanceof ApiError ? e.message : "Failed to delete AMC")
-                    }
-                  }}
-                />
-              ))}
-            </div>
-          )}
-          <CreateAmcDialog
-            open={amcCreateOpen}
-            onOpenChange={setAmcCreateOpen}
-            presetProjectId={id}
-            lockProject
-            onCreated={() => void load()}
-          />
-          <EditAmcDialog
-            amc={editAmc}
-            open={Boolean(editAmc)}
-            onOpenChange={(open) => {
-              if (!open) setEditAmc(null)
-            }}
-            onUpdated={() => void load()}
-          />
-          <DeclineAmcDialog
-            amc={declineAmc}
-            open={Boolean(declineAmc)}
-            onOpenChange={(open) => {
-              if (!open) setDeclineAmc(null)
-            }}
-            onConfirm={async (remark) => {
-              if (!declineAmc) return
-              await api(`/amc/${declineAmc.id}/renewal-decision`, {
-                method: "POST",
-                body: {
-                  decision: "declined",
-                  ...(remark ? { remark } : {}),
-                },
-              })
-              setDeclineAmc(null)
-              await load()
-            }}
-          />
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-sm font-medium text-muted-foreground">
+                  Maintenance contracts
+                </h2>
+                {project.status === "closed" ||
+                project.status === "under_amc" ? (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setAmcCreateOpen(true)}
+                  >
+                    New AMC
+                  </Button>
+                ) : null}
+              </div>
+              {project.status !== "closed" && project.status !== "under_amc" ? (
+                <Empty className="min-h-64 border bg-card">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <IconLock />
+                    </EmptyMedia>
+                    <EmptyTitle>AMC unavailable</EmptyTitle>
+                    <EmptyDescription>
+                      Close the project before setting AMC.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : amcs.length === 0 ? (
+                <Empty className="min-h-64 border bg-card">
+                  <EmptyHeader>
+                    <EmptyMedia variant="icon">
+                      <IconShieldCheck />
+                    </EmptyMedia>
+                    <EmptyTitle>No AMC records</EmptyTitle>
+                    <EmptyDescription>
+                      No maintenance contracts for this project yet.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2">
+                  {amcs.map((amc) => (
+                    <AmcCard
+                      key={amc.id}
+                      amc={{
+                        ...amc,
+                        projectName: project.name,
+                        clientName: project.client?.name,
+                      }}
+                      onRenew={async (record) => {
+                        await api(`/amc/${record.id}/renewal-decision`, {
+                          method: "POST",
+                          body: { decision: "renewed" },
+                        })
+                        setAmcCreateOpen(true)
+                        await load()
+                      }}
+                      onDecline={(record) => {
+                        setDeclineAmc({
+                          ...record,
+                          projectName: project.name,
+                          clientName: project.client?.name,
+                        })
+                      }}
+                      onEdit={(record) => {
+                        setEditAmc({
+                          ...record,
+                          projectName: project.name,
+                          clientName: project.client?.name,
+                        })
+                      }}
+                      canDelete={canDeleteAmc}
+                      onDelete={async (record) => {
+                        const ok = await confirm({
+                          title: "Delete AMC permanently?",
+                          description:
+                            "This cannot be undone. Prefer decline/cancel when the contract simply ended.",
+                          confirmLabel: "Delete",
+                          destructive: true,
+                        })
+                        if (!ok) return
+                        try {
+                          await api(`/amc/${record.id}`, { method: "DELETE" })
+                          await load()
+                        } catch (e) {
+                          alert(
+                            e instanceof ApiError
+                              ? e.message
+                              : "Failed to delete AMC"
+                          )
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+              <CreateAmcDialog
+                open={amcCreateOpen}
+                onOpenChange={setAmcCreateOpen}
+                presetProjectId={id}
+                lockProject
+                onCreated={() => void load()}
+              />
+              <EditAmcDialog
+                amc={editAmc}
+                open={Boolean(editAmc)}
+                onOpenChange={(open) => {
+                  if (!open) setEditAmc(null)
+                }}
+                onUpdated={() => void load()}
+              />
+              <DeclineAmcDialog
+                amc={declineAmc}
+                open={Boolean(declineAmc)}
+                onOpenChange={(open) => {
+                  if (!open) setDeclineAmc(null)
+                }}
+                onConfirm={async (remark) => {
+                  if (!declineAmc) return
+                  await api(`/amc/${declineAmc.id}/renewal-decision`, {
+                    method: "POST",
+                    body: {
+                      decision: "declined",
+                      ...(remark ? { remark } : {}),
+                    },
+                  })
+                  setDeclineAmc(null)
+                  await load()
+                }}
+              />
             </TabsContent>
           </Tabs>
         </div>
 
-        <aside className="xl:sticky xl:top-4 xl:self-start">
+        <aside className="lg:sticky lg:top-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">Project details</CardTitle>
@@ -957,24 +1115,41 @@ function ProjectDetailPage() {
                   )
                 }
               />
-              <Detail label="Base budget" value={formatNpr(project.budgetPaisa)} />
+              <Detail
+                label="Base budget"
+                value={formatNpr(project.budgetPaisa)}
+              />
               <Detail
                 label="VAT"
-                value={project.isVatApplicable ? `Yes (${project.vatRateApplied}%)` : "No"}
+                value={
+                  project.isVatApplicable
+                    ? `Yes (${project.vatRateApplied}%)`
+                    : "No"
+                }
               />
               <Detail
                 label="Total incl. VAT"
                 value={
                   profit
-                    ? formatNpr(String(Number(profit.revenuePaisa) + vatAmountPaisa))
+                    ? formatNpr(
+                        String(Number(profit.revenuePaisa) + vatAmountPaisa)
+                      )
                     : formatNpr(project.budgetPaisa)
                 }
               />
-              <Detail label="Start date" value={String(project.startDate).slice(0, 10)} />
-              <Detail label="End date" value={String(project.endDate).slice(0, 10)} />
+              <Detail
+                label="Start date"
+                value={String(project.startDate).slice(0, 10)}
+              />
+              <Detail
+                label="End date"
+                value={String(project.endDate).slice(0, 10)}
+              />
               <Detail
                 label="Core members"
-                value={String(summary?.activeCoreMemberCount ?? assignedCoreMemberIds.size)}
+                value={String(
+                  summary?.activeCoreMemberCount ?? assignedCoreMemberIds.size
+                )}
               />
               <Detail
                 label="Extensions"
@@ -990,30 +1165,27 @@ function ProjectDetailPage() {
 }
 
 function ProjectMetricCard({
-  icon: Icon,
   label,
   value,
   hint,
   valueClassName,
 }: {
-  icon: typeof IconWallet
   label: string
   value: string
   hint: string
   valueClassName?: string
 }) {
   return (
-    <Card>
-      <CardContent className="pt-5">
+    <Card size="sm">
+      <CardContent>
         <div className="flex items-start justify-between gap-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+          <p className="text-xs font-medium tracking-wider text-muted-foreground uppercase">
             {label}
           </p>
-          <span className="rounded-lg bg-secondary p-2 text-secondary-foreground">
-            <Icon className="size-4" />
-          </span>
         </div>
-        <p className={`mt-3 text-2xl font-semibold tabular-nums ${valueClassName ?? ""}`}>
+        <p
+          className={`text-2xl font-semibold tabular-nums ${valueClassName ?? ""}`}
+        >
           {value}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
@@ -1046,7 +1218,7 @@ function ProjectLaborCostChart({
   const periodBudgetPaisa = periodBudgetForGrain(
     Number(totalBudgetPaisa) || 0,
     durationMonths,
-    grain,
+    grain
   )
   const spent = Number(spentLaborPaisa) || 0
   const totalBudget = Number(totalBudgetPaisa) || 0
@@ -1072,7 +1244,7 @@ function ProjectLaborCostChart({
         grain,
         periodBudgetPaisa,
       }),
-    [series, startDate, endDate, grain, periodBudgetPaisa],
+    [series, startDate, endDate, grain, periodBudgetPaisa]
   )
 
   return (
@@ -1104,28 +1276,68 @@ function ProjectLaborCostChart({
         <Badge variant="outline">{burn.toFixed(0)}% budget burned</Badge>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        {grainLabel(grain)} budget {formatNpr(String(Math.round(periodBudgetPaisa)))}{" "}
-        · {durationMonths} month{durationMonths === 1 ? "" : "s"} duration
+        {grainLabel(grain)} budget{" "}
+        {formatNpr(String(Math.round(periodBudgetPaisa)))} · {durationMonths}{" "}
+        month{durationMonths === 1 ? "" : "s"} duration
       </p>
       {data.length === 0 ? (
         <div className="mt-4 flex h-70 items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
           No completed stand-up allocations yet.
         </div>
       ) : (
-        <ChartContainer config={chartConfig} className="mt-4 aspect-auto h-70 w-full">
-          <AreaChart data={data} margin={{ left: 0, right: 12, top: 8, bottom: 8 }}>
+        <ChartContainer
+          config={chartConfig}
+          className="mt-4 aspect-auto h-70 w-full"
+        >
+          <AreaChart
+            data={data}
+            margin={{ left: 0, right: 12, top: 8, bottom: 8 }}
+          >
             <defs>
-              <linearGradient id="project-labor-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-laborCost)" stopOpacity={0.35} />
-                <stop offset="95%" stopColor="var(--color-laborCost)" stopOpacity={0.02} />
+              <linearGradient
+                id="project-labor-fill"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="5%"
+                  stopColor="var(--color-laborCost)"
+                  stopOpacity={0.35}
+                />
+                <stop
+                  offset="95%"
+                  stopColor="var(--color-laborCost)"
+                  stopOpacity={0.02}
+                />
               </linearGradient>
-              <linearGradient id="project-budget-fill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--color-budget)" stopOpacity={0.2} />
-                <stop offset="95%" stopColor="var(--color-budget)" stopOpacity={0.02} />
+              <linearGradient
+                id="project-budget-fill"
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="5%"
+                  stopColor="var(--color-budget)"
+                  stopOpacity={0.2}
+                />
+                <stop
+                  offset="95%"
+                  stopColor="var(--color-budget)"
+                  stopOpacity={0.02}
+                />
               </linearGradient>
             </defs>
             <CartesianGrid vertical={false} />
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tick={{ fontSize: 11 }} />
+            <XAxis
+              dataKey="label"
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 11 }}
+            />
             <YAxis
               tickLine={false}
               axisLine={false}
@@ -1146,28 +1358,48 @@ function ProjectLaborCostChart({
                     return (
                       <div className="grid gap-1">
                         <div className="flex items-center justify-between gap-4">
-                          <span className="text-muted-foreground">Labor cost</span>
+                          <span className="text-muted-foreground">
+                            Labor cost
+                          </span>
                           <span className="font-medium">
-                            {formatNpr(String(Math.round(payload.laborCost * 100)))}
+                            {formatNpr(
+                              String(Math.round(payload.laborCost * 100))
+                            )}
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-4">
-                          <span className="text-muted-foreground">Period budget</span>
+                          <span className="text-muted-foreground">
+                            Period budget
+                          </span>
                           <span className="font-medium">
-                            {formatNpr(String(Math.round(payload.budget * 100)))}
+                            {formatNpr(
+                              String(Math.round(payload.budget * 100))
+                            )}
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-4">
-                          <span className="text-muted-foreground">Allocations</span>
-                          <span className="font-medium">{payload.allocationPercentTotal}%</span>
+                          <span className="text-muted-foreground">
+                            Allocations
+                          </span>
+                          <span className="font-medium">
+                            {payload.allocationPercentTotal}%
+                          </span>
                         </div>
                         <div className="flex items-center justify-between gap-4">
-                          <span className="text-muted-foreground">Stand-ups</span>
-                          <span className="font-medium">{payload.standupCount}</span>
+                          <span className="text-muted-foreground">
+                            Stand-ups
+                          </span>
+                          <span className="font-medium">
+                            {payload.standupCount}
+                          </span>
                         </div>
                         <div className="flex items-center justify-between gap-4">
-                          <span className="text-muted-foreground">Employees</span>
-                          <span className="font-medium">{payload.employeeCount}</span>
+                          <span className="text-muted-foreground">
+                            Employees
+                          </span>
+                          <span className="font-medium">
+                            {payload.employeeCount}
+                          </span>
                         </div>
                       </div>
                     )
@@ -1204,16 +1436,12 @@ function ProjectLaborCostChart({
   )
 }
 
-function Detail({
-  label,
-  value,
-}: {
-  label: string
-  value: React.ReactNode
-}) {
+function Detail({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-xs uppercase tracking-wide text-muted-foreground">{label}</dt>
+      <dt className="text-xs tracking-wide text-muted-foreground uppercase">
+        {label}
+      </dt>
       <dd className="mt-1 text-sm font-medium">{value}</dd>
     </div>
   )
@@ -1252,7 +1480,7 @@ function inclusiveMonthCount(startDate: string, endDate: string) {
 function periodBudgetForGrain(
   totalBudgetPaisa: number,
   durationMonths: number,
-  grain: LaborGrain,
+  grain: LaborGrain
 ) {
   const months = Math.max(1, durationMonths)
   const monthly = totalBudgetPaisa / months
@@ -1282,7 +1510,9 @@ function isoWeekKey(date: Date) {
   const thursday = addUtcDays(monday, 3)
   const year = thursday.getUTCFullYear()
   const week1Monday = isoWeekStart(new Date(Date.UTC(year, 0, 4)))
-  const week = Math.floor((monday.getTime() - week1Monday.getTime()) / (7 * 86_400_000)) + 1
+  const week =
+    Math.floor((monday.getTime() - week1Monday.getTime()) / (7 * 86_400_000)) +
+    1
   return `${year}-W${String(week).padStart(2, "0")}`
 }
 
@@ -1314,7 +1544,10 @@ function formatPeriodLabel(key: string, grain: LaborGrain) {
 function formatUtcLabel(isoDate: string, options: Intl.DateTimeFormatOptions) {
   const date = parseUtcDate(isoDate)
   if (!date) return isoDate
-  return new Intl.DateTimeFormat("en-US", { ...options, timeZone: "UTC" }).format(date)
+  return new Intl.DateTimeFormat("en-US", {
+    ...options,
+    timeZone: "UTC",
+  }).format(date)
 }
 
 function buildLaborChartData({
@@ -1341,14 +1574,15 @@ function buildLaborChartData({
   const projectEnd = parseUtcDate(endDate)
   if (!start || !projectEnd) return []
 
-  const today = parseUtcDate(new Date().toISOString().slice(0, 10)) ?? projectEnd
+  const today =
+    parseUtcDate(new Date().toISOString().slice(0, 10)) ?? projectEnd
   const lastSeriesDate = series.reduce((latest, item) => {
     return item.date > latest ? item.date : latest
   }, startDate)
   const lastDate = parseUtcDate(lastSeriesDate) ?? start
   const rangeEndMs = Math.max(
     Math.min(today.getTime(), projectEnd.getTime()),
-    lastDate.getTime(),
+    lastDate.getTime()
   )
 
   const buckets = new Map<
@@ -1361,7 +1595,11 @@ function buildLaborChartData({
     }
   >()
 
-  for (let cursor = start; cursor.getTime() <= rangeEndMs; cursor = addUtcDays(cursor, 1)) {
+  for (
+    let cursor = start;
+    cursor.getTime() <= rangeEndMs;
+    cursor = addUtcDays(cursor, 1)
+  ) {
     const key = periodKeyForDate(cursor, grain)
     if (!buckets.has(key)) {
       buckets.set(key, {

@@ -503,6 +503,7 @@ function StatCard({
 }) {
   return (
     <Card
+      size="sm"
       className={interactive ? "cursor-pointer transition-colors hover:bg-muted/40" : undefined}
       onClick={interactive ? onClick : undefined}
       role={interactive ? "button" : undefined}

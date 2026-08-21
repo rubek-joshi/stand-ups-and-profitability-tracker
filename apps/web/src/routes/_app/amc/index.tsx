@@ -81,8 +81,8 @@ function StatCard({
   hint: string
 }) {
   return (
-    <Card>
-      <CardContent className="pt-5">
+    <Card size="sm">
+      <CardContent>
         <div className="flex items-center gap-2 text-muted-foreground">
           <Icon className="size-4" />
           <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
