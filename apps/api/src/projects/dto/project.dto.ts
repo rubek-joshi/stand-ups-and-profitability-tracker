@@ -127,6 +127,14 @@ export class AssignCoreMemberDto {
   coreMemberId!: string;
 }
 
+export class AssignCoreMembersBulkDto {
+  @ApiProperty({ type: [String], description: "One or more core member IDs" })
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  coreMemberIds!: string[];
+}
+
 export class CreateExtensionDto {
   @ApiProperty()
   @IsString()

@@ -30,13 +30,6 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Progress } from "@workspace/ui/components/progress"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
 import { Textarea } from "@workspace/ui/components/textarea"
 import {
   Card,
@@ -73,6 +66,10 @@ import { AmcCard } from "@/components/amc/amc-card"
 import { CreateAmcDialog } from "@/components/amc/create-amc-dialog"
 import { DeclineAmcDialog } from "@/components/amc/decline-amc-dialog"
 import { EditAmcDialog } from "@/components/amc/edit-amc-dialog"
+import {
+  DEFAULT_PRESET_DAYS,
+  rangeFromDays,
+} from "@/components/dashboard/date-range-bar"
 import { HealthBadge, StatusBadge } from "@/components/health-badge"
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
@@ -85,10 +82,11 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { useConfirmDialog } from "@/components/confirm-dialog"
-import { ProjectStandupsTab } from "@/components/standup/project-standups-tab"
+import { StandupHistoryView } from "@/components/standup/standup-history-view"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import { toIsoDateInput } from "@/lib/dashboard-metrics"
 import {
   DEFAULT_LIST_SEARCH,
   clampPage,
@@ -105,12 +103,79 @@ import type {
   ProjectAssignment,
 } from "@/lib/types"
 
+const PROJECT_TABS = [
+  "team",
+  "standups",
+  "extensions",
+  "amc",
+  "labor",
+] as const
+
+type ProjectTab = (typeof PROJECT_TABS)[number]
+
+function defaultStandupHistoryRange() {
+  const range = rangeFromDays(DEFAULT_PRESET_DAYS)
+  return {
+    from: toIsoDateInput(range.from),
+    to: toIsoDateInput(range.to),
+  }
+}
+
+function parseIsoSearchDate(value: unknown): string {
+  if (typeof value !== "string") return ""
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ""
+}
+
+function parseEmployeeIdsSearch(search: Record<string, unknown>): string[] {
+  const fromList =
+    typeof search.employeeIds === "string"
+      ? search.employeeIds
+          .split(",")
+          .map((value) => value.trim())
+          .filter(Boolean)
+      : Array.isArray(search.employeeIds)
+        ? search.employeeIds.filter(
+            (value): value is string =>
+              typeof value === "string" && value.trim().length > 0,
+          )
+        : []
+  return [...new Set(fromList)]
+}
+
+function parseProjectTab(value: unknown): ProjectTab {
+  return PROJECT_TABS.includes(value as ProjectTab)
+    ? (value as ProjectTab)
+    : "team"
+}
+
 export const Route = createFileRoute("/_app/projects/$id")({
+  validateSearch: (search: Record<string, unknown>) => {
+    const defaults = defaultStandupHistoryRange()
+    const from = parseIsoSearchDate(search.from)
+    const to = parseIsoSearchDate(search.to)
+    return {
+      tab: parseProjectTab(search.tab),
+      q: typeof search.q === "string" ? search.q : "",
+      employeeIds: parseEmployeeIdsSearch(search).join(","),
+      from: from && to ? from : defaults.from,
+      to: from && to ? to : defaults.to,
+    }
+  },
   component: ProjectDetailPage,
 })
 
 function ProjectDetailPage() {
   const { id } = Route.useParams()
+  const navigate = Route.useNavigate()
+  const { tab, q, employeeIds, from, to } = Route.useSearch()
+  const employeeIdList = React.useMemo(
+    () =>
+      employeeIds
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    [employeeIds],
+  )
   const { user } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
   const canDeleteAmc = user?.role === "super_admin"
@@ -124,22 +189,29 @@ function ProjectDetailPage() {
   const [amcs, setAmcs] = React.useState<AmcRecord[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
-  const [tab, setTab] = React.useState("team")
   const [extReason, setExtReason] = React.useState("")
   const [extAmount, setExtAmount] = React.useState("0")
   const [extEndDate, setExtEndDate] = React.useState("")
-  const [coreMemberId, setCoreMemberId] = React.useState("")
   const [employeeAddOpen, setEmployeeAddOpen] = React.useState(false)
   const [employeeQuery, setEmployeeQuery] = React.useState("")
   const [selectedEmployeeIds, setSelectedEmployeeIds] = React.useState<
     string[]
   >([])
   const [addingEmployees, setAddingEmployees] = React.useState(false)
+  const [coreMemberAddOpen, setCoreMemberAddOpen] = React.useState(false)
+  const [coreMemberQuery, setCoreMemberQuery] = React.useState("")
+  const [selectedCoreMemberIds, setSelectedCoreMemberIds] = React.useState<
+    string[]
+  >([])
+  const [addingCoreMembers, setAddingCoreMembers] = React.useState(false)
   const [amcCreateOpen, setAmcCreateOpen] = React.useState(false)
+  const [extensionOpen, setExtensionOpen] = React.useState(false)
   const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
   const [editAmc, setEditAmc] = React.useState<AmcRecord | null>(null)
   const [logPage, setLogPage] = React.useState(1)
   const [logPageSize, setLogPageSize] = React.useState<PageSize>(10)
+  const [coreLogPage, setCoreLogPage] = React.useState(1)
+  const [coreLogPageSize, setCoreLogPageSize] = React.useState<PageSize>(10)
   const initialLoad = React.useRef(true)
 
   const load = React.useCallback(async () => {
@@ -217,10 +289,23 @@ function ProjectDetailPage() {
       employee.email.toLowerCase().includes(query)
     )
   })
+  const filteredAvailableCoreMembers = availableCoreMembers.filter((member) => {
+    const query = coreMemberQuery.trim().toLowerCase()
+    if (!query) return true
+    return (
+      member.name.toLowerCase().includes(query) ||
+      member.email.toLowerCase().includes(query)
+    )
+  })
   const allFilteredSelected =
     filteredAvailableEmployees.length > 0 &&
     filteredAvailableEmployees.every((employee) =>
       selectedEmployeeIds.includes(employee.id)
+    )
+  const allFilteredCoreSelected =
+    filteredAvailableCoreMembers.length > 0 &&
+    filteredAvailableCoreMembers.every((member) =>
+      selectedCoreMemberIds.includes(member.id)
     )
   const vatAmountPaisa =
     project.isVatApplicable && profit
@@ -235,6 +320,19 @@ function ProjectDetailPage() {
     (logPageSafe - 1) * logPageSize,
     logPageSafe * logPageSize
   )
+  const activeCoreAssignments = assignments.coreMembers.filter(
+    (assignment) => !assignment.unassignedAt
+  )
+  const coreAssignmentLog = assignments.coreMembers
+  const coreLogTotalPages = totalPagesFor(
+    coreAssignmentLog.length,
+    coreLogPageSize
+  )
+  const coreLogPageSafe = clampPage(coreLogPage, coreLogTotalPages)
+  const pagedCoreAssignmentLog = coreAssignmentLog.slice(
+    (coreLogPageSafe - 1) * coreLogPageSize,
+    coreLogPageSafe * coreLogPageSize
+  )
 
   const openAddEmployees = () => {
     setEmployeeQuery("")
@@ -242,9 +340,23 @@ function ProjectDetailPage() {
     setEmployeeAddOpen(true)
   }
 
+  const openAddCoreMembers = () => {
+    setCoreMemberQuery("")
+    setSelectedCoreMemberIds([])
+    setCoreMemberAddOpen(true)
+  }
+
   const toggleEmployee = (employeeId: string, checked: boolean) => {
     setSelectedEmployeeIds((prev) =>
       checked ? [...prev, employeeId] : prev.filter((id) => id !== employeeId)
+    )
+  }
+
+  const toggleCoreMember = (coreMemberId: string, checked: boolean) => {
+    setSelectedCoreMemberIds((prev) =>
+      checked
+        ? [...prev, coreMemberId]
+        : prev.filter((id) => id !== coreMemberId)
     )
   }
 
@@ -263,6 +375,24 @@ function ProjectDetailPage() {
       ...filteredAvailableEmployees
         .map((employee) => employee.id)
         .filter((employeeId) => !prev.includes(employeeId)),
+    ])
+  }
+
+  const toggleAllFilteredCore = (checked: boolean) => {
+    if (!checked) {
+      const filteredIds = new Set(
+        filteredAvailableCoreMembers.map((member) => member.id)
+      )
+      setSelectedCoreMemberIds((prev) =>
+        prev.filter((id) => !filteredIds.has(id))
+      )
+      return
+    }
+    setSelectedCoreMemberIds((prev) => [
+      ...prev,
+      ...filteredAvailableCoreMembers
+        .map((member) => member.id)
+        .filter((memberId) => !prev.includes(memberId)),
     ])
   }
 
@@ -366,45 +496,23 @@ function ProjectDetailPage() {
             />
           </section>
 
-          <Card>
-            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="space-y-1">
-                <CardTitle className="text-lg">
-                  Labor cost from stand-ups
-                </CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Stand-up labor against the duration-based budget run-rate.
-                </p>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <ProjectLaborCostChart
-                series={laborSeries}
-                startDate={String(project.startDate).slice(0, 10)}
-                endDate={String(project.endDate).slice(0, 10)}
-                totalBudgetPaisa={profit?.revenuePaisa ?? project.budgetPaisa}
-                spentLaborPaisa={summary?.laborCostPaisa ?? "0"}
-              />
-              <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                <Badge variant="outline">
-                  {summary?.completedStandupCount ?? 0} completed stand-ups
-                </Badge>
-                <Badge variant="outline">
-                  {summary?.standupEmployeeCount ?? 0} employees logged
-                </Badge>
-                <Badge variant="outline">
-                  {summary?.allocationPercentTotal ?? 0}% total allocation
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Tabs value={tab} onValueChange={(value) => setTab(String(value))}>
+          <Tabs
+            value={tab}
+            onValueChange={(value) => {
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  tab: parseProjectTab(value),
+                }),
+              })
+            }}
+          >
             <TabsList>
               <TabsTrigger value="team">Team</TabsTrigger>
               <TabsTrigger value="standups">Stand-ups</TabsTrigger>
               <TabsTrigger value="extensions">Extensions</TabsTrigger>
               <TabsTrigger value="amc">AMC</TabsTrigger>
+              <TabsTrigger value="labor">Labor</TabsTrigger>
             </TabsList>
 
             <TabsContent value="team" className="mt-4 space-y-4">
@@ -685,204 +793,325 @@ function ProjectDetailPage() {
               </Card>
 
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Core members</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex flex-wrap gap-2">
-                    <Select
-                      value={coreMemberId || null}
-                      onValueChange={(value) => setCoreMemberId(value ?? "")}
-                      items={Object.fromEntries(
-                        availableCoreMembers.map((member) => [
-                          member.id,
-                          member.name,
-                        ])
-                      )}
-                      disabled={
-                        !canManageAssignments ||
-                        availableCoreMembers.length === 0
-                      }
-                    >
-                      <SelectTrigger className="w-72">
-                        <SelectValue
-                          placeholder={
-                            availableCoreMembers.length === 0
-                              ? "All core members assigned"
-                              : "Assign core member"
-                          }
-                        />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableCoreMembers.map((member) => (
-                          <SelectItem key={member.id} value={member.id}>
-                            {member.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      disabled={!coreMemberId || !canManageAssignments}
-                      onClick={async () => {
-                        await api(`/projects/${id}/assignments/core-members`, {
-                          method: "POST",
-                          body: { coreMemberId },
-                        })
-                        setCoreMemberId("")
-                        await load()
-                      }}
-                    >
-                      Assign
-                    </Button>
+                <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <CardTitle className="text-base">Core members</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Active assignments appear above. Historical assignment
+                      logs stay preserved below. Cost is prorated across
+                      concurrent projects while assigned.
+                    </p>
                   </div>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Assigned</TableHead>
-                        <TableHead>Ended</TableHead>
-                        <TableActionsHead />
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {assignments.coreMembers.map((assignment) => (
-                        <NavigableTableRow
-                          key={assignment.id}
-                          to="/core-members/$id"
-                          params={{ id: assignment.coreMemberId }}
-                        >
-                          <TableCell>
-                            <CoreMemberLink id={assignment.coreMemberId}>
-                              {assignment.coreMember?.name ??
-                                assignment.coreMemberId}
-                            </CoreMemberLink>
-                          </TableCell>
-                          <TableCell>
-                            {String(assignment.assignedAt).slice(0, 10)}
-                          </TableCell>
-                          <TableCell>
-                            {assignment.unassignedAt
-                              ? String(assignment.unassignedAt).slice(0, 10)
-                              : "Present"}
-                          </TableCell>
-                          <TableActionsCell>
-                            <TableActionLink
-                              label="View"
-                              to="/core-members/$id"
-                              params={{ id: assignment.coreMemberId }}
-                            >
-                              <IconEye className="size-3.5" />
-                            </TableActionLink>
-                            {!assignment.unassignedAt ? (
-                              <TableActionButton
-                                label="Unassign"
-                                variant="destructive"
-                                onClick={async () => {
-                                  await api(
-                                    `/projects/${id}/assignments/core-members/${assignment.coreMemberId}`,
-                                    { method: "DELETE" }
-                                  )
-                                  await load()
-                                }}
+                  <Button
+                    disabled={
+                      !canManageAssignments ||
+                      availableCoreMembers.length === 0
+                    }
+                    onClick={openAddCoreMembers}
+                  >
+                    <IconUserPlus className="size-3.5" />
+                    Add core members
+                  </Button>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <Dialog
+                    open={coreMemberAddOpen}
+                    onOpenChange={setCoreMemberAddOpen}
+                  >
+                    <DialogContent className="sm:max-w-lg">
+                      <DialogHeader>
+                        <DialogTitle>Add core members to project</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-3">
+                        <Input
+                          value={coreMemberQuery}
+                          onChange={(e) => setCoreMemberQuery(e.target.value)}
+                          placeholder="Search by name or email…"
+                          aria-label="Search core members to add"
+                        />
+                        {filteredAvailableCoreMembers.length > 0 ? (
+                          <label className="flex items-center gap-2 border-b pb-2 text-sm">
+                            <Checkbox
+                              checked={allFilteredCoreSelected}
+                              onCheckedChange={(checked) =>
+                                toggleAllFilteredCore(Boolean(checked))
+                              }
+                            />
+                            Select all shown (
+                            {filteredAvailableCoreMembers.length})
+                          </label>
+                        ) : null}
+                        <div className="max-h-72 space-y-1 overflow-y-auto">
+                          {filteredAvailableCoreMembers.length === 0 ? (
+                            <p className="py-6 text-center text-sm text-muted-foreground">
+                              {availableCoreMembers.length === 0
+                                ? "All active core members are already assigned to this project."
+                                : "No core members match your search."}
+                            </p>
+                          ) : (
+                            filteredAvailableCoreMembers.map((member) => (
+                              <label
+                                key={member.id}
+                                className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-muted/60"
                               >
-                                <IconUserMinus className="size-3.5" />
-                              </TableActionButton>
-                            ) : null}
-                          </TableActionsCell>
-                        </NavigableTableRow>
+                                <Checkbox
+                                  checked={selectedCoreMemberIds.includes(
+                                    member.id
+                                  )}
+                                  onCheckedChange={(checked) =>
+                                    toggleCoreMember(
+                                      member.id,
+                                      Boolean(checked)
+                                    )
+                                  }
+                                />
+                                <span className="min-w-0">
+                                  <span className="block text-sm font-medium">
+                                    {member.name}
+                                  </span>
+                                  <span className="block text-xs text-muted-foreground">
+                                    {member.email}
+                                  </span>
+                                </span>
+                              </label>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setCoreMemberAddOpen(false)}
+                          disabled={addingCoreMembers}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          disabled={
+                            selectedCoreMemberIds.length === 0 ||
+                            addingCoreMembers
+                          }
+                          onClick={async () => {
+                            setAddingCoreMembers(true)
+                            try {
+                              await api(
+                                `/projects/${id}/assignments/core-members/bulk`,
+                                {
+                                  method: "POST",
+                                  body: {
+                                    coreMemberIds: selectedCoreMemberIds,
+                                  },
+                                }
+                              )
+                              setCoreMemberAddOpen(false)
+                              setSelectedCoreMemberIds([])
+                              setCoreMemberQuery("")
+                              await load()
+                            } catch (e) {
+                              alert(
+                                e instanceof ApiError
+                                  ? e.message
+                                  : "Failed to add core members"
+                              )
+                            } finally {
+                              setAddingCoreMembers(false)
+                            }
+                          }}
+                        >
+                          {addingCoreMembers
+                            ? "Adding…"
+                            : `Add ${selectedCoreMemberIds.length || ""} core member${selectedCoreMemberIds.length === 1 ? "" : "s"}`.trim()}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  {activeCoreAssignments.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                      No active core members assigned.
+                    </p>
+                  ) : (
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {activeCoreAssignments.map((assignment) => (
+                        <Card key={assignment.id} className="border-dashed">
+                          <CardContent>
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <p className="truncate font-medium">
+                                  <CoreMemberLink id={assignment.coreMemberId}>
+                                    {assignment.coreMember?.name ??
+                                      assignment.coreMemberId}
+                                  </CoreMemberLink>
+                                </p>
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {assignment.coreMember?.email ?? "No email"}
+                                </p>
+                              </div>
+                              <Badge variant="secondary">Active</Badge>
+                            </div>
+                            <p className="mt-3 text-xs text-muted-foreground">
+                              Assigned{" "}
+                              {String(assignment.assignedAt).slice(0, 10)}
+                            </p>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="mt-4 w-full"
+                              onClick={async () => {
+                                await api(
+                                  `/projects/${id}/assignments/core-members/${assignment.coreMemberId}`,
+                                  { method: "DELETE" }
+                                )
+                                await load()
+                              }}
+                            >
+                              <IconUserMinus className="size-3.5" />
+                              Release
+                            </Button>
+                          </CardContent>
+                        </Card>
                       ))}
-                      {assignments.coreMembers.length === 0 ? (
+                    </div>
+                  )}
+
+                  <div className="space-y-3">
+                    <div>
+                      <h3 className="text-sm font-medium">Assignment log</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Every assignment period is retained, including
+                        auto-release on project close. Releasing ends cost
+                        accrual for this project from that day.
+                      </p>
+                    </div>
+                    <Table>
+                      <TableHeader>
                         <TableRow>
-                          <TableCell
-                            colSpan={4}
-                            className="text-muted-foreground"
-                          >
-                            No core members assigned yet.
-                          </TableCell>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Assigned</TableHead>
+                          <TableHead>Ended</TableHead>
+                          <TableActionsHead />
                         </TableRow>
-                      ) : null}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {pagedCoreAssignmentLog.map((assignment) => (
+                          <NavigableTableRow
+                            key={assignment.id}
+                            to="/core-members/$id"
+                            params={{ id: assignment.coreMemberId }}
+                          >
+                            <TableCell>
+                              <CoreMemberLink id={assignment.coreMemberId}>
+                                {assignment.coreMember?.name ??
+                                  assignment.coreMemberId}
+                              </CoreMemberLink>
+                            </TableCell>
+                            <TableCell>
+                              {String(assignment.assignedAt).slice(0, 10)}
+                            </TableCell>
+                            <TableCell>
+                              {assignment.unassignedAt
+                                ? String(assignment.unassignedAt).slice(0, 10)
+                                : "Present"}
+                            </TableCell>
+                            <TableActionsCell>
+                              <TableActionLink
+                                label="View"
+                                to="/core-members/$id"
+                                params={{ id: assignment.coreMemberId }}
+                              >
+                                <IconEye className="size-3.5" />
+                              </TableActionLink>
+                              {!assignment.unassignedAt ? (
+                                <TableActionButton
+                                  label="Unassign"
+                                  variant="destructive"
+                                  onClick={async () => {
+                                    await api(
+                                      `/projects/${id}/assignments/core-members/${assignment.coreMemberId}`,
+                                      { method: "DELETE" }
+                                    )
+                                    await load()
+                                  }}
+                                >
+                                  <IconUserMinus className="size-3.5" />
+                                </TableActionButton>
+                              ) : null}
+                            </TableActionsCell>
+                          </NavigableTableRow>
+                        ))}
+                        {coreAssignmentLog.length === 0 ? (
+                          <TableRow>
+                            <TableCell
+                              colSpan={4}
+                              className="text-muted-foreground"
+                            >
+                              No core member assignments yet.
+                            </TableCell>
+                          </TableRow>
+                        ) : null}
+                      </TableBody>
+                    </Table>
+                    {coreAssignmentLog.length > 0 ? (
+                      <PaginationBar
+                        page={coreLogPageSafe}
+                        totalPages={coreLogTotalPages}
+                        total={coreAssignmentLog.length}
+                        pageSize={coreLogPageSize}
+                        onPageChange={setCoreLogPage}
+                        onPageSizeChange={(size) => {
+                          setCoreLogPageSize(size)
+                          setCoreLogPage(1)
+                        }}
+                      />
+                    ) : null}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
 
             <TabsContent value="standups" className="mt-4">
-              <ProjectStandupsTab projectId={id} />
+              <StandupHistoryView
+                q={q}
+                employeeIds={employeeIdList}
+                projectId={id}
+                from={from}
+                to={to}
+                hideProjectFilter
+                onSearchChange={(value) => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      q: value,
+                    }),
+                  })
+                }}
+                onEmployeeIdsChange={(ids) => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      employeeIds: ids.join(","),
+                    }),
+                  })
+                }}
+                onRangeChange={(nextFrom, nextTo) => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      from: nextFrom,
+                      to: nextTo,
+                    }),
+                  })
+                }}
+              />
             </TabsContent>
 
             <TabsContent value="extensions" className="mt-4 space-y-4">
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-base">Add extension</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <form
-                    className="grid max-w-xl gap-3"
-                    onSubmit={async (e) => {
-                      e.preventDefault()
-                      await api(`/projects/${id}/extensions`, {
-                        method: "POST",
-                        body: {
-                          reason: extReason.trim(),
-                          amountNpr: parseNprInput(extAmount || "0"),
-                          endDate: extEndDate,
-                        },
-                      })
-                      setExtReason("")
-                      setExtAmount("0")
-                      setExtEndDate("")
-                      await load()
-                    }}
-                  >
-                    <div className="space-y-2">
-                      <Label>Reason</Label>
-                      <Textarea
-                        required
-                        value={extReason}
-                        onChange={(e) => setExtReason(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Amount (NPR)</Label>
-                      <Input
-                        value={extAmount}
-                        onChange={(e) => setExtAmount(e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>New end date</Label>
-                      <Input
-                        type="date"
-                        required
-                        min={(() => {
-                          const current = new Date(
-                            String(project.endDate).slice(0, 10)
-                          )
-                          current.setUTCDate(current.getUTCDate() + 1)
-                          return current.toISOString().slice(0, 10)
-                        })()}
-                        value={extEndDate}
-                        onChange={(e) => setExtEndDate(e.target.value)}
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        Current end date: {String(project.endDate).slice(0, 10)}
-                      </p>
-                    </div>
-                    <Button
-                      type="submit"
-                      className="w-fit"
-                      disabled={!extEndDate}
-                    >
-                      Add extension
-                    </Button>
-                  </form>
-                </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0">
                   <CardTitle className="text-base">Extension history</CardTitle>
+                  <Button size="sm" onClick={() => setExtensionOpen(true)}>
+                    Add extension
+                  </Button>
                 </CardHeader>
                 <CardContent>
                   <Table>
@@ -928,6 +1157,90 @@ function ProjectDetailPage() {
                   </Table>
                 </CardContent>
               </Card>
+
+              <Dialog
+                open={extensionOpen}
+                onOpenChange={(open) => {
+                  setExtensionOpen(open)
+                  if (!open) {
+                    setExtReason("")
+                    setExtAmount("0")
+                    setExtEndDate("")
+                  }
+                }}
+              >
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add extension</DialogTitle>
+                  </DialogHeader>
+                  <form
+                    className="space-y-3"
+                    onSubmit={async (e) => {
+                      e.preventDefault()
+                      await api(`/projects/${id}/extensions`, {
+                        method: "POST",
+                        body: {
+                          reason: extReason.trim(),
+                          amountNpr: parseNprInput(extAmount || "0"),
+                          endDate: extEndDate,
+                        },
+                      })
+                      setExtReason("")
+                      setExtAmount("0")
+                      setExtEndDate("")
+                      setExtensionOpen(false)
+                      await load()
+                    }}
+                  >
+                    <div className="space-y-2">
+                      <Label>Reason</Label>
+                      <Textarea
+                        required
+                        value={extReason}
+                        onChange={(e) => setExtReason(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Amount (NPR)</Label>
+                      <Input
+                        value={extAmount}
+                        onChange={(e) => setExtAmount(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>New end date</Label>
+                      <Input
+                        type="date"
+                        required
+                        min={(() => {
+                          const current = new Date(
+                            String(project.endDate).slice(0, 10)
+                          )
+                          current.setUTCDate(current.getUTCDate() + 1)
+                          return current.toISOString().slice(0, 10)
+                        })()}
+                        value={extEndDate}
+                        onChange={(e) => setExtEndDate(e.target.value)}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Current end date: {String(project.endDate).slice(0, 10)}
+                      </p>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setExtensionOpen(false)}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={!extEndDate}>
+                        Add extension
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </TabsContent>
 
             <TabsContent value="amc" className="mt-4 space-y-4">
@@ -1061,6 +1374,41 @@ function ProjectDetailPage() {
                   await load()
                 }}
               />
+            </TabsContent>
+
+            <TabsContent value="labor" className="mt-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">
+                    Labor cost from stand-ups
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">
+                    Stand-up labor against the duration-based budget run-rate.
+                  </p>
+                </CardHeader>
+                <CardContent>
+                  <ProjectLaborCostChart
+                    series={laborSeries}
+                    startDate={String(project.startDate).slice(0, 10)}
+                    endDate={String(project.endDate).slice(0, 10)}
+                    totalBudgetPaisa={
+                      profit?.revenuePaisa ?? project.budgetPaisa
+                    }
+                    spentLaborPaisa={summary?.laborCostPaisa ?? "0"}
+                  />
+                  <div className="mt-4 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    <Badge variant="outline">
+                      {summary?.completedStandupCount ?? 0} completed stand-ups
+                    </Badge>
+                    <Badge variant="outline">
+                      {summary?.standupEmployeeCount ?? 0} employees logged
+                    </Badge>
+                    <Badge variant="outline">
+                      {summary?.allocationPercentTotal ?? 0}% total allocation
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>

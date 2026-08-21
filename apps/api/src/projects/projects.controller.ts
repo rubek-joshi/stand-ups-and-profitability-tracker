@@ -18,6 +18,7 @@ import { RequirePermission } from "../casbin/decorators/require-permission.decor
 import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import {
   AssignCoreMemberDto,
+  AssignCoreMembersBulkDto,
   AssignEmployeeDto,
   AssignEmployeesBulkDto,
   CreateExtensionDto,
@@ -161,6 +162,17 @@ export class ProjectsController {
     @CurrentUser() user: AuthUser,
   ) {
     return this.projectsService.assignCoreMember(id, dto, user.id);
+  }
+
+  @Post(":id/assignments/core-members/bulk")
+  @RequirePermission("projects", "*")
+  @ApiOperation({ summary: "Assign multiple core members" })
+  async assignCoreMembersBulk(
+    @Param("id") id: string,
+    @Body() dto: AssignCoreMembersBulkDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.projectsService.assignCoreMembersBulk(id, dto, user.id);
   }
 
   @Delete(":id/assignments/core-members/:coreMemberId")

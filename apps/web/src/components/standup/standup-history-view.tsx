@@ -234,9 +234,11 @@ type Props = {
   from: string
   to: string
   refreshKey?: number
+  /** Hide project filter control (projectId still applied to the query). */
+  hideProjectFilter?: boolean
   onSearchChange: (value: string) => void
   onEmployeeIdsChange: (ids: string[]) => void
-  onProjectChange: (value: string) => void
+  onProjectChange?: (value: string) => void
   onRangeChange: (from: string, to: string) => void
 }
 
@@ -541,6 +543,7 @@ export function StandupHistoryView({
   from,
   to,
   refreshKey = 0,
+  hideProjectFilter = false,
   onSearchChange,
   onEmployeeIdsChange,
   onProjectChange,
@@ -583,6 +586,17 @@ export function StandupHistoryView({
     let cancelled = false
     void (async () => {
       try {
+        if (hideProjectFilter) {
+          const empRes = await api<
+            PaginatedEnvelope<Employee[]> | Envelope<Employee[]>
+          >("/employees")
+          if (cancelled) return
+          setEmployees(
+            [...empRes.data].sort((a, b) => a.name.localeCompare(b.name)),
+          )
+          setProjects([])
+          return
+        }
         const [empRes, projRes] = await Promise.all([
           api<PaginatedEnvelope<Employee[]> | Envelope<Employee[]>>("/employees"),
           api<Envelope<Project[]> | PaginatedEnvelope<Project[]>>("/projects"),
@@ -604,7 +618,7 @@ export function StandupHistoryView({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [hideProjectFilter])
 
   const projectItems = React.useMemo(
     () =>
@@ -694,7 +708,11 @@ export function StandupHistoryView({
           <Input
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search by name, project, notes, or tasks (fuzzy)…"
+            placeholder={
+              hideProjectFilter
+                ? "Search by name, notes, or tasks (fuzzy)…"
+                : "Search by name, project, notes, or tasks (fuzzy)…"
+            }
             className="pl-9"
             aria-label="Search stand-up history"
           />
@@ -704,25 +722,27 @@ export function StandupHistoryView({
           selectedIds={employeeIds}
           onChange={onEmployeeIdsChange}
         />
-        <Select
-          value={projectId || ALL_PROJECTS}
-          onValueChange={(value) => {
-            onProjectChange(value === ALL_PROJECTS || !value ? "" : value)
-          }}
-          items={projectItems}
-        >
-          <SelectTrigger className="w-56" aria-label="Filter by project">
-            <SelectValue placeholder="All projects" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
-            {projects.map((project) => (
-              <SelectItem key={project.id} value={project.id}>
-                {project.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!hideProjectFilter ? (
+          <Select
+            value={projectId || ALL_PROJECTS}
+            onValueChange={(value) => {
+              onProjectChange?.(value === ALL_PROJECTS || !value ? "" : value)
+            }}
+            items={projectItems}
+          >
+            <SelectTrigger className="w-56" aria-label="Filter by project">
+              <SelectValue placeholder="All projects" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={ALL_PROJECTS}>All projects</SelectItem>
+              {projects.map((project) => (
+                <SelectItem key={project.id} value={project.id}>
+                  {project.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
         <DateRangeBar
           range={range}
           activePreset={activePreset}

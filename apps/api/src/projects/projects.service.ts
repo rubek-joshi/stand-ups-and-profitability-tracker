@@ -24,6 +24,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ProfitabilityService } from "../profitability/profitability.service";
 import {
   AssignCoreMemberDto,
+  AssignCoreMembersBulkDto,
   AssignEmployeeDto,
   AssignEmployeesBulkDto,
   CreateExtensionDto,
@@ -396,6 +397,79 @@ export class ProjectsService {
       metadata: { projectId, coreMemberId: dto.coreMemberId },
     });
     return assignment;
+  }
+
+  async assignCoreMembersBulk(
+    projectId: string,
+    dto: AssignCoreMembersBulkDto,
+    actorId: string,
+  ) {
+    await this.getProjectOrThrow(projectId);
+    const coreMemberIds = [...new Set(dto.coreMemberIds)];
+    const members = await this.prismaService.coreMember.findMany({
+      where: { id: { in: coreMemberIds } },
+      select: { id: true, name: true },
+    });
+    if (members.length !== coreMemberIds.length) {
+      const foundIds = new Set(members.map((member) => member.id));
+      const missingIds = coreMemberIds.filter(
+        (coreMemberId) => !foundIds.has(coreMemberId),
+      );
+      throw new NotFoundException(
+        `Core members not found: ${missingIds.join(", ")}`,
+      );
+    }
+    const existing = await this.prismaService.coreMemberAssignment.findMany({
+      where: {
+        projectId,
+        coreMemberId: { in: coreMemberIds },
+        unassignedAt: null,
+      },
+      include: { coreMember: true },
+    });
+    if (existing.length > 0) {
+      throw new BadRequestException(
+        `Already assigned: ${existing
+          .map(
+            (assignment) =>
+              assignment.coreMember?.name ?? assignment.coreMemberId,
+          )
+          .join(", ")}`,
+      );
+    }
+
+    const created = await this.prismaService.$transaction(async (tx) => {
+      await tx.coreMemberAssignment.createMany({
+        data: coreMemberIds.map((coreMemberId) => ({
+          projectId,
+          coreMemberId,
+        })),
+      });
+      return tx.coreMemberAssignment.findMany({
+        where: {
+          projectId,
+          coreMemberId: { in: coreMemberIds },
+          unassignedAt: null,
+        },
+        include: { coreMember: true },
+        orderBy: { assignedAt: "desc" },
+      });
+    });
+
+    this.profitabilityService.clearCache(projectId);
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.CORE_MEMBER_ASSIGNED,
+      targetType: "CoreMemberAssignment",
+      targetId: projectId,
+      metadata: {
+        projectId,
+        coreMemberIds,
+        count: created.length,
+      },
+    });
+
+    return created;
   }
 
   async unassignCoreMember(
