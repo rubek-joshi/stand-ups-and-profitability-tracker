@@ -374,9 +374,6 @@ importers:
       '@tabler/icons-react':
         specifier: ^3.46.0
         version: 3.46.0(react@19.2.6)
-      '@types/culori':
-        specifier: ^4.0.1
-        version: 4.0.1
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -420,6 +417,9 @@ importers:
       '@turbo/gen':
         specifier: ^2.9.15
         version: 2.9.15(@types/node@22.19.19)
+      '@types/culori':
+        specifier: ^4.0.1
+        version: 4.0.1
       '@types/node':
         specifier: ^22
         version: 22.19.19

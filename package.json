@@ -30,9 +30,17 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
+      "@prisma/engines",
       "esbuild",
       "lightningcss",
-      "bcrypt"
+      "prisma",
+      "unrs-resolver"
+    ],
+    "ignoredBuiltDependencies": [
+      "@scarf/scarf",
+      "msgpackr-extract",
+      "msw",
+      "unrs-resolver"
     ]
   }
 }
