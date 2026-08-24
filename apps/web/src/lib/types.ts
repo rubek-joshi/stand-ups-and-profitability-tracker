@@ -252,12 +252,9 @@ export type SalaryEntry = {
   createdAt?: string
 }
 
-export type StandupStatus = "draft" | "in_progress" | "completed"
-
 export type StandupCalendarDay = {
   id: string
   date: string
-  status: StandupStatus
 }
 
 export type AttendanceStatus =
@@ -270,12 +267,18 @@ export type AttendanceStatus =
 export type Standup = {
   id: string
   date: string
-  status: StandupStatus
   employeeGroupId?: string | null
   employeeGroup?: { id: string; name: string } | null
   createdAt?: string
+  updatedAt?: string
   createdBy?: { id: string; name: string; email: string }
+  updatedBy?: { id: string; name: string; email: string }
   _count?: { entries: number }
+  stats?: {
+    working: number
+    absent: number
+    projectCount: number
+  }
   entries?: StandupEntry[]
 }
 

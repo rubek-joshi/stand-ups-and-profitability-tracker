@@ -5,7 +5,6 @@ import {
   ClientStatus,
   PersonStatus,
   ProjectStatus,
-  StandupStatus,
 } from "@workspace/database";
 import { parseIsoDate, toIsoDate } from "../_shared/utils/date.util";
 import { PrismaService } from "../prisma/prisma.service";
@@ -113,13 +112,11 @@ export class DashboardService {
       }),
       this.prismaService.standup.count({
         where: {
-          status: StandupStatus.completed,
           ...(standupDateFilter ? { date: standupDateFilter } : {}),
         },
       }),
       this.prismaService.standup.findMany({
         where: {
-          status: StandupStatus.completed,
           ...(standupDateFilter ? { date: standupDateFilter } : {}),
         },
         include: {

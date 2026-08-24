@@ -5,9 +5,11 @@ import {
   IconCalendar,
   IconClipboard,
   IconDeviceFloppy,
+  IconDotsVertical,
   IconLayoutGrid,
   IconSearch,
   IconTable,
+  IconTrash,
   IconUsers,
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
@@ -25,6 +27,18 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog"
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -32,7 +46,6 @@ import {
   SelectValue,
 } from "@workspace/ui/components/select"
 import { PageHeader } from "@/components/page-header"
-import { StatusBadge } from "@/components/health-badge"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { SHORTCUTS_FAB_BOTTOM_CLASS } from "@/components/keyboard-shortcuts"
@@ -56,6 +69,12 @@ import {
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { primaryModifierPressed } from "@/lib/keyboard"
+import {
+  STANDUP_DELETABLE_DAYS,
+  STANDUP_EDITABLE_DAYS,
+  isStandupDeletable,
+  isStandupEditable,
+} from "@/lib/standup-age"
 import { toast } from "@workspace/ui/components/toast"
 import * as Y from "yjs"
 import {
@@ -309,7 +328,7 @@ function applyAssignedProjectDefaults(
   standup: Standup,
   projects: Project[],
 ): Record<string, EntryDraft> {
-  if (standup.status === "completed") return drafts
+  if (!isStandupEditable(String(standup.date))) return drafts
   const standupDate = String(standup.date).slice(0, 10)
   let changed = false
   const next = { ...drafts }
@@ -482,7 +501,14 @@ function StandupDetailPage() {
   draftsRef.current = drafts
   const visibleEntriesRef = React.useRef<Array<{ id: string }>>([])
 
-  const readonly = standup?.status === "completed"
+  const readonly = Boolean(standup && !isStandupEditable(String(standup.date)))
+  const canDelete =
+    user?.role === "super_admin" &&
+    Boolean(standup && isStandupDeletable(String(standup.date)))
+  const deleteBlockedByAge =
+    user?.role === "super_admin" &&
+    Boolean(standup && !isStandupDeletable(String(standup.date)))
+  const navigate = Route.useNavigate()
   const isDirty =
     Boolean(standup) && !readonly && baseline !== "" && serializeDrafts(drafts) !== baseline
 
@@ -1086,57 +1112,98 @@ function StandupDetailPage() {
         title={`Stand-up · ${dateLabel}`}
         description="Attendance, tasks, and project allocations"
         breadcrumbs={[
-          { label: "Stand-ups", to: "/stand-ups", search: { page: 1, pageSize: 25 } },
+          { label: "Stand-ups", to: "/stand-ups", search: { page: 1, pageSize: 25, view: "list", q: "", employeeIds: "", projectId: "", from: "", to: "" } },
           { label: dateLabel },
         ]}
-        status={<StatusBadge status={standup.status} />}
         actions={
-          <>
-            {standup.status === "completed" ? (
-              <Button
-                variant="outline"
-                onClick={async () => {
-                  await api(`/standups/${id}/reopen`, { method: "POST" })
-                  await load()
-                }}
-              >
-                Reopen
-              </Button>
-            ) : (
-              <Button
-                disabled={saving}
-                onClick={async () => {
-                  const ok = await confirm({
-                    title: "Complete stand-up?",
-                    description:
-                      "Current changes will be saved first. Attendance records will be derived. Entries become read-only.",
-                    confirmLabel: "Complete",
-                  })
-                  if (!ok) return
-                  try {
-                    if (isDirty) {
-                      const saved = await saveAll()
-                      if (!saved) return
-                    }
-                    await api(`/standups/${id}/complete`, { method: "POST" })
-                    await load()
-                  } catch (e) {
-                    setMessageDialog({
-                      title: "Complete failed",
-                      description:
-                        e instanceof ApiError
-                          ? e.message
-                          : "Failed to complete this stand-up.",
-                    })
+          <div className="flex items-center gap-2">
+            {user?.role === "super_admin" ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label="Stand-up actions"
+                    />
                   }
-                }}
-              >
-                Complete
-              </Button>
-            )}
-          </>
+                >
+                  <IconDotsVertical />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="min-w-40">
+                  <DropdownMenuGroup>
+                    {canDelete ? (
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={async () => {
+                          const ok = await confirm({
+                            title: "Delete stand-up?",
+                            description:
+                              "This permanently deletes the stand-up, its entries, and derived attendance. Type I understand to confirm.",
+                            confirmLabel: "Delete",
+                            confirmPhrase: "I understand",
+                            destructive: true,
+                          })
+                          if (!ok) return
+                          try {
+                            await api(`/standups/${id}`, { method: "DELETE" })
+                            void navigate({
+                              to: "/stand-ups",
+                              search: {
+                                page: 1,
+                                pageSize: 25,
+                                view: "list",
+                                q: "",
+                                employeeIds: "",
+                                projectId: "",
+                                from: "",
+                                to: "",
+                              },
+                            })
+                          } catch (e) {
+                            setMessageDialog({
+                              title: "Delete failed",
+                              description:
+                                e instanceof ApiError
+                                  ? e.message
+                                  : "Failed to delete this stand-up.",
+                            })
+                          }
+                        }}
+                      >
+                        <IconTrash />
+                        Delete
+                      </DropdownMenuItem>
+                    ) : deleteBlockedByAge ? (
+                      <Tooltip>
+                        <TooltipTrigger
+                          render={<div className="w-full cursor-not-allowed" />}
+                        >
+                          <DropdownMenuItem disabled variant="destructive">
+                            <IconTrash />
+                            Delete
+                          </DropdownMenuItem>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Cannot delete stand-ups older than{" "}
+                          {STANDUP_DELETABLE_DAYS} days
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : null}
+          </div>
         }
       />
+
+      {readonly ? (
+        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
+          This stand-up is older than {STANDUP_EDITABLE_DAYS} days and is
+          read-only.
+        </div>
+      ) : null}
 
       <div className="sticky top-4 z-20 mb-6 flex flex-wrap items-center gap-3 rounded-xl border bg-card/95 px-4 py-3 shadow-sm backdrop-blur">
         <div className="min-w-0 flex-1">

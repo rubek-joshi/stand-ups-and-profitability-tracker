@@ -35,7 +35,6 @@ export {
   ProjectStatus,
   PersonStatus,
   AttendanceType,
-  StandupStatus,
   AttendanceStatus,
   AmcStatus,
   AmcType,

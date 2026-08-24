@@ -35,7 +35,6 @@ import {
 } from "@workspace/ui/components/tabs"
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
-import { StatusBadge } from "@/components/health-badge"
 import { StandupCalendar, utcIsoDate } from "@/components/standup/standup-calendar"
 import { StandupHistoryView } from "@/components/standup/standup-history-view"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
@@ -247,9 +246,10 @@ function StandupsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Entries</TableHead>
-                      <TableHead>Created by</TableHead>
+                      <TableHead>Working</TableHead>
+                      <TableHead>Absent</TableHead>
+                      <TableHead>Projects</TableHead>
+                      <TableHead>Last updated by</TableHead>
                       <TableActionsHead />
                     </TableRow>
                   </TableHeader>
@@ -270,11 +270,18 @@ function StandupsPage() {
                             {formatStandupDate(String(s.date))}
                           </Link>
                         </TableCell>
-                        <TableCell>
-                          <StatusBadge status={s.status} />
+                        <TableCell className="tabular-nums">
+                          {s.stats?.working ?? "—"}
                         </TableCell>
-                        <TableCell>{s._count?.entries ?? "—"}</TableCell>
-                        <TableCell>{s.createdBy?.name ?? "—"}</TableCell>
+                        <TableCell className="tabular-nums">
+                          {s.stats?.absent ?? "—"}
+                        </TableCell>
+                        <TableCell className="tabular-nums">
+                          {s.stats?.projectCount ?? "—"}
+                        </TableCell>
+                        <TableCell>
+                          {s.updatedBy?.name ?? s.createdBy?.name ?? "—"}
+                        </TableCell>
                         <TableActionsCell>
                           <TableActionLink
                             label="Open"

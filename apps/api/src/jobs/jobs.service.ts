@@ -8,6 +8,7 @@ import {
 import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { QueuesService } from "../queues/queues.service";
+import { StandupsService } from "../standups/standups.service";
 
 const AUTO_EXTEND_REASON =
   "Automatically extended — project was not closed by its end date";
@@ -20,12 +21,28 @@ export class JobsService {
     private readonly prismaService: PrismaService,
     private readonly auditService: AuditService,
     private readonly queuesService: QueuesService,
+    private readonly standupsService: StandupsService,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
   async runHourlyMaintenance(): Promise<void> {
     await this.autoExtendProjects();
     await this.refreshAmcStatusesAndRemind();
+  }
+
+  /** Shortly after midnight Asia/Kathmandu — mark unwritten yesterday entries absent. */
+  @Cron("5 0 * * *", { timeZone: "Asia/Kathmandu" })
+  async runStandupAutoAbsent(): Promise<void> {
+    try {
+      const result = await this.standupsService.autoAbsentUnwrittenYesterday();
+      if (result.standupId) {
+        this.logger.log(
+          `Stand-up ${result.standupId}: marked ${result.markedAbsent} empty entries absent`,
+        );
+      }
+    } catch (error) {
+      this.logger.error("Stand-up auto-absent job failed", error);
+    }
   }
 
   async autoExtendProjects(): Promise<void> {

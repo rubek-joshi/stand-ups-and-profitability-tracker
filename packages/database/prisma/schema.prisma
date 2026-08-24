@@ -32,12 +32,6 @@ enum AttendanceType {
   unpaid_absence
 }
 
-enum StandupStatus {
-  draft
-  in_progress
-  completed
-}
-
 enum AttendanceStatus {
   present
   first_half_leave
@@ -126,6 +120,8 @@ enum AuditAction {
   STANDUP_COMPLETED
   STANDUP_REOPENED
   STANDUP_OVERRIDE_GRANTED
+  STANDUP_DELETED
+  STANDUP_AUTO_ABSENTED
   AMC_SET
   AMC_UPDATED
   AMC_CANCELLED
@@ -167,6 +163,7 @@ model User {
 
   auditLogs               AuditLog[]               @relation("AuditActor")
   createdStandups         Standup[]                @relation("StandupCreator")
+  updatedStandups         Standup[]                @relation("StandupUpdater")
   createdExtensions       ProjectExtension[]       @relation("ExtensionCreator")
   employeeSalaryChanges   EmployeeSalaryEntry[]    @relation("EmployeeSalaryChangedBy")
   coreMemberSalaryChanges CoreMemberSalaryEntry[]  @relation("CoreMemberSalaryChangedBy")
@@ -459,22 +456,24 @@ model CoreMemberSalaryEntry {
 }
 
 model Standup {
-  id              String        @id @default(cuid())
-  date            DateTime      @db.Date
-  status          StandupStatus @default(draft)
+  id              String    @id @default(cuid())
+  date            DateTime  @db.Date
   createdById     String
+  updatedById     String
   employeeGroupId String?
   yjsState        Bytes?
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   createdBy     User              @relation("StandupCreator", fields: [createdById], references: [id])
+  updatedBy     User              @relation("StandupUpdater", fields: [updatedById], references: [id])
   employeeGroup EmployeeGroup?    @relation(fields: [employeeGroupId], references: [id], onDelete: Restrict)
   entries       StandupEntry[]
   attendance    AttendanceRecord[]
 
   @@index([date])
   @@index([employeeGroupId])
+  @@index([updatedById])
   @@map("standups")
 }
 

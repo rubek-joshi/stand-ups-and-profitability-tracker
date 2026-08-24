@@ -68,7 +68,7 @@ export type StandupHistoryRecord = {
 export type StandupHistoryDay = {
   date: string
   standupId: string
-  status: string
+  status?: string
   records: StandupHistoryRecord[]
 }
 

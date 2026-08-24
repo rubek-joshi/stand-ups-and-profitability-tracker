@@ -163,9 +163,6 @@ export class ProfitabilityService {
 
     for (const allocation of allocations) {
       const standup = allocation.standupEntry.standup;
-      if (standup.status !== "completed") {
-        continue;
-      }
       if (options?.from && standup.date < options.from) {
         continue;
       }
@@ -231,7 +228,7 @@ export class ProfitabilityService {
       percentage: number;
       standupEntry: {
         attendanceStatus: AttendanceStatus;
-        standup: { date: Date; status: string };
+        standup: { date: Date };
         employee: {
           salaryEntries: Array<{ effectiveDate: Date; salaryPaisa: bigint }>;
         };
@@ -243,9 +240,6 @@ export class ProfitabilityService {
     let total = 0n;
     for (const allocation of allocations) {
       const standup = allocation.standupEntry.standup;
-      if (standup.status !== "completed") {
-        continue;
-      }
       if (from && standup.date < from) {
         continue;
       }

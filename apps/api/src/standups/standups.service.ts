@@ -12,7 +12,6 @@ import {
   PersonStatus,
   Prisma,
   ProjectStatus,
-  StandupStatus,
   StandupTaskState,
 } from "@workspace/database";
 import { AuditService } from "../audit/audit.service";
@@ -23,6 +22,13 @@ import {
   toIsoDate,
   toMonthKey,
 } from "../_shared/utils/date.util";
+import {
+  STANDUP_DELETABLE_DAYS,
+  STANDUP_EDITABLE_DAYS,
+  isStandupDeletable,
+  isStandupEditable,
+  nptYesterdayDate,
+} from "../_shared/utils/standup-age.util";
 import {
   paginatedResult,
   resolvePagination,
@@ -84,8 +90,8 @@ export class StandupsService {
     const standup = await this.prismaService.standup.create({
       data: {
         date,
-        status: StandupStatus.draft,
         createdById: actorId,
+        updatedById: actorId,
         employeeGroupId: null,
         entries: {
           create: employees.map((employee) => ({
@@ -123,12 +129,18 @@ export class StandupsService {
       page: filters.page,
       pageSize: filters.pageSize,
     });
-    const [data, total] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.prismaService.standup.findMany({
         orderBy: { date: "desc" },
         include: {
           createdBy: { select: { id: true, name: true, email: true } },
-          _count: { select: { entries: true } },
+          updatedBy: { select: { id: true, name: true, email: true } },
+          entries: {
+            select: {
+              attendanceStatus: true,
+              allocations: { select: { projectId: true } },
+            },
+          },
         },
         ...(pagination
           ? { skip: pagination.skip, take: pagination.take }
@@ -136,7 +148,38 @@ export class StandupsService {
       }),
       this.prismaService.standup.count(),
     ]);
-    return paginatedResult(data, total, pagination);
+    const data = rows.map((standup) => {
+      const projectIds = new Set<string>()
+      let working = 0
+      let absent = 0
+      for (const entry of standup.entries) {
+        if (entry.attendanceStatus === AttendanceStatus.absent) {
+          absent += 1
+        } else {
+          working += 1
+        }
+        for (const allocation of entry.allocations) {
+          projectIds.add(allocation.projectId)
+        }
+      }
+      return {
+        id: standup.id,
+        date: toIsoDate(standup.date),
+        createdById: standup.createdById,
+        updatedById: standup.updatedById,
+        employeeGroupId: standup.employeeGroupId,
+        createdAt: standup.createdAt,
+        updatedAt: standup.updatedAt,
+        createdBy: standup.createdBy,
+        updatedBy: standup.updatedBy,
+        stats: {
+          working,
+          absent,
+          projectCount: projectIds.size,
+        },
+      }
+    })
+    return paginatedResult(data, total, pagination)
   }
 
   async findCalendar(from: string, to: string) {
@@ -161,7 +204,6 @@ export class StandupsService {
       select: {
         id: true,
         date: true,
-        status: true,
       },
       orderBy: { date: "asc" },
     });
@@ -169,7 +211,6 @@ export class StandupsService {
     return standups.map((standup) => ({
       id: standup.id,
       date: toIsoDate(standup.date),
-      status: standup.status,
     }));
   }
 
@@ -270,7 +311,6 @@ export class StandupsService {
     const data = standups.map((standup) => ({
       date: toIsoDate(standup.date),
       standupId: standup.id,
-      status: standup.status,
       records: standup.entries.map((entry) => ({
         id: entry.id,
         employee: entry.employee,
@@ -367,7 +407,6 @@ export class StandupsService {
     const data = standups.map((standup) => ({
       date: toIsoDate(standup.date),
       standupId: standup.id,
-      status: standup.status,
       records: standup.entries.map((entry) => ({
         id: entry.id,
         employee: entry.employee,
@@ -533,7 +572,7 @@ export class StandupsService {
 
   async findOne(id: string) {
     const existing = await this.loadStandupOrThrow(id);
-    if (existing.status !== StandupStatus.completed) {
+    if (isStandupEditable(existing.date)) {
       await this.syncMissingParticipants(existing);
     }
     return this.loadStandupOrThrow(id);
@@ -566,9 +605,9 @@ export class StandupsService {
       throw new BadRequestException("At least one entry is required");
     }
     const standup = await this.findOne(standupId);
-    if (standup.status === StandupStatus.completed) {
+    if (!isStandupEditable(standup.date)) {
       throw new BadRequestException(
-        "Cannot edit entries on a completed standup; reopen first",
+        `Stand-ups older than ${STANDUP_EDITABLE_DAYS} days cannot be edited`,
       );
     }
 
@@ -711,14 +750,18 @@ export class StandupsService {
           }),
         );
       }
-      if (standup.status === StandupStatus.draft) {
-        await tx.standup.update({
-          where: { id: standupId },
-          data: { status: StandupStatus.in_progress },
-        });
-      }
+      await tx.standup.update({
+        where: { id: standupId },
+        data: { updatedById: actorId },
+      });
       return results;
     });
+
+    await this.rederiveAttendanceForEmployees(
+      standupId,
+      updatedEntries.map((item) => item.employeeId),
+    );
+    this.profitabilityService.clearCache();
 
     await this.auditService.write({
       actorId,
@@ -739,19 +782,176 @@ export class StandupsService {
     }));
   }
 
-  async complete(standupId: string, actorId: string) {
-    const standup = await this.findOne(standupId);
-    if (standup.status === StandupStatus.completed) {
-      throw new BadRequestException("Standup is already completed");
+  async remove(standupId: string, actorId: string) {
+    const standup = await this.loadStandupOrThrow(standupId);
+    if (!isStandupDeletable(standup.date)) {
+      throw new BadRequestException(
+        `Stand-ups older than ${STANDUP_DELETABLE_DAYS} days cannot be deleted`,
+      );
+    }
+    await this.prismaService.$transaction(async (tx) => {
+      await tx.attendanceRecord.deleteMany({ where: { standupId } });
+      await tx.standup.delete({ where: { id: standupId } });
+    });
+    this.profitabilityService.clearCache();
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.STANDUP_DELETED,
+      targetType: "Standup",
+      targetId: standupId,
+      metadata: { date: toIsoDate(standup.date) },
+    });
+    return { id: standupId };
+  }
+
+  /**
+   * After NPT midnight: mark yesterday's empty present entries as absent,
+   * then re-derive attendance for the whole stand-up.
+   */
+  async autoAbsentUnwrittenYesterday(): Promise<{
+    standupId: string | null;
+    markedAbsent: number;
+  }> {
+    const yesterday = nptYesterdayDate();
+    const standup = await this.prismaService.standup.findFirst({
+      where: { date: yesterday },
+      include: {
+        entries: {
+          include: {
+            allocations: { select: { id: true } },
+          },
+        },
+      },
+    });
+    if (!standup) {
+      return { standupId: null, markedAbsent: 0 };
+    }
+
+    const emptyIds = standup.entries
+      .filter((entry) => this.isEntryUnwritten(entry))
+      .map((entry) => entry.id);
+
+    if (emptyIds.length > 0) {
+      await this.prismaService.standupEntry.updateMany({
+        where: { id: { in: emptyIds } },
+        data: {
+          attendanceStatus: AttendanceStatus.absent,
+          miscellaneousNotes: null,
+        },
+      });
+      await this.prismaService.projectAllocation.deleteMany({
+        where: { standupEntryId: { in: emptyIds } },
+      });
+    }
+
+    const allEmployeeIds = standup.entries.map((entry) => entry.employeeId);
+    await this.rederiveAttendanceForEmployees(standup.id, allEmployeeIds);
+    this.profitabilityService.clearCache();
+
+    const systemUser = await this.prismaService.user.findFirst({
+      where: { isActive: true },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    });
+    if (systemUser) {
+      await this.prismaService.standup.update({
+        where: { id: standup.id },
+        data: { updatedById: systemUser.id },
+      });
+      await this.auditService.write({
+        actorId: systemUser.id,
+        action: AuditAction.STANDUP_AUTO_ABSENTED,
+        targetType: "Standup",
+        targetId: standup.id,
+        metadata: {
+          date: toIsoDate(yesterday),
+          markedAbsent: emptyIds.length,
+        },
+      });
+    }
+
+    return { standupId: standup.id, markedAbsent: emptyIds.length };
+  }
+
+  private async loadStandupOrThrow(id: string) {
+    const standup = await this.prismaService.standup.findUnique({
+      where: { id },
+      include: {
+        createdBy: { select: { id: true, name: true, email: true } },
+        updatedBy: { select: { id: true, name: true, email: true } },
+        employeeGroup: { select: { id: true, name: true } },
+        entries: {
+          include: {
+            employee: {
+              include: {
+                assignments: {
+                  include: {
+                    project: { select: { id: true, name: true, status: true } },
+                  },
+                },
+              },
+            },
+            allocations: {
+              include: {
+                project: true,
+                tasks: { orderBy: { sortOrder: "asc" as const } },
+              },
+            },
+          },
+          orderBy: { employee: { name: "asc" } },
+        },
+      },
+    });
+    if (!standup) {
+      throw new NotFoundException(`Standup ${id} not found`);
+    }
+    return standup;
+  }
+
+  private isEntryUnwritten(entry: {
+    attendanceStatus: AttendanceStatus;
+    miscellaneousNotes?: string | null;
+    allocations: Array<{ id: string }>;
+  }): boolean {
+    if (entry.attendanceStatus !== AttendanceStatus.present) {
+      return false;
+    }
+    if (entry.allocations.length > 0) {
+      return false;
+    }
+    if (entry.miscellaneousNotes?.trim()) {
+      return false;
+    }
+    return true;
+  }
+
+  private async rederiveAttendanceForEmployees(
+    standupId: string,
+    employeeIds: string[],
+  ) {
+    if (employeeIds.length === 0) return;
+    const standup = await this.prismaService.standup.findUnique({
+      where: { id: standupId },
+      select: { id: true, date: true },
+    });
+    if (!standup) {
+      throw new NotFoundException(`Standup ${standupId} not found`);
     }
     const settings = await this.prismaService.orgSettings.findFirst();
     if (!settings) {
       throw new BadRequestException("Org settings not found");
     }
+    const uniqueEmployeeIds = [...new Set(employeeIds)];
+    const entries = await this.prismaService.standupEntry.findMany({
+      where: { standupId, employeeId: { in: uniqueEmployeeIds } },
+    });
     const month = toMonthKey(standup.date);
+
     await this.prismaService.$transaction(async (tx) => {
-      await tx.attendanceRecord.deleteMany({ where: { standupId } });
-      for (const entry of standup.entries) {
+      await tx.attendanceRecord.deleteMany({
+        where: { standupId, employeeId: { in: uniqueEmployeeIds } },
+      });
+      for (const entry of entries) {
         if (entry.attendanceStatus === AttendanceStatus.present) {
           continue;
         }
@@ -787,76 +987,7 @@ export class StandupsService {
           },
         });
       }
-      await tx.standup.update({
-        where: { id: standupId },
-        data: { status: StandupStatus.completed },
-      });
     });
-    this.profitabilityService.clearCache();
-    await this.auditService.write({
-      actorId,
-      action: AuditAction.STANDUP_COMPLETED,
-      targetType: "Standup",
-      targetId: standupId,
-      metadata: { date: standup.date },
-    });
-    return this.findOne(standupId);
-  }
-
-  async reopen(standupId: string, actorId: string) {
-    const standup = await this.findOne(standupId);
-    if (standup.status !== StandupStatus.completed) {
-      throw new BadRequestException("Only completed standups can be reopened");
-    }
-    await this.prismaService.$transaction(async (tx) => {
-      await tx.attendanceRecord.deleteMany({ where: { standupId } });
-      await tx.standup.update({
-        where: { id: standupId },
-        data: { status: StandupStatus.in_progress },
-      });
-    });
-    this.profitabilityService.clearCache();
-    await this.auditService.write({
-      actorId,
-      action: AuditAction.STANDUP_REOPENED,
-      targetType: "Standup",
-      targetId: standupId,
-    });
-    return this.findOne(standupId);
-  }
-
-  private async loadStandupOrThrow(id: string) {
-    const standup = await this.prismaService.standup.findUnique({
-      where: { id },
-      include: {
-        createdBy: { select: { id: true, name: true, email: true } },
-        employeeGroup: { select: { id: true, name: true } },
-        entries: {
-          include: {
-            employee: {
-              include: {
-                assignments: {
-                  include: {
-                    project: { select: { id: true, name: true, status: true } },
-                  },
-                },
-              },
-            },
-            allocations: {
-              include: {
-                project: true,
-                tasks: { orderBy: { sortOrder: "asc" as const } },
-              },
-            },
-          },
-          orderBy: { employee: { name: "asc" } },
-        },
-      },
-    });
-    if (!standup) {
-      throw new NotFoundException(`Standup ${id} not found`);
-    }
-    return standup;
   }
 
   private async findActiveEmployeesForDate(date: Date) {

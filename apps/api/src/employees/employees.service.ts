@@ -133,7 +133,7 @@ export class EmployeesService {
         attendanceRecords: { orderBy: { date: "desc" } },
         standupEntries: {
           include: {
-            standup: { select: { id: true, date: true, status: true } },
+            standup: { select: { id: true, date: true } },
             allocations: {
               include: {
                 project: { select: { id: true, name: true, status: true } },
