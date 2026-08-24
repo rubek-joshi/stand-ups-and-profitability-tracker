@@ -84,8 +84,14 @@ if [[ -f "$WEB_ROOT/_shell.html" && ! -f "$WEB_ROOT/index.html" ]]; then
 fi
 sudo chown -R www-data:www-data "$WEB_ROOT"
 
+if ! grep -Rqs --include='*.js' 'strip the /api prefix' "$WEB_ROOT"; then
+  echo "ERROR: published JS is not the same-origin /api client (missing api.ts marker)."
+  echo "       The login button would POST /auth/login and Nginx would return 405."
+  exit 1
+fi
+
 if [[ "${VITE_API_URL:-}" != *localhost:4101* ]] && grep -Rqs "localhost:4101" "$WEB_ROOT"; then
-  echo "ERROR: published frontend still references http://localhost:4101. Check VITE_API_URL and rebuild."
+  echo "ERROR: published frontend still references http://localhost:4101."
   exit 1
 fi
 

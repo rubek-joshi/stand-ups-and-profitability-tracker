@@ -1,27 +1,13 @@
 const TOKEN_KEY = "pt_token"
-const LOCAL_API_ORIGIN = "http://localhost:4101"
 
-function stripTrailingSlash(url: string): string {
-  return url.replace(/\/+$/, "")
-}
-
-/**
- * Socket.IO host. In the browser this is the page origin so Vite (dev) and
- * Nginx (prod) can proxy `/socket.io`. Direct Nest origin is only used off-window.
- */
+/** Socket.IO host (page origin). Nginx/Vite proxy `/socket.io`. */
 export function getApiBaseUrl(): string {
-  if (typeof window !== "undefined") {
-    return window.location.origin
-  }
-  const raw = import.meta.env.VITE_API_URL || LOCAL_API_ORIGIN
-  return stripTrailingSlash(String(raw))
+  if (typeof window === "undefined") return ""
+  return window.location.origin
 }
 
 function apiUrl(path: string): string {
   const normalized = path.startsWith("/") ? path : `/${path}`
-  if (typeof window === "undefined") {
-    return `${getApiBaseUrl()}${normalized}`
-  }
   return `/api${normalized}`
 }
 
