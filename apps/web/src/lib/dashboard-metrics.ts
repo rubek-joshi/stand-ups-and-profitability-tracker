@@ -106,6 +106,11 @@ export function rangeFromIsoDates(from: string, to: string): DateRange | null {
   return { from: start, to: end }
 }
 
+function finiteNumber(value: unknown, fallback = 0): number {
+  const n = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
 export function formatAuditAction(action: string): string {
   return action
     .toLowerCase()
@@ -133,7 +138,7 @@ export function buildDashboard(
     name: row.name,
     client: row.clientName,
     profitLossPaisa: row.profitLossPaisa,
-    marginPercent: row.marginPercent,
+    marginPercent: finiteNumber(row.marginPercent),
   })
 
   const mapAmc = (
@@ -152,7 +157,7 @@ export function buildDashboard(
     settings,
     netProfitPaisa: summary.netProfitLossPaisa,
     totalRevenuePaisa: summary.totalRevenuePaisa,
-    marginPct: summary.overallMarginPercent,
+    marginPct: finiteNumber(summary.overallMarginPercent),
     activeClients: summary.activeClients,
     clientsWithActiveProjects: summary.clientsWithActiveProjects ?? 0,
     activeProjects: summary.activeCount,
@@ -172,7 +177,7 @@ export function buildDashboard(
       name: row.name,
       client: row.clientName,
       profitLossPaisa: "0",
-      marginPercent: row.marginPercent,
+      marginPercent: finiteNumber(row.marginPercent),
     })),
     amcFollowUps: (summary.amcReminders ?? []).map(mapAmc),
     amcList: (summary.amcContracts ?? []).map(mapAmc),

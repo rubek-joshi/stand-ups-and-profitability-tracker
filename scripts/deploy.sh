@@ -44,8 +44,18 @@ pnpm db:deploy
 echo "==> Seeding database"
 pnpm db:seed
 
-echo "==> Building apps"
-pnpm turbo build --filter=@workspace/api --filter=web
+# Vite inlines VITE_* at build time from the root .env (see apps/web vite envDir).
+set -a
+# shellcheck source=/dev/null
+source "$ROOT_DIR/.env"
+set +a
+
+echo "==> Building API"
+pnpm turbo build --filter=@workspace/api
+
+echo "==> Building web (forced; VITE_API_URL=${VITE_API_URL:-unset})"
+rm -rf apps/web/dist apps/web/.output
+pnpm turbo build --filter=web --force
 
 if [[ -d apps/web/dist/client ]]; then
   WEB_DIST="apps/web/dist/client"
@@ -69,6 +79,11 @@ if [[ -f "$WEB_ROOT/_shell.html" && ! -f "$WEB_ROOT/index.html" ]]; then
 fi
 sudo chown -R www-data:www-data "$WEB_ROOT"
 
+if [[ "${VITE_API_URL:-}" != *localhost:4101* ]] && grep -Rqs "localhost:4101" "$WEB_ROOT"; then
+  echo "ERROR: published frontend still references http://localhost:4101. Check VITE_API_URL and rebuild."
+  exit 1
+fi
+
 echo "==> Restarting PM2 processes"
 if pm2 describe profitability-api >/dev/null 2>&1; then
   pm2 reload ecosystem.config.cjs --update-env
@@ -77,4 +92,23 @@ else
 fi
 
 pm2 save
+
+# The SPA and the API share hostnames, so /api/ must reach Nest. If Nginx falls
+# through to index.html, the frontend parses HTML as JSON and pages break with
+# errors like "marginPct is undefined" or "map is not a function".
+# An unauthenticated GET must answer with a JSON problem document, not the SPA shell.
+if command -v curl >/dev/null 2>&1 && [[ -n "${CORS_ORIGIN:-}" ]]; then
+  sleep 3
+  PROBE_URL="${CORS_ORIGIN%/}/api/clients"
+  PROBE_CT="$(curl -sS -o /dev/null -w '%{content_type}' "$PROBE_URL" || true)"
+  case "$PROBE_CT" in
+    *json*) ;;
+    *)
+      echo "WARNING: $PROBE_URL returned '${PROBE_CT:-no content-type}' instead of JSON."
+      echo "         Nginx is likely serving the SPA for /api/ instead of proxying to 127.0.0.1:4101."
+      echo "         See docs/ubuntu-nginx-deploy.md."
+      ;;
+  esac
+fi
+
 echo "==> Deploy complete"

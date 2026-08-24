@@ -1,9 +1,9 @@
-import { INestApplication, ValidationPipe } from "@nestjs/common";
+import { INestApplication } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
-import { createRfc9457ValidationPipeExceptionFactory } from "@camcima/nestjs-rfc9457";
 import request from "supertest";
 import { App } from "supertest/types";
 import { AppModule } from "../src/app.module";
+import { configureHttp } from "../src/configure-http";
 
 describe("AppController (e2e)", () => {
   let app: INestApplication<App>;
@@ -14,14 +14,7 @@ describe("AppController (e2e)", () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    app.useGlobalPipes(
-      new ValidationPipe({
-        whitelist: true,
-        forbidNonWhitelisted: true,
-        transform: true,
-        exceptionFactory: createRfc9457ValidationPipeExceptionFactory(),
-      }),
-    );
+    configureHttp(app);
     await app.init();
   });
 
@@ -30,8 +23,15 @@ describe("AppController (e2e)", () => {
   });
 
   it("/health (GET)", () => {
-    return request(app.getHttpServer())
-      .get("/health")
-      .expect(200);
+    return request(app.getHttpServer()).get("/health").expect(200);
+  });
+
+  it("serves auth under /api", async () => {
+    const res = await request(app.getHttpServer()).post("/api/auth/login");
+    expect(res.status).not.toBe(404);
+  });
+
+  it("does not serve auth at /auth/login", () => {
+    return request(app.getHttpServer()).post("/auth/login").expect(404);
   });
 });

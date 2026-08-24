@@ -18,6 +18,7 @@
     "SUPER_ADMIN_PASSWORD",
     "SUPER_ADMIN_NAME",
     "CORS_ORIGIN",
+    "VITE_API_URL",
     "POSTGRES_USER",
     "POSTGRES_PASSWORD",
     "POSTGRES_DB",
@@ -31,7 +32,7 @@
     },
     "build": {
       "dependsOn": ["^build", "^db:generate"],
-      "inputs": ["$TURBO_DEFAULT$", ".env*"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*", "$TURBO_ROOT$/.env"],
       "outputs": [".output/**", "dist/**"]
     },
     "lint": {

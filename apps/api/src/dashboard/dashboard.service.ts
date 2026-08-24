@@ -212,10 +212,13 @@ export class DashboardService {
       0n,
     );
 
-    const overallMarginPercent =
+    const computedMargin =
       revenueSum === 0n
         ? 0
         : Number((profitLossSum * 10000n) / revenueSum) / 100;
+    const overallMarginPercent = Number.isFinite(computedMargin)
+      ? computedMargin
+      : 0;
 
     const clientsWithActiveProjects = new Set(
       projects

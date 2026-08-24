@@ -1,11 +1,9 @@
-import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
-import { createRfc9457ValidationPipeExceptionFactory } from "@camcima/nestjs-rfc9457";
 import { applyProblemDetailResponses } from "@camcima/nestjs-rfc9457/swagger";
 import { AppModule } from "./app.module";
-import { TransformResInterceptor } from "./_shared/interceptors/transform-res.interceptor";
+import { configureHttp } from "./configure-http";
 import { enableBigIntJson } from "./_shared/utils/bigint-json";
 
 enableBigIntJson();
@@ -19,17 +17,7 @@ async function bootstrap(): Promise<void> {
     "http://localhost:4100",
   );
   app.enableCors({ origin: corsOrigin, credentials: true });
-
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: true },
-      exceptionFactory: createRfc9457ValidationPipeExceptionFactory(),
-    }),
-  );
-  app.useGlobalInterceptors(new TransformResInterceptor());
+  configureHttp(app);
 
   const swaggerConfig = new DocumentBuilder()
     .setTitle("Tracker API")
@@ -38,13 +26,18 @@ async function bootstrap(): Promise<void> {
     .addBearerAuth()
     .build();
 
-  SwaggerModule.setup("api/docs", app, () => {
-    applyProblemDetailResponses(app, {
-      statuses: [400, 401, 403, 404, 422, 500],
-      validationStatuses: [400, 422],
-    });
-    return SwaggerModule.createDocument(app, swaggerConfig);
-  });
+  SwaggerModule.setup(
+    "docs",
+    app,
+    () => {
+      applyProblemDetailResponses(app, {
+        statuses: [400, 401, 403, 404, 422, 500],
+        validationStatuses: [400, 422],
+      });
+      return SwaggerModule.createDocument(app, swaggerConfig);
+    },
+    { useGlobalPrefix: true },
+  );
 
   const port = Number(configService.get<string>("API_PORT") ?? 4101);
   await app.listen(port);

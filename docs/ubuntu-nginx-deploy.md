@@ -77,6 +77,10 @@ API listens on **4101**. Nginx serves the built web app from **`/var/www/tracker
 
 ## Nginx
 
+The API has a global `/api` prefix (`/api/clients`, `/api/dashboard/summary`, …). SPA routes reuse the same paths without the prefix (`/clients`, `/`). If Nginx does not proxy `/api/` to Nest, the browser receives `index.html` for those fetches. That shows up as `marginPct is undefined` and `.map is not a function`.
+
+`VITE_API_URL` is the **API origin only** (e.g. `https://tracker.example.com`), not `…/api`. The web client appends `/api`.
+
 ### Single domain (path-based)
 
 Example site at `/etc/nginx/sites-available/profitability-tracker`:
@@ -89,7 +93,8 @@ server {
     root /var/www/tracker;
     index index.html;
 
-    location /api/ {
+    # REST API + Swagger. `^~` so this wins over regex locations.
+    location ^~ /api/ {
         proxy_pass http://127.0.0.1:4101/api/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -98,9 +103,8 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Health and auth are not under /api/* by default
-    location ~ ^/(auth|health|api) {
-        proxy_pass http://127.0.0.1:4101;
+    location = /health {
+        proxy_pass http://127.0.0.1:4101/health;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -138,7 +142,7 @@ sudo systemctl reload nginx
 - `app.example.com` → `/var/www/tracker`
 - `api.example.com` → `127.0.0.1:4101`
 
-Set `CORS_ORIGIN` to the web origin (e.g. `https://app.example.com`).
+Set `CORS_ORIGIN` to the web origin (e.g. `https://app.example.com`) and `VITE_API_URL` to `https://api.example.com`. The client still calls `{VITE_API_URL}/api/...`.
 
 ## TLS (Let’s Encrypt)
 
@@ -174,7 +178,7 @@ chmod +x scripts/deploy.sh
 3. `docker compose up -d` and wait for healthy Postgres/Redis
 4. `pnpm install --frozen-lockfile`
 5. Prisma generate, migrate deploy, and seed
-6. Build API + web
+6. Build API + web (web is always rebuilt so `VITE_API_URL` from root `.env` is baked in)
 7. Publish the web build to `/var/www/tracker`
 8. Reload/start PM2 via `ecosystem.config.cjs`
 
@@ -198,3 +202,4 @@ git checkout <previous-commit>
 - Web: `https://tracker.example.com/`
 - API health: `https://tracker.example.com/health`
 - Swagger: `https://tracker.example.com/api/docs` (or `http://127.0.0.1:4101/api/docs` on the host)
+- Confirm `/api` is JSON, not HTML: `curl -sI https://tracker.example.com/api/docs` should not be `text/html` from the SPA
