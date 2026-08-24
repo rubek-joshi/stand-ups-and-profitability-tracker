@@ -31,6 +31,7 @@ import {
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
+import { JoinedDate } from "@/components/joined-date"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { buildListQuery, parseListSearch, totalPagesFor } from "@/lib/list-query"
 import { formatNpr, parseNprInput } from "@/lib/money"
@@ -185,7 +186,7 @@ function EmployeesPage() {
                       <StatusBadge status={e.status} />
                     </TableCell>
                     <TableCell>
-                      {e.dateJoined?.slice?.(0, 10) ?? String(e.dateJoined).slice(0, 10)}
+                      <JoinedDate value={e.dateJoined} />
                     </TableCell>
                     <TableActionsCell>
                       <TableActionLink

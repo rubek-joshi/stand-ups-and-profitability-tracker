@@ -29,6 +29,7 @@ import {
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
+import { JoinedDate } from "@/components/joined-date"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { parseNprInput } from "@/lib/money"
 import type { CoreMember } from "@/lib/types"
@@ -129,7 +130,9 @@ function CoreMembersPage() {
                   <TableCell>
                     <StatusBadge status={m.status} />
                   </TableCell>
-                  <TableCell>{String(m.dateJoined).slice(0, 10)}</TableCell>
+                  <TableCell>
+                    <JoinedDate value={m.dateJoined} />
+                  </TableCell>
                   <TableActionsCell>
                     <TableActionLink
                       label="View"
