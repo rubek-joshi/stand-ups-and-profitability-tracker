@@ -103,6 +103,17 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
+    # Cached / old JS posts to /auth/login. Without this, Nginx `try_files`
+    # handles the POST and returns 405 Method Not Allowed.
+    location ^~ /auth/ {
+        proxy_pass http://127.0.0.1:4101/api/auth/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
     location = /health {
         proxy_pass http://127.0.0.1:4101/health;
         proxy_http_version 1.1;
@@ -202,4 +213,11 @@ git checkout <previous-commit>
 - Web: `https://tracker.example.com/`
 - API health: `https://tracker.example.com/health`
 - Swagger: `https://tracker.example.com/api/docs` (or `http://127.0.0.1:4101/api/docs` on the host)
-- Confirm `/api` is JSON, not HTML: `curl -sI https://tracker.example.com/api/docs` should not be `text/html` from the SPA
+- Confirm `/api` reaches Nest (use **GET**, not `curl -sI` / HEAD — Nest GET routes return 404 for HEAD):
+
+```bash
+curl -s -o /dev/null -w '%{http_code} %{content_type}\n' https://tracker.example.com/api/clients
+# expect: 401 application/problem+json
+```
+
+If that is `404`, PM2 is still running an API build without the `/api` prefix. If login returns **405 Method Not Allowed** from Nginx, POST `/auth/login` is hitting `location /` — add the `/auth/` proxy block above and reload Nginx.

@@ -51,7 +51,12 @@ source "$ROOT_DIR/.env"
 set +a
 
 echo "==> Building API"
-pnpm turbo build --filter=@workspace/api
+rm -rf apps/api/dist
+pnpm turbo build --filter=@workspace/api --force
+if [[ ! -f apps/api/dist/configure-http.js ]]; then
+  echo "ERROR: API build is missing dist/configure-http.js. The /api global prefix will not be applied."
+  exit 1
+fi
 
 echo "==> Building web (forced; VITE_API_URL=${VITE_API_URL:-unset})"
 rm -rf apps/web/dist apps/web/.output
@@ -86,9 +91,16 @@ fi
 
 echo "==> Restarting PM2 processes"
 if pm2 describe profitability-api >/dev/null 2>&1; then
-  pm2 reload ecosystem.config.cjs --update-env
+  pm2 restart ecosystem.config.cjs --update-env
 else
   pm2 start ecosystem.config.cjs
+fi
+sleep 2
+LOGIN_PROBE="$(curl -sS -X POST http://127.0.0.1:4101/api/auth/login -H 'Content-Type: application/json' -d '{}' || true)"
+if echo "$LOGIN_PROBE" | grep -q 'Cannot POST /api/auth/login'; then
+  echo "ERROR: PM2 is still serving an API without the /api prefix. Check git pull, dist/, and pm2 logs."
+  echo "$LOGIN_PROBE"
+  exit 1
 fi
 
 pm2 save
