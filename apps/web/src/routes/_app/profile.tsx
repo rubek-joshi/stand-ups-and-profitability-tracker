@@ -25,6 +25,7 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { ChangePasswordDialog } from "@/components/change-password-dialog"
 import { PasskeysCard } from "@/components/passkeys-card"
+import { StandupLayoutPreview } from "@/components/standup/standup-layout-preview"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
@@ -473,6 +474,18 @@ function ProfilePage() {
                   </div>
                 </button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Stand-up preview</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <StandupLayoutPreview
+                layout={layoutPreference}
+                accent={accentPreference}
+              />
             </CardContent>
           </Card>
         </aside>
