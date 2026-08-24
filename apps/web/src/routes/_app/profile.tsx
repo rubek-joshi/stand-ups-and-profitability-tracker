@@ -2,9 +2,11 @@ import * as React from "react"
 import { createFileRoute } from "@tanstack/react-router"
 import {
   IconDeviceDesktop,
+  IconLayoutGrid,
   IconMoon,
   IconPencil,
   IconSun,
+  IconTable,
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import {
@@ -61,6 +63,25 @@ const PREFERENCE_OPTIONS: Array<{
     label: "A specific group",
     hint: "Show only members of your selected group by default; others stay in the stand-up.",
   },
+]
+
+const LAYOUT_OPTIONS: Array<{
+  id: StandupLayoutPreference
+  label: string
+  icon: typeof IconLayoutGrid
+}> = [
+  { id: "card", label: "Card view", icon: IconLayoutGrid },
+  { id: "table", label: "Table view", icon: IconTable },
+]
+
+const ACCENT_OPTIONS: Array<{
+  id: StandupProjectAccentPreference
+  label: string
+  hint: string
+}> = [
+  { id: "off", label: "Off", hint: "Dots only" },
+  { id: "muted", label: "Muted", hint: "Soft hues" },
+  { id: "on", label: "On", hint: "Full colors" },
 ]
 
 function ProfilePage() {
@@ -284,120 +305,105 @@ function ProfilePage() {
                     }
                   }}
                 >
-                  <div className="grid gap-2">
-                    {PREFERENCE_OPTIONS.map((opt) => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setPreference(opt.value)}
-                        className={`rounded-lg border px-3 py-3 text-left transition-colors ${
-                          preference === opt.value
-                            ? "border-primary bg-primary/10"
-                            : "border-border hover:bg-muted"
-                        }`}
-                      >
-                        <p className="text-sm font-medium">{opt.label}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {opt.hint}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-
-                  {preference === "group" ? (
+                  <div className="grid gap-4 sm:grid-cols-2 sm:items-start">
                     <div className="grid gap-2">
-                      <Label>Preferred group</Label>
-                      <Select
-                        value={groupId || null}
-                        onValueChange={(v) => setGroupId(v ?? "")}
-                        items={Object.fromEntries(
-                          groups.map((g) => [g.id, g.name])
-                        )}
-                        disabled={groups.length === 0}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue
-                            placeholder={
-                              groups.length === 0
-                                ? "No groups available"
-                                : "Choose a group"
-                            }
-                          />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {groups.map((g) => (
-                            <SelectItem key={g.id} value={g.id}>
-                              {g.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  ) : null}
-
-                  <div className="grid gap-2">
-                    <Label>Default layout</Label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(
-                        [
-                          { id: "card" as const, label: "Card view" },
-                          { id: "table" as const, label: "Table view" },
-                        ] as const
-                      ).map((opt) => (
+                      <Label>Stand-up Scope</Label>
+                      {PREFERENCE_OPTIONS.map((opt) => (
                         <button
-                          key={opt.id}
+                          key={opt.value}
                           type="button"
-                          onClick={() => setLayoutPreference(opt.id)}
-                          className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                            layoutPreference === opt.id
-                              ? "border-primary bg-primary/10 font-medium"
+                          onClick={() => setPreference(opt.value)}
+                          className={`rounded-lg border px-3 py-3 text-left transition-colors ${
+                            preference === opt.value
+                              ? "border-primary bg-primary/10"
                               : "border-border hover:bg-muted"
                           }`}
                         >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-2">
-                    <Label>Project accents</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {(
-                        [
-                          {
-                            id: "off" as const,
-                            label: "Off",
-                            hint: "Dots only",
-                          },
-                          {
-                            id: "muted" as const,
-                            label: "Muted",
-                            hint: "Soft hues",
-                          },
-                          {
-                            id: "on" as const,
-                            label: "On",
-                            hint: "Full colors",
-                          },
-                        ] as const
-                      ).map((opt) => (
-                        <button
-                          key={opt.id}
-                          type="button"
-                          onClick={() => setAccentPreference(opt.id)}
-                          className={`rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
-                            accentPreference === opt.id
-                              ? "border-primary bg-primary/10 font-medium"
-                              : "border-border hover:bg-muted"
-                          }`}
-                        >
-                          <span className="block">{opt.label}</span>
-                          <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                          <p className="text-sm font-medium">{opt.label}</p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
                             {opt.hint}
-                          </span>
+                          </p>
                         </button>
                       ))}
+                      {preference === "group" ? (
+                        <div className="grid gap-2 pt-1">
+                          <Label>Preferred group</Label>
+                          <Select
+                            value={groupId || null}
+                            onValueChange={(v) => setGroupId(v ?? "")}
+                            items={Object.fromEntries(
+                              groups.map((g) => [g.id, g.name])
+                            )}
+                            disabled={groups.length === 0}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue
+                                placeholder={
+                                  groups.length === 0
+                                    ? "No groups available"
+                                    : "Choose a group"
+                                }
+                              />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {groups.map((g) => (
+                                <SelectItem key={g.id} value={g.id}>
+                                  {g.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="grid gap-4">
+                      <div className="grid gap-2">
+                        <Label>Default layout</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {LAYOUT_OPTIONS.map((opt) => {
+                            const Icon = opt.icon
+                            return (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                onClick={() => setLayoutPreference(opt.id)}
+                                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                                  layoutPreference === opt.id
+                                    ? "border-primary bg-primary/10 font-medium"
+                                    : "border-border hover:bg-muted"
+                                }`}
+                              >
+                                <Icon className="size-4 shrink-0" />
+                                {opt.label}
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-2">
+                        <Label>Project accents</Label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {ACCENT_OPTIONS.map((opt) => (
+                            <button
+                              key={opt.id}
+                              type="button"
+                              onClick={() => setAccentPreference(opt.id)}
+                              className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                                accentPreference === opt.id
+                                  ? "border-primary bg-primary/10 font-medium"
+                                  : "border-border hover:bg-muted"
+                              }`}
+                            >
+                              <span className="block">{opt.label}</span>
+                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                {opt.hint}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
@@ -477,7 +483,7 @@ function ProfilePage() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="hidden lg:block">
             <CardHeader>
               <CardTitle className="text-base">Stand-up preview</CardTitle>
             </CardHeader>
@@ -485,6 +491,10 @@ function ProfilePage() {
               <StandupLayoutPreview
                 layout={layoutPreference}
                 accent={accentPreference}
+                scope={preference}
+                groupName={
+                  groups.find((g) => g.id === groupId)?.name ?? "Engineering"
+                }
               />
             </CardContent>
           </Card>

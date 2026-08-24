@@ -6,6 +6,7 @@ import type {
   AttendanceStatus,
   StandupLayoutPreference,
   StandupProjectAccentPreference,
+  StandupScopePreference,
 } from "@/lib/types"
 import {
   ATTENDANCE_META,
@@ -33,6 +34,7 @@ type PreviewAllocation = {
 type PreviewEntry = {
   name: string
   email: string
+  inGroup: boolean
   attendanceStatus: AttendanceStatus
   allocations: PreviewAllocation[]
 }
@@ -41,6 +43,7 @@ const ENTRIES: PreviewEntry[] = [
   {
     name: "Asha Rai",
     email: "asha@ottr.dev",
+    inGroup: true,
     attendanceStatus: "present",
     allocations: [
       {
@@ -61,6 +64,7 @@ const ENTRIES: PreviewEntry[] = [
   {
     name: "Binod Thapa",
     email: "binod@ottr.dev",
+    inGroup: true,
     attendanceStatus: "late",
     allocations: [
       {
@@ -73,6 +77,7 @@ const ENTRIES: PreviewEntry[] = [
   {
     name: "Maya Gurung",
     email: "maya@ottr.dev",
+    inGroup: false,
     attendanceStatus: "absent",
     allocations: [],
   },
@@ -253,13 +258,15 @@ function TaskMini({
 }
 
 function CardPreview({
+  entries,
   accent,
 }: {
+  entries: PreviewEntry[]
   accent: StandupProjectAccentPreference
 }) {
   return (
     <div className="flex flex-col gap-5">
-      {ENTRIES.map((entry) => {
+      {entries.map((entry) => {
         const meta = ATTENDANCE_META[entry.attendanceStatus]
         const faded = entry.attendanceStatus === "absent"
         return (
@@ -308,8 +315,10 @@ function CardPreview({
 }
 
 function TablePreview({
+  entries,
   accent,
 }: {
+  entries: PreviewEntry[]
   accent: StandupProjectAccentPreference
 }) {
   return (
@@ -324,7 +333,7 @@ function TablePreview({
           </tr>
         </thead>
         <tbody>
-          {ENTRIES.map((entry) => {
+          {entries.map((entry) => {
             const faded = entry.attendanceStatus === "absent"
             const meta = ATTENDANCE_META[entry.attendanceStatus]
             return (
@@ -368,15 +377,97 @@ function TablePreview({
   )
 }
 
+function AskPromptPreview({
+  groupName,
+  focus,
+  onFocusChange,
+  onCreate,
+}: {
+  groupName: string
+  focus: "everyone" | "group"
+  onFocusChange: (focus: "everyone" | "group") => void
+  onCreate: () => void
+}) {
+  return (
+    <div className="flex w-full max-w-70 flex-col gap-3 rounded-xl border bg-card p-3 shadow-lg">
+      <p className="text-sm font-semibold">Create stand-up</p>
+      <div className="flex flex-col gap-1">
+        <p className="text-xs font-medium">Date</p>
+        <div className="rounded-md border bg-background px-2 py-1.5 font-mono text-xs text-muted-foreground">
+          2026-08-19
+        </div>
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs font-medium">Who do you want to focus on?</p>
+        <p className="text-[0.65rem] leading-snug text-muted-foreground">
+          All employees are included. This only sets your default view filter.
+        </p>
+        <div className="grid grid-cols-2 gap-1.5">
+          {(
+            [
+              ["everyone", "Everyone"],
+              ["group", "A specific group"],
+            ] as const
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => onFocusChange(value)}
+              className={cn(
+                "rounded-lg border px-2 py-2 text-center text-[0.7rem] font-medium transition-colors",
+                focus === value
+                  ? "border-primary bg-primary/10 text-primary"
+                  : "border-border bg-card text-muted-foreground hover:bg-muted",
+              )}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {focus === "group" ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-xs font-medium">Group</p>
+          <div className="rounded-md border bg-background px-2 py-1.5 text-xs">
+            {groupName}
+          </div>
+        </div>
+      ) : null}
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={onCreate}
+          className="rounded-md bg-primary px-2.5 py-1 text-[0.7rem] font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Create
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function StandupLayoutPreview({
   layout,
   accent,
+  scope,
+  groupName = "Engineering",
 }: {
   layout: StandupLayoutPreference
   accent: StandupProjectAccentPreference
+  scope: StandupScopePreference
+  groupName?: string
 }) {
   const frameRef = React.useRef<HTMLDivElement>(null)
   const [scale, setScale] = React.useState(0.32)
+  const [askFocus, setAskFocus] = React.useState<"everyone" | "group">(
+    "everyone",
+  )
+  const [askCreated, setAskCreated] = React.useState(false)
+
+  React.useEffect(() => {
+    setAskFocus("everyone")
+    setAskCreated(false)
+  }, [scope])
 
   React.useLayoutEffect(() => {
     const frame = frameRef.current
@@ -391,16 +482,35 @@ export function StandupLayoutPreview({
     return () => observer.disconnect()
   }, [])
 
+  const groupFilter =
+    scope === "group" || (scope === "ask" && askCreated && askFocus === "group")
+  const visibleEntries = groupFilter
+    ? ENTRIES.filter((entry) => entry.inGroup)
+    : ENTRIES
+  const hiddenGroupCount = groupFilter
+    ? ENTRIES.length - visibleEntries.length
+    : 0
+
   const layoutLabel = layout === "card" ? "Card view" : "Table view"
   const accentLabel =
     accent === "off" ? "dots only" : accent === "on" ? "full colors" : "soft hues"
+  const scopeLabel =
+    scope === "ask"
+      ? askCreated
+        ? askFocus === "group"
+          ? `Ask · Group “${groupName}”`
+          : "Ask · Everyone"
+        : "Ask every time"
+      : scope === "group"
+        ? `Group “${groupName}”`
+        : "Everyone"
 
   return (
     <div className="flex flex-col gap-2">
       <div
         ref={frameRef}
-        role="img"
-        aria-label={`Stand-up preview, ${layoutLabel}, project accents ${accentLabel}`}
+        role="region"
+        aria-label={`Stand-up preview, ${scopeLabel}, ${layoutLabel}, project accents ${accentLabel}`}
         className="relative overflow-hidden rounded-lg border bg-background"
         style={{ height: PREVIEW_MAX_HEIGHT }}
       >
@@ -448,18 +558,41 @@ export function StandupLayoutPreview({
                   Table
                 </span>
               </div>
+              {groupFilter ? (
+                <>
+                  <span className="inline-flex h-8 items-center rounded-md border border-border bg-background px-2.5 text-xs">
+                    Show everyone
+                  </span>
+                  {hiddenGroupCount > 0 ? (
+                    <Badge variant="outline">
+                      {hiddenGroupCount} hidden by group filter
+                    </Badge>
+                  ) : null}
+                </>
+              ) : null}
             </div>
             {layout === "card" ? (
-              <CardPreview accent={accent} />
+              <CardPreview entries={visibleEntries} accent={accent} />
             ) : (
-              <TablePreview accent={accent} />
+              <TablePreview entries={visibleEntries} accent={accent} />
             )}
           </div>
         </div>
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-background to-transparent" />
+        {scope === "ask" && !askCreated ? (
+          <div className="absolute inset-0 flex items-center justify-center overflow-y-auto bg-background/70 p-3">
+            <AskPromptPreview
+              groupName={groupName}
+              focus={askFocus}
+              onFocusChange={setAskFocus}
+              onCreate={() => setAskCreated(true)}
+            />
+          </div>
+        ) : (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-linear-to-t from-background to-transparent" />
+        )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Dummy data · {layoutLabel} · {accentLabel}
+        Dummy data · {scopeLabel} · {layoutLabel} · {accentLabel}
       </p>
     </div>
   )
