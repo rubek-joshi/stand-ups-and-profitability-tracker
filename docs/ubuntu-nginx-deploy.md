@@ -77,9 +77,17 @@ API listens on **4101**. Nginx serves the built web app from **`/var/www/tracker
 
 ## Nginx
 
-The API has a global `/api` prefix (`/api/clients`, `/api/dashboard/summary`, …). SPA routes reuse the same paths without the prefix (`/clients`, `/`). If Nginx does not proxy `/api/` to Nest, the browser receives `index.html` for those fetches. That shows up as `marginPct is undefined` and `.map is not a function`.
+The browser always calls **same-origin** `/api/...` (and `/socket.io` for collab). Nest itself has **no** `/api` prefix — Vite (dev) and Nginx (prod) strip it, same as ATS:
 
-`VITE_API_URL` is the **API origin only** (e.g. `https://tracker.example.com`), not `…/api`. The web client appends `/api`.
+```nginx
+location /api/ {
+    proxy_pass http://127.0.0.1:4101/;   # trailing slash strips /api
+}
+```
+
+So `POST /api/auth/login` becomes `POST /auth/login` on port 4101. If Nginx forwards `/api` *without* stripping, Nest returns `Cannot POST /api/auth/login`. If `/api/` is not proxied at all, the SPA `try_files` returns HTML (dashboard `marginPct` crash, `.map is not a function`) or **405** on POST.
+
+`VITE_API_URL` is not required in production. The built client uses relative `/api`.
 
 ### Single domain (path-based)
 
@@ -93,34 +101,17 @@ server {
     root /var/www/tracker;
     index index.html;
 
-    # REST API + Swagger. `^~` so this wins over regex locations.
-    location ^~ /api/ {
-        proxy_pass http://127.0.0.1:4101/api/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+    client_max_body_size 25M;
 
-    # Cached / old JS posts to /auth/login. Without this, Nginx `try_files`
-    # handles the POST and returns 405 Method Not Allowed.
-    location ^~ /auth/ {
-        proxy_pass http://127.0.0.1:4101/api/auth/;
+    # Nest API — the app calls /api/*; strip the /api prefix
+    location /api/ {
+        proxy_pass http://127.0.0.1:4101/;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    location = /health {
-        proxy_pass http://127.0.0.1:4101/health;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_read_timeout 120s;
     }
 
     location /socket.io/ {
@@ -140,6 +131,8 @@ server {
 }
 ```
 
+Optional: keep `location = /health` proxying to `http://127.0.0.1:4101/health` if you want a root health URL. `/api/health` already maps to Nest `/health` via the strip.
+
 Enable and reload:
 
 ```bash
@@ -150,10 +143,10 @@ sudo systemctl reload nginx
 
 ### Subdomains (optional)
 
-- `app.example.com` → `/var/www/tracker`
-- `api.example.com` → `127.0.0.1:4101`
+- `app.example.com` → `/var/www/tracker` (same `/api/` strip proxy to 4101)
+- `api.example.com` → `127.0.0.1:4101` (no strip; Nest routes are unprefixed)
 
-Set `CORS_ORIGIN` to the web origin (e.g. `https://app.example.com`) and `VITE_API_URL` to `https://api.example.com`. The client still calls `{VITE_API_URL}/api/...`.
+Set `CORS_ORIGIN` to the web origin when the API is on a different host.
 
 ## TLS (Let’s Encrypt)
 
@@ -189,9 +182,9 @@ chmod +x scripts/deploy.sh
 3. `docker compose up -d` and wait for healthy Postgres/Redis
 4. `pnpm install --frozen-lockfile`
 5. Prisma generate, migrate deploy, and seed
-6. Build API + web (web is always rebuilt so `VITE_API_URL` from root `.env` is baked in)
+6. Build API + web (web is always rebuilt so a stale `VITE_API_URL` cannot bake `localhost:4101` into the bundle)
 7. Publish the web build to `/var/www/tracker`
-8. Reload/start PM2 via `ecosystem.config.cjs`
+8. Restart PM2 via `ecosystem.config.cjs`
 
 ## Logs and rollback
 
@@ -211,13 +204,17 @@ git checkout <previous-commit>
 ## Smoke checks
 
 - Web: `https://tracker.example.com/`
-- API health: `https://tracker.example.com/health`
-- Swagger: `https://tracker.example.com/api/docs` (or `http://127.0.0.1:4101/api/docs` on the host)
-- Confirm `/api` reaches Nest (use **GET**, not `curl -sI` / HEAD — Nest GET routes return 404 for HEAD):
+- API health via strip: `curl -s https://tracker.example.com/api/health` → `{"data":{"status":"ok"}}`
+- Direct Nest: `curl -s http://127.0.0.1:4101/health`
+- Swagger: `https://tracker.example.com/api/docs` (Nest serves `/docs`; Nginx strips `/api`)
+- Confirm GET (not `curl -sI` / HEAD):
 
 ```bash
 curl -s -o /dev/null -w '%{http_code} %{content_type}\n' https://tracker.example.com/api/clients
 # expect: 401 application/problem+json
+
+curl -s -X POST http://127.0.0.1:4101/auth/login -H 'Content-Type: application/json' -d '{}'
+# expect: 400 validation, not 404
 ```
 
-If that is `404`, PM2 is still running an API build without the `/api` prefix. If login returns **405 Method Not Allowed** from Nginx, POST `/auth/login` is hitting `location /` — add the `/auth/` proxy block above and reload Nginx.
+If public `/api/auth/login` returns `Cannot POST /api/auth/login`, Nginx is **not** stripping the prefix — `proxy_pass` must end with `http://127.0.0.1:4101/;` (trailing slash). If login returns **405** from Nginx, POST is hitting `location /` instead of `location /api/`.

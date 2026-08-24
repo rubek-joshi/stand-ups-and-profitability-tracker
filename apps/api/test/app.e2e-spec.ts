@@ -26,12 +26,12 @@ describe("AppController (e2e)", () => {
     return request(app.getHttpServer()).get("/health").expect(200);
   });
 
-  it("serves auth under /api", async () => {
-    const res = await request(app.getHttpServer()).post("/api/auth/login");
+  it("serves auth at /auth/login", async () => {
+    const res = await request(app.getHttpServer()).post("/auth/login");
     expect(res.status).not.toBe(404);
   });
 
-  it("does not serve auth at /auth/login", () => {
-    return request(app.getHttpServer()).post("/auth/login").expect(404);
+  it("does not serve auth at /api/auth/login (prefix is stripped by Vite/Nginx)", () => {
+    return request(app.getHttpServer()).post("/api/auth/login").expect(404);
   });
 });

@@ -1,25 +1,28 @@
 const TOKEN_KEY = "pt_token"
-const DEFAULT_API_ORIGIN = "http://localhost:4101"
+const LOCAL_API_ORIGIN = "http://localhost:4101"
 
 function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, "")
 }
 
-/** API origin from VITE_API_URL. Trailing `/api` is ignored so env can be origin or origin+/api. */
-export function getApiOrigin(): string {
-  const raw = import.meta.env.VITE_API_URL || DEFAULT_API_ORIGIN
-  return stripTrailingSlash(raw)
-}
-
-/** Socket.IO origin — never includes the `/api` HTTP prefix. */
+/**
+ * Socket.IO host. In the browser this is the page origin so Vite (dev) and
+ * Nginx (prod) can proxy `/socket.io`. Direct Nest origin is only used off-window.
+ */
 export function getApiBaseUrl(): string {
-  const origin = getApiOrigin()
-  return origin.endsWith("/api") ? origin.slice(0, -4) : origin
+  if (typeof window !== "undefined") {
+    return window.location.origin
+  }
+  const raw = import.meta.env.VITE_API_URL || LOCAL_API_ORIGIN
+  return stripTrailingSlash(String(raw))
 }
 
-function httpApiBase(): string {
-  const origin = getApiOrigin()
-  return origin.endsWith("/api") ? origin : `${origin}/api`
+function apiUrl(path: string): string {
+  const normalized = path.startsWith("/") ? path : `/${path}`
+  if (typeof window === "undefined") {
+    return `${getApiBaseUrl()}${normalized}`
+  }
+  return `/api${normalized}`
 }
 
 export function getToken(): string | null {
@@ -71,8 +74,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   const authToken = skipAuth ? null : (token ?? getToken())
   if (authToken) headers.set("Authorization", `Bearer ${authToken}`)
 
-  const normalizedPath = path.startsWith("/") ? path : `/${path}`
-  const res = await fetch(`${httpApiBase()}${normalizedPath}`, {
+  const res = await fetch(apiUrl(path), {
     ...rest,
     headers,
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -86,7 +88,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   if (text && looksLikeHtml(text, contentType)) {
     throw new ApiError(
       res.status,
-      "API returned the web app instead of JSON. Nginx must proxy /api/ to the Nest server (port 4101).",
+      "API returned the web app instead of JSON. Nginx must proxy /api/ to Nest and strip the /api prefix.",
       text.slice(0, 200),
     )
   }
@@ -98,7 +100,7 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
     } catch {
       throw new ApiError(
         res.status,
-        "API returned a non-JSON response. Check that VITE_API_URL points at the API origin.",
+        "API returned a non-JSON response. Check that /api is proxied to the Nest server.",
         text.slice(0, 200),
       )
     }

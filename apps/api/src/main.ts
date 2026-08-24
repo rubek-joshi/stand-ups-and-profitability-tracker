@@ -26,23 +26,19 @@ async function bootstrap(): Promise<void> {
     .addBearerAuth()
     .build();
 
-  SwaggerModule.setup(
-    "docs",
-    app,
-    () => {
-      applyProblemDetailResponses(app, {
-        statuses: [400, 401, 403, 404, 422, 500],
-        validationStatuses: [400, 422],
-      });
-      return SwaggerModule.createDocument(app, swaggerConfig);
-    },
-    { useGlobalPrefix: true },
-  );
+  SwaggerModule.setup("docs", app, () => {
+    applyProblemDetailResponses(app, {
+      statuses: [400, 401, 403, 404, 422, 500],
+      validationStatuses: [400, 422],
+    });
+    return SwaggerModule.createDocument(app, swaggerConfig);
+  });
 
   const port = Number(configService.get<string>("API_PORT") ?? 4101);
   await app.listen(port);
   console.log(`API listening on http://localhost:${port}`);
-  console.log(`Swagger docs at http://localhost:${port}/api/docs`);
+  console.log(`Swagger docs at http://localhost:${port}/docs`);
+
 }
 
 void bootstrap();

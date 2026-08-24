@@ -53,12 +53,12 @@ set +a
 echo "==> Building API"
 rm -rf apps/api/dist
 pnpm turbo build --filter=@workspace/api --force
-if [[ ! -f apps/api/dist/configure-http.js ]]; then
-  echo "ERROR: API build is missing dist/configure-http.js. The /api global prefix will not be applied."
+if [[ ! -f apps/api/dist/main.js ]]; then
+  echo "ERROR: API build did not emit dist/main.js."
   exit 1
 fi
 
-echo "==> Building web (forced; VITE_API_URL=${VITE_API_URL:-unset})"
+echo "==> Building web (forced; browser calls same-origin /api, Vite/Nginx strip the prefix)"
 rm -rf apps/web/dist apps/web/.output
 pnpm turbo build --filter=web --force
 
@@ -96,31 +96,30 @@ else
   pm2 start ecosystem.config.cjs
 fi
 sleep 2
-LOGIN_PROBE="$(curl -sS -X POST http://127.0.0.1:4101/api/auth/login -H 'Content-Type: application/json' -d '{}' || true)"
-if echo "$LOGIN_PROBE" | grep -q 'Cannot POST /api/auth/login'; then
-  echo "ERROR: PM2 is still serving an API without the /api prefix. Check git pull, dist/, and pm2 logs."
+LOGIN_PROBE="$(curl -sS -X POST http://127.0.0.1:4101/auth/login -H 'Content-Type: application/json' -d '{}' || true)"
+if echo "$LOGIN_PROBE" | grep -q 'Cannot POST /auth/login'; then
+  echo "ERROR: PM2 is not serving POST /auth/login. Check git pull, dist/, and pm2 logs."
   echo "$LOGIN_PROBE"
   exit 1
 fi
 
 pm2 save
 
-# The SPA and the API share hostnames, so /api/ must reach Nest. If Nginx falls
-# through to index.html, the frontend parses HTML as JSON and pages break with
-# errors like "marginPct is undefined" or "map is not a function".
-# An unauthenticated GET must answer with a JSON problem document, not the SPA shell.
+# The SPA and the API share a hostname. Nginx must proxy /api/ to Nest and
+# strip the prefix (proxy_pass ...4101/;). If it falls through to index.html,
+# the frontend parses HTML as JSON (marginPct undefined, .map is not a function).
 if command -v curl >/dev/null 2>&1 && [[ -n "${CORS_ORIGIN:-}" ]]; then
   sleep 3
   PROBE_URL="${CORS_ORIGIN%/}/api/clients"
+  PROBE_BODY="$(curl -sS "$PROBE_URL" || true)"
   PROBE_CT="$(curl -sS -o /dev/null -w '%{content_type}' "$PROBE_URL" || true)"
-  case "$PROBE_CT" in
-    *json*) ;;
-    *)
-      echo "WARNING: $PROBE_URL returned '${PROBE_CT:-no content-type}' instead of JSON."
-      echo "         Nginx is likely serving the SPA for /api/ instead of proxying to 127.0.0.1:4101."
-      echo "         See docs/ubuntu-nginx-deploy.md."
-      ;;
-  esac
+  if echo "$PROBE_BODY" | grep -q 'Cannot GET /api/clients'; then
+    echo "WARNING: $PROBE_URL reached Nest without stripping /api."
+    echo "         Use: location /api/ { proxy_pass http://127.0.0.1:4101/; }"
+  elif echo "$PROBE_CT" | grep -qv json; then
+    echo "WARNING: $PROBE_URL returned '${PROBE_CT:-no content-type}' instead of JSON."
+    echo "         Nginx is likely serving the SPA for /api/. See docs/ubuntu-nginx-deploy.md."
+  fi
 fi
 
 echo "==> Deploy complete"
