@@ -16,7 +16,16 @@ const config = defineConfig({
     // Do not alias package roots — that forces CJS entrypoints and breaks Vite's ESM runner.
     dedupe: ["react", "react-dom"],
   },
-  plugins: [devtools(), tailwindcss(), tanstackStart(), viteReact()],
+  plugins: [
+    devtools(),
+    tailwindcss(),
+    tanstackStart({
+      spa: {
+        enabled: true,
+      },
+    }),
+    viteReact(),
+  ],
   server: {
     port: 4100,
   },

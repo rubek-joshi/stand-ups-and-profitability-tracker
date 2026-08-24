@@ -1,15 +1,17 @@
 # Ubuntu + Nginx deployment
 
-Deploy the Profitability Tracker monorepo on an Ubuntu 22.04/24.04 instance with Docker (Postgres/Redis), PM2 (Node apps), and Nginx as a reverse proxy.
+Deploy the Profitability Tracker monorepo on an Ubuntu 22.04/24.04 instance with Docker (Postgres/Redis), PM2 (API), and Nginx serving the frontend from `/var/www/tracker`.
 
 ## Ports
 
 | Service | Host port |
 | --- | --- |
-| Web (`apps/web`) | `4100` |
+| Web (Nginx, `/var/www/tracker`) | `80` / `443` |
 | API (`apps/api`) | `4101` |
 | Postgres (Docker) | `6432` → container `5432` |
 | Redis (Docker) | `6679` → container `6379` |
+
+Vite still uses `4100` for local `pnpm dev:web`.
 
 ## Prerequisites
 
@@ -63,7 +65,7 @@ pnpm db:seed
 pnpm turbo build --filter=@workspace/api --filter=web
 ```
 
-5. Start processes with PM2:
+5. Start the API with PM2:
 
 ```bash
 pm2 start ecosystem.config.cjs
@@ -71,7 +73,7 @@ pm2 save
 pm2 startup
 ```
 
-API listens on **4101**, web preview on **4100**.
+API listens on **4101**. Nginx serves the built web app from **`/var/www/tracker`**.
 
 ## Nginx
 
@@ -84,6 +86,9 @@ server {
     listen 80;
     server_name tracker.example.com;
 
+    root /var/www/tracker;
+    index index.html;
+
     location /api/ {
         proxy_pass http://127.0.0.1:4101/api/;
         proxy_http_version 1.1;
@@ -93,7 +98,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Health and auth are not under /api/* by default — proxy all API routes:
+    # Health and auth are not under /api/* by default
     location ~ ^/(auth|health|api) {
         proxy_pass http://127.0.0.1:4101;
         proxy_http_version 1.1;
@@ -103,8 +108,8 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    location / {
-        proxy_pass http://127.0.0.1:4100;
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:4101/socket.io/;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -112,6 +117,10 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location / {
+        try_files $uri $uri/ /index.html;
     }
 }
 ```
@@ -126,7 +135,7 @@ sudo systemctl reload nginx
 
 ### Subdomains (optional)
 
-- `app.example.com` → `127.0.0.1:4100`
+- `app.example.com` → `/var/www/tracker`
 - `api.example.com` → `127.0.0.1:4101`
 
 Set `CORS_ORIGIN` to the web origin (e.g. `https://app.example.com`).
@@ -166,11 +175,12 @@ chmod +x scripts/deploy.sh
 4. `pnpm install --frozen-lockfile`
 5. Prisma generate, migrate deploy, and seed
 6. Build API + web
-7. Reload/start PM2 via `ecosystem.config.cjs`
+7. Publish the web build to `/var/www/tracker`
+8. Reload/start PM2 via `ecosystem.config.cjs`
 
 ## Logs and rollback
 
-- API/web logs: `pm2 logs`
+- API logs: `pm2 logs`
 - Nginx: `/var/log/nginx/access.log`, `/var/log/nginx/error.log`
 - Docker: `docker compose logs -f postgres redis`
 

@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+WEB_ROOT="${WEB_ROOT:-/var/www/tracker}"
+
 if [[ ! -f .env ]]; then
   echo "Missing root .env. Copy .env.example to .env and fill in values."
   exit 1
@@ -44,6 +46,28 @@ pnpm db:seed
 
 echo "==> Building apps"
 pnpm turbo build --filter=@workspace/api --filter=web
+
+if [[ -d apps/web/dist/client ]]; then
+  WEB_DIST="apps/web/dist/client"
+elif [[ -d apps/web/dist ]]; then
+  WEB_DIST="apps/web/dist"
+else
+  echo "Web build output not found (apps/web/dist)."
+  exit 1
+fi
+
+echo "==> Publishing frontend to $WEB_ROOT"
+sudo mkdir -p "$WEB_ROOT"
+if command -v rsync >/dev/null 2>&1; then
+  sudo rsync -a --delete "$WEB_DIST/" "$WEB_ROOT/"
+else
+  sudo find "$WEB_ROOT" -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+  sudo cp -a "$WEB_DIST"/. "$WEB_ROOT/"
+fi
+if [[ -f "$WEB_ROOT/_shell.html" && ! -f "$WEB_ROOT/index.html" ]]; then
+  sudo cp "$WEB_ROOT/_shell.html" "$WEB_ROOT/index.html"
+fi
+sudo chown -R www-data:www-data "$WEB_ROOT"
 
 echo "==> Restarting PM2 processes"
 if pm2 describe profitability-api >/dev/null 2>&1; then
