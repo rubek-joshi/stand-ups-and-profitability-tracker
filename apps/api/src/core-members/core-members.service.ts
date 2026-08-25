@@ -37,6 +37,7 @@ export class CoreMembersService {
         name: dto.name,
         email: dto.email,
         contactNumber: dto.contactNumber?.trim() || null,
+        panNumber: dto.panNumber?.trim() || null,
         dateJoined: parseIsoDate(dto.dateJoined),
         ...(dto.initialSalaryNpr !== undefined
           ? {
@@ -105,6 +106,9 @@ export class CoreMembersService {
         email: dto.email,
         ...(dto.contactNumber !== undefined
           ? { contactNumber: dto.contactNumber?.trim() || null }
+          : {}),
+        ...(dto.panNumber !== undefined
+          ? { panNumber: dto.panNumber?.trim() || null }
           : {}),
         dateJoined: dto.dateJoined
           ? parseIsoDate(dto.dateJoined)

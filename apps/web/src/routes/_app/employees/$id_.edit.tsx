@@ -24,6 +24,7 @@ function EmployeeEditPage() {
   const [name, setName] = React.useState("")
   const [email, setEmail] = React.useState("")
   const [contactNumber, setContactNumber] = React.useState("")
+  const [panNumber, setPanNumber] = React.useState("")
   const [dateJoined, setDateJoined] = React.useState("")
   const [dateOfBirth, setDateOfBirth] = React.useState("")
 
@@ -36,6 +37,7 @@ function EmployeeEditPage() {
       setName(res.data.name)
       setEmail(res.data.email)
       setContactNumber(res.data.contactNumber ?? "")
+      setPanNumber(res.data.panNumber ?? "")
       setDateJoined(String(res.data.dateJoined).slice(0, 10))
       setDateOfBirth(
         res.data.dateOfBirth ? String(res.data.dateOfBirth).slice(0, 10) : "",
@@ -65,15 +67,6 @@ function EmployeeEditPage() {
           { label: employee.name, to: "/employees/$id", params: { id } },
           { label: "Edit details" },
         ]}
-        actions={
-          <Link
-            to="/employees/$id"
-            params={{ id }}
-            className={buttonVariants({ variant: "secondary" })}
-          >
-            Cancel
-          </Link>
-        }
       />
 
       <Card className="max-w-xl">
@@ -98,6 +91,7 @@ function EmployeeEditPage() {
                     name: name.trim(),
                     email: email.trim(),
                     contactNumber: contactNumber.trim() || null,
+                    panNumber: panNumber.trim() || null,
                     dateJoined,
                     dateOfBirth: dateOfBirth || null,
                   },
@@ -132,6 +126,14 @@ function EmployeeEditPage() {
               />
             </div>
             <div className="space-y-2">
+              <Label>PAN number (optional)</Label>
+              <Input
+                value={panNumber}
+                maxLength={20}
+                onChange={(e) => setPanNumber(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
               <Label>Date joined</Label>
               <Input
                 type="date"
@@ -149,9 +151,18 @@ function EmployeeEditPage() {
                 onChange={(e) => setDateOfBirth(e.target.value)}
               />
             </div>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save profile"}
-            </Button>
+            <div className="flex gap-2 pt-1">
+              <Link
+                to="/employees/$id"
+                params={{ id }}
+                className={buttonVariants({ variant: "secondary" })}
+              >
+                Cancel
+              </Link>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving…" : "Save profile"}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

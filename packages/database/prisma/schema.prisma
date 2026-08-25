@@ -361,6 +361,7 @@ model Employee {
   name          String
   email         String       @unique
   contactNumber String?
+  panNumber     String?
   status        PersonStatus @default(active)
   dateJoined    DateTime     @db.Date
   dateOfBirth   DateTime?    @db.Date
@@ -426,6 +427,7 @@ model CoreMember {
   name          String
   email         String       @unique
   contactNumber String?
+  panNumber     String?
   status        PersonStatus @default(active)
   dateJoined    DateTime     @db.Date
   dateLeft      DateTime?    @db.Date

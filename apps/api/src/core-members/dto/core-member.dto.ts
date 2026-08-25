@@ -27,6 +27,12 @@ export class CreateCoreMemberDto {
   @MaxLength(40)
   contactNumber?: string;
 
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  panNumber?: string;
+
   @ApiProperty({ example: "2026-01-01" })
   @IsDateString()
   dateJoined!: string;
@@ -55,6 +61,12 @@ export class UpdateCoreMemberDto {
   @IsString()
   @MaxLength(40)
   contactNumber?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  panNumber?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

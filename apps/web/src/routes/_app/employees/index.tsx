@@ -54,6 +54,7 @@ function EmployeesPage() {
     name: "",
     email: "",
     contactNumber: "",
+    panNumber: "",
     dateJoined: new Date().toISOString().slice(0, 10),
     dateOfBirth: "",
     initialSalaryNpr: "",
@@ -249,6 +250,7 @@ function EmployeesPage() {
                     name: form.name.trim(),
                     email: form.email.trim(),
                     contactNumber: form.contactNumber.trim() || undefined,
+                    panNumber: form.panNumber.trim() || undefined,
                     dateJoined: form.dateJoined,
                     dateOfBirth: form.dateOfBirth || undefined,
                     initialSalaryNpr: form.initialSalaryNpr
@@ -261,6 +263,7 @@ function EmployeesPage() {
                   name: "",
                   email: "",
                   contactNumber: "",
+                  panNumber: "",
                   dateJoined: new Date().toISOString().slice(0, 10),
                   dateOfBirth: "",
                   initialSalaryNpr: "",
@@ -294,6 +297,14 @@ function EmployeesPage() {
                 type="tel"
                 value={form.contactNumber}
                 onChange={(e) => setForm((f) => ({ ...f, contactNumber: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>PAN number (optional)</Label>
+              <Input
+                value={form.panNumber}
+                maxLength={20}
+                onChange={(e) => setForm((f) => ({ ...f, panNumber: e.target.value }))}
               />
             </div>
             <div className="space-y-2">

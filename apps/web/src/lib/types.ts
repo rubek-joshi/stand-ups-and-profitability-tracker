@@ -158,6 +158,7 @@ export type Employee = {
   name: string
   email: string
   contactNumber?: string | null
+  panNumber?: string | null
   status: PersonStatus
   dateJoined: string
   dateOfBirth?: string | null
@@ -238,6 +239,7 @@ export type CoreMember = {
   name: string
   email: string
   contactNumber?: string | null
+  panNumber?: string | null
   status: PersonStatus
   dateJoined: string
   dateLeft: string | null

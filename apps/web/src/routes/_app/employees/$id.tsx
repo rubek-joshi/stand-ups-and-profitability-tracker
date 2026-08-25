@@ -6,6 +6,7 @@ import {
   IconCake,
   IconClock,
   IconDotsVertical,
+  IconId,
   IconMail,
   IconMessage,
   IconMoon,
@@ -726,6 +727,11 @@ function EmployeeDetailPage() {
                     "—"
                   )
                 }
+              />
+              <Detail
+                icon={IconId}
+                label="PAN number"
+                value={employee.panNumber || "—"}
               />
               {employee.dateLeft ? (
                 <Detail

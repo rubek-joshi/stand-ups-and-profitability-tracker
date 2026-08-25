@@ -4,10 +4,20 @@ import {
   IconDotsVertical,
   IconPencil,
   IconTrash,
+  IconTrendingUp,
   IconUserOff,
 } from "@tabler/icons-react"
+import { format, parseISO } from "date-fns"
+import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@workspace/ui/components/dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +25,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@workspace/ui/components/dropdown-menu"
+import { Input } from "@workspace/ui/components/input"
+import { Label } from "@workspace/ui/components/label"
 import {
   Table,
   TableBody,
@@ -31,17 +43,41 @@ import {
 import { PageHeader } from "@/components/page-header"
 import { StatusBadge } from "@/components/health-badge"
 import { MailLink, TelLink } from "@/components/contact-link"
+import { JoinedDate } from "@/components/joined-date"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { MarkLeftDialog } from "@/components/mark-left-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
-import { TableActionLink } from "@/components/table-row-actions"
+import {
+  TableActionButton,
+  TableActionLink,
+  TableActionsCell,
+  TableActionsHead,
+} from "@/components/table-row-actions"
 import { api, ApiError, type Envelope } from "@/lib/api"
-import { formatNpr } from "@/lib/money"
-import type { CoreMember } from "@/lib/types"
+import { formatJoinedDate } from "@/lib/dates"
+import { formatNpr, paisaToNpr, parseNprInput } from "@/lib/money"
+import type { CoreMember, SalaryEntry } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/core-members/$id")({
   component: CoreMemberDetailPage,
 })
+
+type SalaryForm = {
+  salaryNpr: string
+  effectiveDate: string
+  reason: string
+}
+
+const emptySalaryForm = (): SalaryForm => ({
+  salaryNpr: "",
+  effectiveDate: new Date().toISOString().slice(0, 10),
+  reason: "",
+})
+
+function toDateKey(value: string | Date) {
+  if (typeof value === "string") return value.slice(0, 10)
+  return value.toISOString().slice(0, 10)
+}
 
 function CoreMemberDetailPage() {
   const { id } = Route.useParams()
@@ -51,6 +87,9 @@ function CoreMemberDetailPage() {
   const [member, setMember] = React.useState<CoreMember | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
+  const [salaryOpen, setSalaryOpen] = React.useState(false)
+  const [editingEntry, setEditingEntry] = React.useState<SalaryEntry | null>(null)
+  const [salaryForm, setSalaryForm] = React.useState<SalaryForm>(emptySalaryForm)
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -69,12 +108,29 @@ function CoreMemberDetailPage() {
     void load()
   }, [load])
 
+  const openCreateSalary = () => {
+    setEditingEntry(null)
+    setSalaryForm(emptySalaryForm())
+    setSalaryOpen(true)
+  }
+
+  const openEditSalary = (entry: SalaryEntry) => {
+    setEditingEntry(entry)
+    setSalaryForm({
+      salaryNpr: String(paisaToNpr(entry.salaryPaisa)),
+      effectiveDate: String(entry.effectiveDate).slice(0, 10),
+      reason: entry.reason ?? "",
+    })
+    setSalaryOpen(true)
+  }
+
   if (loading) return <LoadingState />
   if (error) return <ErrorState message={error} onRetry={load} />
   if (!member) return null
 
-  const entries = member.salaryEntries ?? []
-  const canDelete = entries.length === 0
+  const salaryEntries = member.salaryEntries ?? []
+  const currentSalary = salaryEntries[0]
+  const canDelete = salaryEntries.length === 0
 
   return (
     <div>
@@ -153,11 +209,22 @@ function CoreMemberDetailPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <section className="min-w-0">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Salary entries</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle className="text-base">Salary history</CardTitle>
+                {currentSalary ? (
+                  <Badge variant="secondary" className="gap-1">
+                    <IconTrendingUp className="size-3" />
+                    {formatNpr(currentSalary.salaryPaisa)}
+                  </Badge>
+                ) : null}
+              </div>
+              <Button size="sm" onClick={openCreateSalary}>
+                Add
+              </Button>
             </CardHeader>
             <CardContent>
-              {entries.length === 0 ? (
+              {salaryEntries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No salary entries</p>
               ) : (
                 <Table>
@@ -165,19 +232,74 @@ function CoreMemberDetailPage() {
                     <TableRow>
                       <TableHead>Effective</TableHead>
                       <TableHead>Amount</TableHead>
-                      <TableHead>Reason</TableHead>
+                      <TableHead className="text-right">Change</TableHead>
+                      <TableActionsHead />
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {entries.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell>{String(entry.effectiveDate).slice(0, 10)}</TableCell>
-                        <TableCell>{formatNpr(entry.salaryPaisa)}</TableCell>
-                        <TableCell className="max-w-48 truncate text-muted-foreground">
-                          {entry.reason?.trim() || "—"}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {salaryEntries.map((entry, i) => {
+                      const prev = salaryEntries[i + 1]
+                      const current = paisaToNpr(entry.salaryPaisa)
+                      const previous = prev ? paisaToNpr(prev.salaryPaisa) : null
+                      const delta =
+                        previous && previous !== 0
+                          ? ((current - previous) / previous) * 100
+                          : null
+                      return (
+                        <TableRow key={entry.id}>
+                          <TableCell>
+                            <div className="font-medium whitespace-nowrap">
+                              {format(parseISO(toDateKey(entry.effectiveDate)), "d MMM yyyy")}
+                            </div>
+                            {entry.reason?.trim() ? (
+                              <div className="text-xs text-muted-foreground">{entry.reason}</div>
+                            ) : null}
+                          </TableCell>
+                          <TableCell className="tabular-nums">
+                            {formatNpr(entry.salaryPaisa)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            {delta === null ? (
+                              <span className="text-xs text-muted-foreground">Starting</span>
+                            ) : (
+                              <Badge variant={delta >= 0 ? "default" : "destructive"}>
+                                {delta >= 0 ? "+" : ""}
+                                {delta.toFixed(1)}%
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableActionsCell>
+                            <TableActionButton
+                              label="Edit"
+                              onClick={() => openEditSalary(entry)}
+                            >
+                              <IconPencil className="size-3.5" />
+                            </TableActionButton>
+                            <TableActionButton
+                              label="Delete"
+                              variant="destructive"
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: "Delete salary entry?",
+                                  description:
+                                    "This will recalculate cost and profit/loss for affected periods.",
+                                  confirmLabel: "Delete",
+                                  destructive: true,
+                                })
+                                if (!ok) return
+                                await api(
+                                  `/core-members/${id}/salary-entries/${entry.id}`,
+                                  { method: "DELETE" },
+                                )
+                                await load()
+                              }}
+                            >
+                              <IconTrash className="size-3.5" />
+                            </TableActionButton>
+                          </TableActionsCell>
+                        </TableRow>
+                      )
+                    })}
                   </TableBody>
                 </Table>
               )}
@@ -214,13 +336,17 @@ function CoreMemberDetailPage() {
                 }
               />
               <Detail
+                label="PAN number"
+                value={member.panNumber || "—"}
+              />
+              <Detail
                 label="Joined"
-                value={String(member.dateJoined).slice(0, 10)}
+                value={<JoinedDate value={member.dateJoined} />}
               />
               <Detail
                 label="Left"
                 value={
-                  member.dateLeft ? String(member.dateLeft).slice(0, 10) : "—"
+                  member.dateLeft ? formatJoinedDate(member.dateLeft) : "—"
                 }
               />
             </CardContent>
@@ -228,6 +354,91 @@ function CoreMemberDetailPage() {
         </aside>
       </div>
       {dialog}
+      <Dialog
+        open={salaryOpen}
+        onOpenChange={(open) => {
+          setSalaryOpen(open)
+          if (!open) setEditingEntry(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingEntry ? "Edit salary entry" : "Add salary entry"}
+            </DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={async (e) => {
+              e.preventDefault()
+              const body = {
+                salaryNpr: parseNprInput(salaryForm.salaryNpr),
+                effectiveDate: salaryForm.effectiveDate,
+                reason: salaryForm.reason.trim() || undefined,
+              }
+              if (editingEntry) {
+                const ok = await confirm({
+                  title: "Update salary entry?",
+                  description:
+                    "This may recalculate cost and profit/loss for affected projects.",
+                  confirmLabel: "Update",
+                  destructive: true,
+                })
+                if (!ok) return
+                await api(`/core-members/${id}/salary-entries/${editingEntry.id}`, {
+                  method: "PATCH",
+                  body,
+                })
+              } else {
+                await api(`/core-members/${id}/salary-entries`, {
+                  method: "POST",
+                  body,
+                })
+              }
+              setSalaryOpen(false)
+              setEditingEntry(null)
+              await load()
+            }}
+          >
+            <div className="space-y-2">
+              <Label>Salary (NPR)</Label>
+              <Input
+                required
+                value={salaryForm.salaryNpr}
+                onChange={(e) =>
+                  setSalaryForm((f) => ({ ...f, salaryNpr: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Effective date</Label>
+              <Input
+                type="date"
+                required
+                value={salaryForm.effectiveDate}
+                onChange={(e) =>
+                  setSalaryForm((f) => ({ ...f, effectiveDate: e.target.value }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Reason</Label>
+              <Input
+                value={salaryForm.reason}
+                onChange={(e) =>
+                  setSalaryForm((f) => ({ ...f, reason: e.target.value }))
+                }
+                placeholder="Optional"
+              />
+            </div>
+            <DialogFooter>
+              <Button type="submit">
+                {editingEntry ? "Save entry" : "Add entry"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <MarkLeftDialog
         open={markLeftOpen}
         onOpenChange={setMarkLeftOpen}
