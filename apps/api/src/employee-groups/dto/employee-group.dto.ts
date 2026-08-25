@@ -35,6 +35,12 @@ export class UpdateEmployeeGroupDto {
   @IsString()
   @MaxLength(1000)
   description?: string | null;
+
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  standupGuidelines?: string | null;
 }
 
 export class AddEmployeeGroupMemberDto {

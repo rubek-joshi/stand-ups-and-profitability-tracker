@@ -127,12 +127,14 @@ export class ProjectsService {
 
   async findOne(id: string) {
     const project = await this.getProjectOrThrow(id);
-    const profitability =
-      await this.profitabilityService.calculateProjectProfitLoss(id);
-    const laborSummary =
-      await this.profitabilityService.calculateProjectLaborSummary(id);
+    const [profitability, laborSummary, allocationCount] = await Promise.all([
+      this.profitabilityService.calculateProjectProfitLoss(id),
+      this.profitabilityService.calculateProjectLaborSummary(id),
+      this.prismaService.projectAllocation.count({ where: { projectId: id } }),
+    ]);
     return {
       ...this.serializeProject(project),
+      canDelete: this.canDeleteProject(project.status, allocationCount),
       extensions: serializeMoneyList(project.extensions, EXTENSION_MONEY_FIELDS),
       profitability: {
         ...profitability,
@@ -235,6 +237,39 @@ export class ProjectsService {
       },
     });
     return this.serializeProject(project);
+  }
+
+  async remove(id: string, actorId: string) {
+    const before = await this.getProjectOrThrow(id);
+    if (
+      before.status === ProjectStatus.closed ||
+      before.status === ProjectStatus.under_amc
+    ) {
+      throw new BadRequestException("Cannot delete a closed project");
+    }
+    const allocationCount = await this.prismaService.projectAllocation.count({
+      where: { projectId: id },
+    });
+    if (allocationCount > 0) {
+      throw new BadRequestException(
+        "Cannot delete a project that has stand-up records",
+      );
+    }
+    await this.prismaService.$transaction(async (tx) => {
+      await tx.projectAssignment.deleteMany({ where: { projectId: id } });
+      await tx.coreMemberAssignment.deleteMany({ where: { projectId: id } });
+      await tx.projectExtension.deleteMany({ where: { projectId: id } });
+      await tx.project.delete({ where: { id } });
+    });
+    this.profitabilityService.clearCache(id);
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.PROJECT_DELETED,
+      targetType: "Project",
+      targetId: id,
+      metadata: { before: this.serializeProject(before) },
+    });
+    return { id };
   }
 
   async assignEmployee(
@@ -582,6 +617,14 @@ export class ProjectsService {
       orderBy: { endDate: "desc" as const },
     },
   } as const;
+
+  private canDeleteProject(status: ProjectStatus, allocationCount: number) {
+    return (
+      status !== ProjectStatus.closed &&
+      status !== ProjectStatus.under_amc &&
+      allocationCount === 0
+    );
+  }
 
   private async getProjectOrThrow(id: string) {
     const project = await this.prismaService.project.findUnique({

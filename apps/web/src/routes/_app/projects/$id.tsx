@@ -1,10 +1,12 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
 import {
+  IconDotsVertical,
   IconEye,
   IconLock,
   IconPencil,
   IconShieldCheck,
+  IconTrash,
   IconUserMinus,
   IconUserPlus,
 } from "@tabler/icons-react"
@@ -27,6 +29,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Progress } from "@workspace/ui/components/progress"
@@ -50,6 +59,11 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import {
   ToggleGroup,
   ToggleGroupItem,
@@ -262,6 +276,7 @@ function ProjectDetailPage() {
   const laborSeries = dashboard?.laborSeries ?? []
   const canManageAssignments =
     project.status !== "closed" && project.status !== "under_amc"
+  const canDeleteProject = Boolean(project.canDelete)
   const assignedEmployeeIds = new Set(
     assignments.employees
       .filter((assignment) => !assignment.unassignedAt)
@@ -415,23 +430,85 @@ function ProjectDetailPage() {
         }
         actions={
           canManageAssignments ? (
-            <Button
-              variant="outline"
-              onClick={async () => {
-                const ok = await confirm({
-                  title: "Close project?",
-                  description:
-                    "Closing the project will end all active employee and core member assignments and preserve their history logs.",
-                  confirmLabel: "Close project",
-                  destructive: true,
-                })
-                if (!ok) return
-                await api(`/projects/${id}/close`, { method: "POST" })
-                await load()
-              }}
-            >
-              Close
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Project actions"
+                  />
+                }
+              >
+                <IconDotsVertical />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuGroup>
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "Close project?",
+                        description:
+                          "Closing the project will end all active employee and core member assignments and preserve their history logs.",
+                        confirmLabel: "Close project",
+                        destructive: true,
+                      })
+                      if (!ok) return
+                      await api(`/projects/${id}/close`, { method: "POST" })
+                      await load()
+                    }}
+                  >
+                    <IconLock />
+                    Close
+                  </DropdownMenuItem>
+                  {canDeleteProject ? (
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={async () => {
+                        const ok = await confirm({
+                          title: "Delete project?",
+                          description:
+                            "This permanently deletes the project, its assignments, and extensions.",
+                          confirmLabel: "Delete",
+                          destructive: true,
+                        })
+                        if (!ok) return
+                        try {
+                          await api(`/projects/${id}`, { method: "DELETE" })
+                          void navigate({
+                            to: "/projects",
+                            search: DEFAULT_LIST_SEARCH,
+                          })
+                        } catch (e) {
+                          alert(
+                            e instanceof ApiError ? e.message : "Delete failed",
+                          )
+                        }
+                      }}
+                    >
+                      <IconTrash />
+                      Delete
+                    </DropdownMenuItem>
+                  ) : (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={<div className="w-full cursor-not-allowed" />}
+                      >
+                        <DropdownMenuItem disabled variant="destructive">
+                          <IconTrash />
+                          Delete
+                        </DropdownMenuItem>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Cannot delete: stand-ups have been recorded for this
+                        project
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null
         }
       />

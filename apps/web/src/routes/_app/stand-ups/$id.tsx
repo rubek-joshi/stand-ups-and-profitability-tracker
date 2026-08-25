@@ -62,6 +62,7 @@ import { StandupCardView } from "@/components/standup/standup-card-view"
 import { StandupTableView } from "@/components/standup/table-view"
 import { advanceStandupFocus } from "@/components/standup/standup-focus-nav"
 import { toggleMiscellaneousNotes } from "@/components/standup/miscellaneous-notes-toggle"
+import { StandupGuidelinesControl } from "@/components/standup/standup-guidelines-dialog"
 import {
   rebalance,
   type DraftAlloc,
@@ -1282,6 +1283,15 @@ function StandupDetailPage() {
         {hiddenGroupCount > 0 && !query.trim() ? (
           <Badge variant="outline">{hiddenGroupCount} hidden by group filter</Badge>
         ) : null}
+
+        <StandupGuidelinesControl
+          viewingEveryone={
+            user?.standupScopePreference !== "group" ||
+            !user?.standupPreferredGroupId ||
+            showAllEmployees
+          }
+          preferredGroupId={user?.standupPreferredGroupId}
+        />
 
         <Button
           type="button"

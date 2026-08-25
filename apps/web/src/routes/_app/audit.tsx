@@ -103,6 +103,7 @@ const ACTIONS = [
   "PROJECT_AUTO_EXTENDED",
   "PROJECT_CLOSED",
   "PROJECT_CREATED",
+  "PROJECT_DELETED",
   "PROJECT_EXTENDED",
   "PROJECT_UPDATED",
   "SETTINGS_UPDATED",
@@ -178,7 +179,7 @@ function AuditPage() {
       setError(
         e instanceof ApiError
           ? e.status === 403
-            ? "Audit logs are available to super admins only."
+            ? "Audit logs are available to admins only."
             : e.message
           : "Failed to load audit logs"
       )

@@ -1,5 +1,7 @@
 import * as React from "react"
 import {
+  $createParagraphNode,
+  $findMatchingParent,
   $getRoot,
   $getSelection,
   $isRangeSelection,
@@ -7,16 +9,21 @@ import {
   type EditorState,
   type LexicalEditor,
 } from "lexical"
-import { $convertFromMarkdownString, $convertToMarkdownString, TRANSFORMERS } from "@lexical/markdown"
-import { HeadingNode, QuoteNode } from "@lexical/rich-text"
-import { CodeNode } from "@lexical/code"
-import { LinkNode } from "@lexical/link"
 import {
-  ListItemNode,
-  ListNode,
+  $convertFromMarkdownString,
+  $convertToMarkdownString,
+} from "@lexical/markdown"
+import {
+  $createHeadingNode,
+  $isHeadingNode,
+  type HeadingTagType,
+} from "@lexical/rich-text"
+import { $isLinkNode, TOGGLE_LINK_COMMAND } from "@lexical/link"
+import {
   INSERT_UNORDERED_LIST_COMMAND,
   INSERT_ORDERED_LIST_COMMAND,
 } from "@lexical/list"
+import { $setBlocksType } from "@lexical/selection"
 import { LexicalComposer } from "@lexical/react/LexicalComposer"
 import { useLexicalComposerContext } from "@lexical/react/LexicalComposerContext"
 import { RichTextPlugin } from "@lexical/react/LexicalRichTextPlugin"
@@ -26,16 +33,32 @@ import { OnChangePlugin } from "@lexical/react/LexicalOnChangePlugin"
 import { ListPlugin } from "@lexical/react/LexicalListPlugin"
 import { LinkPlugin } from "@lexical/react/LexicalLinkPlugin"
 import { MarkdownShortcutPlugin } from "@lexical/react/LexicalMarkdownShortcutPlugin"
+import { HorizontalRulePlugin } from "@lexical/react/LexicalHorizontalRulePlugin"
+import { INSERT_HORIZONTAL_RULE_COMMAND } from "@lexical/react/LexicalHorizontalRuleNode"
 import { LexicalErrorBoundary } from "@lexical/react/LexicalErrorBoundary"
 import {
   IconBold,
+  IconCode,
+  IconH1,
+  IconH2,
+  IconH3,
   IconItalic,
+  IconLink,
   IconList,
   IconListNumbers,
-  IconCode,
+  IconMinus,
+  IconStrikethrough,
+  IconUnderline,
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
+import {
+  MARKDOWN_TRANSFORMERS,
+  markdownEditorNodes,
+  markdownEditorTheme,
+} from "@/components/standup/markdown-shared"
+
+export { markdownEditorTheme }
 
 type Props = {
   editorKey?: string
@@ -79,29 +102,6 @@ function RegisterStandupNotesEditor({ editorKey }: { editorKey: string }) {
   return null
 }
 
-const editorTheme = {
-  paragraph: "mb-1 last:mb-0",
-  quote: "border-l-2 border-border pl-3 text-muted-foreground italic",
-  heading: {
-    h1: "mb-1 text-base font-semibold",
-    h2: "mb-1 text-sm font-semibold",
-    h3: "mb-1 text-sm font-semibold",
-  },
-  list: {
-    ul: "mb-1 list-disc pl-5",
-    ol: "mb-1 list-decimal pl-5",
-    listitem: "my-0.5",
-  },
-  link: "text-primary underline",
-  text: {
-    bold: "font-semibold",
-    italic: "italic",
-    code: "rounded bg-muted px-1 py-0.5 font-mono text-[0.85em]",
-    strikethrough: "line-through",
-  },
-  code: "my-2 block overflow-x-auto rounded-md bg-muted px-2 py-1.5 font-mono text-[13px]",
-}
-
 function normalizeMarkdown(value: string) {
   return value.replace(/\r\n/g, "\n").replace(/\n+$/g, "")
 }
@@ -125,14 +125,16 @@ function MarkdownNotesInner({
     if (next === lastSyncedRef.current) return
     lastSyncedRef.current = next
     editor.update(() => {
-      $convertFromMarkdownString(value || "", TRANSFORMERS)
+      $convertFromMarkdownString(value || "", MARKDOWN_TRANSFORMERS)
     })
   }, [editor, value])
 
   const handleChange = React.useCallback(
     (editorState: EditorState) => {
       editorState.read(() => {
-        const markdown = normalizeMarkdown($convertToMarkdownString(TRANSFORMERS))
+        const markdown = normalizeMarkdown(
+          $convertToMarkdownString(MARKDOWN_TRANSFORMERS),
+        )
         if (markdown === lastSyncedRef.current) return
         lastSyncedRef.current = markdown
         onChange(markdown)
@@ -173,7 +175,8 @@ function MarkdownNotesInner({
       <HistoryPlugin />
       <ListPlugin />
       <LinkPlugin />
-      <MarkdownShortcutPlugin transformers={TRANSFORMERS} />
+      <HorizontalRulePlugin />
+      <MarkdownShortcutPlugin transformers={MARKDOWN_TRANSFORMERS} />
       <OnChangePlugin onChange={handleChange} ignoreSelectionChange />
     </>
   )
@@ -184,7 +187,11 @@ function Toolbar({ disabled }: { disabled?: boolean }) {
   const [formats, setFormats] = React.useState({
     bold: false,
     italic: false,
+    underline: false,
+    strikethrough: false,
     code: false,
+    heading: null as HeadingTagType | null,
+    link: false,
   })
 
   React.useEffect(() => {
@@ -192,13 +199,31 @@ function Toolbar({ disabled }: { disabled?: boolean }) {
       editorState.read(() => {
         const selection = $getSelection()
         if (!$isRangeSelection(selection)) {
-          setFormats({ bold: false, italic: false, code: false })
+          setFormats({
+            bold: false,
+            italic: false,
+            underline: false,
+            strikethrough: false,
+            code: false,
+            heading: null,
+            link: false,
+          })
           return
         }
+        const heading = $findMatchingParent(
+          selection.anchor.getNode(),
+          $isHeadingNode,
+        )
         setFormats({
           bold: selection.hasFormat("bold"),
           italic: selection.hasFormat("italic"),
+          underline: selection.hasFormat("underline"),
+          strikethrough: selection.hasFormat("strikethrough"),
           code: selection.hasFormat("code"),
+          heading: heading?.getTag() ?? null,
+          link: Boolean(
+            $findMatchingParent(selection.anchor.getNode(), $isLinkNode),
+          ),
         })
       })
     })
@@ -209,8 +234,77 @@ function Toolbar({ disabled }: { disabled?: boolean }) {
     fn(editor)
   }
 
+  const toggleHeading = (tag: HeadingTagType) => {
+    run((ed) => {
+      ed.update(() => {
+        const selection = $getSelection()
+        if (!$isRangeSelection(selection)) return
+        const heading = $findMatchingParent(
+          selection.anchor.getNode(),
+          $isHeadingNode,
+        )
+        if (heading?.getTag() === tag) {
+          $setBlocksType(selection, () => $createParagraphNode())
+          return
+        }
+        $setBlocksType(selection, () => $createHeadingNode(tag))
+      })
+    })
+  }
+
+  const toggleLink = () => {
+    const existing = editor.getEditorState().read(() => {
+      const selection = $getSelection()
+      if (!$isRangeSelection(selection)) return ""
+      return (
+        $findMatchingParent(selection.anchor.getNode(), $isLinkNode)?.getURL() ??
+        ""
+      )
+    })
+    const next = window.prompt("Link URL", existing || "https://")
+    if (next === null) return
+    const url = next.trim()
+    run((ed) => {
+      if (!url) {
+        ed.dispatchCommand(TOGGLE_LINK_COMMAND, null)
+        return
+      }
+      const href = /^(https?:|mailto:|tel:)/i.test(url) ? url : `https://${url}`
+      ed.dispatchCommand(TOGGLE_LINK_COMMAND, {
+        url: href,
+        target: "_blank",
+        rel: "noreferrer",
+      })
+    })
+  }
+
   return (
-    <div className="flex flex-wrap gap-1">
+    <div className="flex flex-wrap items-center gap-1">
+      <ToolbarButton
+        disabled={disabled}
+        active={formats.heading === "h1"}
+        title="Heading 1"
+        onClick={() => toggleHeading("h1")}
+      >
+        <IconH1 className="size-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        disabled={disabled}
+        active={formats.heading === "h2"}
+        title="Heading 2"
+        onClick={() => toggleHeading("h2")}
+      >
+        <IconH2 className="size-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        disabled={disabled}
+        active={formats.heading === "h3"}
+        title="Heading 3"
+        onClick={() => toggleHeading("h3")}
+      >
+        <IconH3 className="size-3.5" />
+      </ToolbarButton>
+      <ToolbarDivider />
       <ToolbarButton
         disabled={disabled}
         active={formats.bold}
@@ -229,12 +323,53 @@ function Toolbar({ disabled }: { disabled?: boolean }) {
       </ToolbarButton>
       <ToolbarButton
         disabled={disabled}
+        active={formats.underline}
+        title="Underline"
+        onClick={() =>
+          run((ed) => ed.dispatchCommand(FORMAT_TEXT_COMMAND, "underline"))
+        }
+      >
+        <IconUnderline className="size-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        disabled={disabled}
+        active={formats.strikethrough}
+        title="Strikethrough"
+        onClick={() =>
+          run((ed) => ed.dispatchCommand(FORMAT_TEXT_COMMAND, "strikethrough"))
+        }
+      >
+        <IconStrikethrough className="size-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        disabled={disabled}
         active={formats.code}
         title="Inline code"
         onClick={() => run((ed) => ed.dispatchCommand(FORMAT_TEXT_COMMAND, "code"))}
       >
         <IconCode className="size-3.5" />
       </ToolbarButton>
+      <ToolbarDivider />
+      <ToolbarButton
+        disabled={disabled}
+        active={formats.link}
+        title="Link"
+        onClick={toggleLink}
+      >
+        <IconLink className="size-3.5" />
+      </ToolbarButton>
+      <ToolbarButton
+        disabled={disabled}
+        title="Divider"
+        onClick={() =>
+          run((ed) =>
+            ed.dispatchCommand(INSERT_HORIZONTAL_RULE_COMMAND, undefined),
+          )
+        }
+      >
+        <IconMinus className="size-3.5" />
+      </ToolbarButton>
+      <ToolbarDivider />
       <ToolbarButton
         disabled={disabled}
         title="Bullet list"
@@ -255,6 +390,10 @@ function Toolbar({ disabled }: { disabled?: boolean }) {
       </ToolbarButton>
     </div>
   )
+}
+
+function ToolbarDivider() {
+  return <span className="mx-0.5 h-4 w-px bg-border" aria-hidden />
 }
 
 function ToolbarButton({
@@ -298,14 +437,14 @@ export function MarkdownNotes({
   const initialConfig = React.useMemo(
     () => ({
       namespace: `standup-notes-${editorId}`,
-      theme: editorTheme,
+      theme: markdownEditorTheme,
       editable: !disabled,
       onError(error: Error) {
         console.error(error)
       },
-      nodes: [HeadingNode, QuoteNode, ListNode, ListItemNode, LinkNode, CodeNode],
+      nodes: markdownEditorNodes,
       editorState: () => {
-        $convertFromMarkdownString(value || "", TRANSFORMERS)
+        $convertFromMarkdownString(value || "", MARKDOWN_TRANSFORMERS)
       },
     }),
     // Mount once per editor instance; external updates sync via effect.

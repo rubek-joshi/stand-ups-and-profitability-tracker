@@ -55,6 +55,7 @@ export type Project = {
   employeeAssignments?: ProjectAssignment[]
   coreMemberAssignments?: CoreMemberAssignment[]
   dashboard?: ProjectDashboard
+  canDelete?: boolean
 }
 
 export type ProjectDashboard = {
@@ -237,6 +238,7 @@ export type EmployeeGroup = {
   id: string
   name: string
   description: string | null
+  standupGuidelines?: string | null
   memberCount?: number
   members?: EmployeeGroupMember[]
   createdAt: string

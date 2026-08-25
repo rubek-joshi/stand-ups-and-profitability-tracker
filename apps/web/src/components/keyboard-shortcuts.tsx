@@ -34,6 +34,7 @@ const STANDUP_SHORTCUTS: Array<{ keys: string[]; description: string }> = [
   { keys: ["Alt", "P"], description: "Mark task in progress" },
   { keys: ["Alt", "T"], description: "Move task to tomorrow" },
   { keys: ["Alt", "Enter"], description: "Mark task complete" },
+  { keys: ["Alt", "G"], description: "Toggle stand-up guidelines" },
 ]
 
 function ShortcutList({

@@ -1,6 +1,7 @@
 import type { UserRole } from "@/lib/types"
 
 export const STAFF_ROLES: UserRole[] = ["super_admin", "admin", "manager"]
+export const AUDIT_ROLES: UserRole[] = ["super_admin", "admin"]
 
 export function homePathForRole(role: string | null | undefined): "/stand-ups" | "/" {
   return role === "standup_taker" ? "/stand-ups" : "/"

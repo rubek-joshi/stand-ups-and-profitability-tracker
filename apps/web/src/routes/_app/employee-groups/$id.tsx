@@ -49,7 +49,10 @@ import {
   TableActionsCell,
   TableActionsHead,
 } from "@/components/table-row-actions"
+import { MarkdownNotes } from "@/components/standup/markdown-notes"
+import { MarkdownPreview } from "@/components/standup/markdown-preview"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 import {
   clampPage,
   DEFAULT_LIST_SEARCH,
@@ -65,6 +68,7 @@ export const Route = createFileRoute("/_app/employee-groups/$id")({
 function EmployeeGroupDetailPage() {
   const { id } = Route.useParams()
   const navigate = Route.useNavigate()
+  const { user } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
   const [group, setGroup] = React.useState<EmployeeGroup | null>(null)
   const [employees, setEmployees] = React.useState<Employee[]>([])
@@ -79,6 +83,9 @@ function EmployeeGroupDetailPage() {
   const [pageSize, setPageSize] = React.useState<PageSize>(25)
   const [loading, setLoading] = React.useState(true)
   const [saving, setSaving] = React.useState(false)
+  const [editingGuidelines, setEditingGuidelines] = React.useState(false)
+  const [guidelinesDraft, setGuidelinesDraft] = React.useState("")
+  const [savingGuidelines, setSavingGuidelines] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
   const load = React.useCallback(async () => {
@@ -92,6 +99,7 @@ function EmployeeGroupDetailPage() {
       setGroup(g.data)
       setName(g.data.name)
       setDescription(g.data.description ?? "")
+      setGuidelinesDraft(g.data.standupGuidelines ?? "")
       setEmployees(emps.data.filter((e) => e.status === "active"))
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load group")
@@ -104,6 +112,7 @@ function EmployeeGroupDetailPage() {
     void load()
     setPage(1)
     setEditing(false)
+    setEditingGuidelines(false)
   }, [load])
 
   const members = group?.members ?? []
@@ -132,6 +141,10 @@ function EmployeeGroupDetailPage() {
     filteredAvailable.length > 0 &&
     filteredAvailable.every((employee) => selectedEmployeeIds.includes(employee.id))
   const pageMembers = members.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const canManageGroup =
+    user?.role === "super_admin" || user?.role === "admin"
+  const hasGuidelines = Boolean(group.standupGuidelines?.trim())
+  const showGuidelinesCard = canManageGroup || hasGuidelines
 
   const startEdit = () => {
     setName(group.name)
@@ -518,6 +531,99 @@ function EmployeeGroupDetailPage() {
           </Card>
         </aside>
       </div>
+
+      {showGuidelinesCard ? (
+        <Card className="mt-6">
+          <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
+            <div className="min-w-0">
+              <CardTitle className="text-base">Stand-up guidelines</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Optional markdown shown on the stand-up page for this group.
+              </p>
+            </div>
+            {canManageGroup && !editingGuidelines ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-8 shrink-0"
+                aria-label={hasGuidelines ? "Edit stand-up guidelines" : "Add stand-up guidelines"}
+                onClick={() => {
+                  setGuidelinesDraft(group.standupGuidelines ?? "")
+                  setEditingGuidelines(true)
+                }}
+              >
+                <IconPencil className="size-4" />
+              </Button>
+            ) : null}
+          </CardHeader>
+          <CardContent>
+            {editingGuidelines ? (
+              <form
+                className="flex flex-col gap-3"
+                onSubmit={async (e) => {
+                  e.preventDefault()
+                  setSavingGuidelines(true)
+                  try {
+                    const res = await api<Envelope<EmployeeGroup>>(
+                      `/employee-groups/${id}`,
+                      {
+                        method: "PATCH",
+                        body: {
+                          standupGuidelines: guidelinesDraft.trim() || null,
+                        },
+                      },
+                    )
+                    setGroup(res.data)
+                    setGuidelinesDraft(res.data.standupGuidelines ?? "")
+                    setEditingGuidelines(false)
+                  } catch (err) {
+                    alert(
+                      err instanceof ApiError
+                        ? err.message
+                        : "Failed to save stand-up guidelines",
+                    )
+                  } finally {
+                    setSavingGuidelines(false)
+                  }
+                }}
+              >
+                <MarkdownNotes
+                  editorKey={`group-guidelines-${id}`}
+                  value={guidelinesDraft}
+                  onChange={setGuidelinesDraft}
+                  disabled={savingGuidelines}
+                  label="Markdown"
+                  placeholder="What this group should cover in stand-up…"
+                />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={savingGuidelines}>
+                    {savingGuidelines ? "Saving…" : "Save guidelines"}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={savingGuidelines}
+                    onClick={() => {
+                      setGuidelinesDraft(group.standupGuidelines ?? "")
+                      setEditingGuidelines(false)
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : hasGuidelines && group.standupGuidelines ? (
+              <MarkdownPreview markdown={group.standupGuidelines} />
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                No stand-up guidelines yet.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {dialog}
     </div>
   )

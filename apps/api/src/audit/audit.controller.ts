@@ -23,7 +23,7 @@ export class AuditController {
 
   @Get()
   @RequirePermission("audit", "read")
-  @ApiOperation({ summary: "List audit logs (super admin)" })
+  @ApiOperation({ summary: "List audit logs (admin and super admin)" })
   @ApiOkResponse()
   async findAll(
     @Query("action") action?: AuditAction,

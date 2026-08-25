@@ -686,59 +686,72 @@ function EmployeeDetailPage() {
                 </p>
               ) : (
                 <ul className="divide-y">
-                  {standupsInRange.slice(0, 8).map((entry) => (
-                    <li
-                      key={entry.id}
-                      className="flex flex-wrap items-center gap-3 py-3 text-sm"
-                    >
-                      <Link
-                        to="/stand-ups/$id"
-                        params={{ id: entry.standup.id }}
-                        className="w-24 shrink-0 font-medium tabular-nums hover:underline"
+                  {standupsInRange.slice(0, 8).map((entry) => {
+                    const taskPreview = (entry.allocations ?? [])
+                      .flatMap((a) => a.tasks ?? [])
+                      .map((t) => t.text.trim())
+                      .filter(Boolean)
+                      .slice(0, 3)
+                      .join(" · ")
+                    const misc = entry.miscellaneousNotes?.trim() ?? ""
+                    return (
+                      <li
+                        key={entry.id}
+                        className="flex items-start gap-3 py-3 text-sm"
                       >
-                        {format(parseISO(toDateKey(entry.standup.date)), "d MMM")}
-                      </Link>
-                      <div className="flex flex-wrap gap-2">
-                        {entry.allocations.length === 0 ? (
-                          <span className="text-xs text-muted-foreground">No projects</span>
-                        ) : (
-                          entry.allocations.map((a) => (
-                            <span
-                              key={a.id}
-                              className="inline-flex items-center gap-2 text-xs text-muted-foreground"
-                            >
-                              <span
-                                className="size-2 rounded-full"
-                                style={{
-                                  background: projectColor(
-                                    a.projectId,
-                                    projectIndex.get(a.projectId) ?? 0,
-                                  ),
-                                }}
-                              />
-                              {a.project?.name ?? a.projectId}
-                              <span className="tabular-nums">{a.percentage}%</span>
+                        <Link
+                          to="/stand-ups/$id"
+                          params={{ id: entry.standup.id }}
+                          className="w-24 shrink-0 pt-0.5 font-medium tabular-nums hover:underline"
+                        >
+                          {format(parseISO(toDateKey(entry.standup.date)), "d MMM")}
+                        </Link>
+                        <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                          <div className="flex flex-wrap gap-2">
+                            {entry.allocations.length === 0 ? (
+                              <span className="text-xs text-muted-foreground">
+                                No projects
+                              </span>
+                            ) : (
+                              entry.allocations.map((a) => (
+                                <span
+                                  key={a.id}
+                                  className="inline-flex items-center gap-2 text-xs text-muted-foreground"
+                                >
+                                  <span
+                                    className="size-2 rounded-full"
+                                    style={{
+                                      background: projectColor(
+                                        a.projectId,
+                                        projectIndex.get(a.projectId) ?? 0,
+                                      ),
+                                    }}
+                                  />
+                                  {a.project?.name ?? a.projectId}
+                                  <span className="tabular-nums">{a.percentage}%</span>
+                                </span>
+                              ))
+                            )}
+                          </div>
+                          {taskPreview ? (
+                            <span className="line-clamp-1 text-muted-foreground">
+                              {taskPreview}
                             </span>
-                          ))
-                        )}
-                      </div>
-                      {(() => {
-                        const taskPreview = (entry.allocations ?? [])
-                          .flatMap((a) => a.tasks ?? [])
-                          .map((t) => t.text.trim())
-                          .filter(Boolean)
-                          .slice(0, 3)
-                          .join(" · ")
-                        const misc = entry.miscellaneousNotes?.trim()
-                        const preview = taskPreview || misc
-                        return preview ? (
-                          <span className="line-clamp-1 text-muted-foreground">
-                            {preview}
-                          </span>
-                        ) : null
-                      })()}
-                    </li>
-                  ))}
+                          ) : null}
+                          {misc ? (
+                            <div className="flex min-w-0 items-center gap-2">
+                              <Badge variant="secondary" className="shrink-0">
+                                Miscellaneous
+                              </Badge>
+                              <span className="line-clamp-1 text-muted-foreground">
+                                {previewPlainText(misc)}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </CardContent>
@@ -1095,6 +1108,13 @@ function EmployeeDetailPage() {
       />
     </div>
   )
+}
+
+function previewPlainText(markdown: string) {
+  return markdown
+    .replace(/[#*_`>~[\]]+/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
 }
 
 function Detail({

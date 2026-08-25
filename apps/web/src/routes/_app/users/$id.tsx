@@ -113,6 +113,7 @@ function UserDetailPage() {
 
   const isSelf = currentUser?.id === id
   const isSuperAdmin = currentUser?.role === "super_admin"
+  const canViewAudit = isSuperAdmin || currentUser?.role === "admin"
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -129,7 +130,7 @@ function UserDetailPage() {
   }, [id])
 
   const loadAudit = React.useCallback(async () => {
-    if (!isSuperAdmin) {
+    if (!canViewAudit) {
       setLogs([])
       setAuditTotal(0)
       setAuditError(null)
@@ -153,7 +154,7 @@ function UserDetailPage() {
             : "Failed to load audit activity",
       )
     }
-  }, [id, isSuperAdmin])
+  }, [id, canViewAudit])
 
   React.useEffect(() => {
     void load()
@@ -310,7 +311,7 @@ function UserDetailPage() {
       />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-        {isSuperAdmin ? (
+        {canViewAudit ? (
           <Card className="min-w-0">
             <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
               <CardTitle className="text-base">Recent activity</CardTitle>

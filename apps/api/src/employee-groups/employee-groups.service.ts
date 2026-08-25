@@ -82,6 +82,7 @@ export class EmployeeGroupsService {
         id: g.id,
         name: g.name,
         description: g.description,
+        standupGuidelines: g.standupGuidelines,
         memberCount: g._count.members,
         createdAt: g.createdAt,
         updatedAt: g.updatedAt,
@@ -115,6 +116,10 @@ export class EmployeeGroupsService {
           dto.description === undefined
             ? undefined
             : dto.description?.trim() || null,
+        standupGuidelines:
+          dto.standupGuidelines === undefined
+            ? undefined
+            : dto.standupGuidelines?.trim() || null,
       },
       include: this.detailInclude(),
     });
@@ -310,6 +315,7 @@ export class EmployeeGroupsService {
       id: group.id,
       name: group.name,
       description: group.description,
+      standupGuidelines: group.standupGuidelines,
       memberCount: group._count.members,
       members: group.members.map((m) => ({
         employeeId: m.employeeId,

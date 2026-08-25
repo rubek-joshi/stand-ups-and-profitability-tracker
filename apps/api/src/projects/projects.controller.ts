@@ -102,6 +102,15 @@ export class ProjectsController {
     return this.projectsService.close(id, user.id);
   }
 
+  @Delete(":id")
+  @RequirePermission("projects", "*")
+  @ApiOperation({
+    summary: "Delete project if it is open and has no stand-up records",
+  })
+  async remove(@Param("id") id: string, @CurrentUser() user: AuthUser) {
+    return this.projectsService.remove(id, user.id);
+  }
+
   @Post(":id/extensions")
   @RequirePermission("projects", "*")
   @ApiOperation({ summary: "Add project extension" })
