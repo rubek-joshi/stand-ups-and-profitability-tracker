@@ -18,9 +18,11 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import { QueuesService } from "../queues/queues.service";
 import {
+  CreateEmergencyContactDto,
   CreateEmployeeDto,
   CreateSalaryEntryDto,
   MarkLeftDto,
+  UpdateEmergencyContactDto,
   UpdateEmployeeDto,
   UpdateSalaryEntryDto,
 } from "./dto/employee.dto";
@@ -151,6 +153,7 @@ export class EmployeesService {
           },
           orderBy: { group: { name: "asc" } },
         },
+        emergencyContacts: { orderBy: { createdAt: "asc" } },
       },
     });
     if (!employee) {
@@ -259,6 +262,73 @@ export class EmployeesService {
       metadata: { before: employee },
     });
     return { id };
+  }
+
+  async createEmergencyContact(
+    employeeId: string,
+    dto: CreateEmergencyContactDto,
+    actorId: string,
+  ) {
+    await this.getOrThrow(employeeId);
+    const contact = await this.prismaService.employeeEmergencyContact.create({
+      data: {
+        employeeId,
+        fullName: dto.fullName.trim(),
+        phoneNumber: dto.phoneNumber.trim(),
+      },
+    });
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.EMPLOYEE_EMERGENCY_CONTACT_CREATED,
+      targetType: "EmployeeEmergencyContact",
+      targetId: contact.id,
+      metadata: { after: contact },
+    });
+    return contact;
+  }
+
+  async updateEmergencyContact(
+    employeeId: string,
+    contactId: string,
+    dto: UpdateEmergencyContactDto,
+    actorId: string,
+  ) {
+    const before = await this.getEmergencyContactOrThrow(employeeId, contactId);
+    const contact = await this.prismaService.employeeEmergencyContact.update({
+      where: { id: contactId },
+      data: {
+        fullName: dto.fullName === undefined ? undefined : dto.fullName.trim(),
+        phoneNumber:
+          dto.phoneNumber === undefined ? undefined : dto.phoneNumber.trim(),
+      },
+    });
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.EMPLOYEE_EMERGENCY_CONTACT_UPDATED,
+      targetType: "EmployeeEmergencyContact",
+      targetId: contact.id,
+      metadata: { before, after: contact },
+    });
+    return contact;
+  }
+
+  async deleteEmergencyContact(
+    employeeId: string,
+    contactId: string,
+    actorId: string,
+  ) {
+    const before = await this.getEmergencyContactOrThrow(employeeId, contactId);
+    await this.prismaService.employeeEmergencyContact.delete({
+      where: { id: contactId },
+    });
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.EMPLOYEE_EMERGENCY_CONTACT_DELETED,
+      targetType: "EmployeeEmergencyContact",
+      targetId: contactId,
+      metadata: { before },
+    });
+    return { id: contactId };
   }
 
   async createSalaryEntry(
@@ -370,6 +440,21 @@ export class EmployeesService {
       throw new NotFoundException(`Salary entry ${entryId} not found`);
     }
     return entry;
+  }
+
+  private async getEmergencyContactOrThrow(
+    employeeId: string,
+    contactId: string,
+  ) {
+    const contact = await this.prismaService.employeeEmergencyContact.findFirst(
+      {
+        where: { id: contactId, employeeId },
+      },
+    );
+    if (!contact) {
+      throw new NotFoundException(`Emergency contact ${contactId} not found`);
+    }
+    return contact;
   }
 
   private serializeEmployee<

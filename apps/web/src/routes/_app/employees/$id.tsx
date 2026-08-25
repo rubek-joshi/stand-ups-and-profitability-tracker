@@ -88,7 +88,11 @@ import {
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import { formatNpr, paisaToNpr, parseNprInput } from "@/lib/money"
-import type { Employee, SalaryEntry } from "@/lib/types"
+import type {
+  Employee,
+  EmployeeEmergencyContact,
+  SalaryEntry,
+} from "@/lib/types"
 
 export const Route = createFileRoute("/_app/employees/$id")({
   component: EmployeeDetailPage,
@@ -106,6 +110,16 @@ const emptySalaryForm = (): SalaryForm => ({
   salaryNpr: "",
   effectiveDate: new Date().toISOString().slice(0, 10),
   reason: "",
+})
+
+type EmergencyContactForm = {
+  fullName: string
+  phoneNumber: string
+}
+
+const emptyEmergencyContactForm = (): EmergencyContactForm => ({
+  fullName: "",
+  phoneNumber: "",
 })
 
 function presetsFor(today: Date): Array<{ id: PresetId; label: string; range: () => DateRange }> {
@@ -178,6 +192,11 @@ function EmployeeDetailPage() {
   const [salaryOpen, setSalaryOpen] = React.useState(false)
   const [editingEntry, setEditingEntry] = React.useState<SalaryEntry | null>(null)
   const [salaryForm, setSalaryForm] = React.useState<SalaryForm>(emptySalaryForm)
+  const [emergencyContactOpen, setEmergencyContactOpen] = React.useState(false)
+  const [editingEmergencyContact, setEditingEmergencyContact] =
+    React.useState<EmployeeEmergencyContact | null>(null)
+  const [emergencyContactForm, setEmergencyContactForm] =
+    React.useState<EmergencyContactForm>(emptyEmergencyContactForm)
 
   const today = React.useMemo(() => startOfDay(new Date()), [])
   const presets = React.useMemo(() => presetsFor(today), [today])
@@ -186,18 +205,30 @@ function EmployeeDetailPage() {
     presetsFor(startOfDay(new Date()))[0]!.range(),
   )
 
+  const fetchEmployee = React.useCallback(async () => {
+    const res = await api<Envelope<Employee>>(`/employees/${id}`)
+    setEmployee(res.data)
+  }, [id])
+
   const load = React.useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await api<Envelope<Employee>>(`/employees/${id}`)
-      setEmployee(res.data)
+      await fetchEmployee()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load")
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [fetchEmployee])
+
+  const refresh = React.useCallback(async () => {
+    try {
+      await fetchEmployee()
+    } catch (e) {
+      alert(e instanceof ApiError ? e.message : "Failed to refresh employee")
+    }
+  }, [fetchEmployee])
 
   React.useEffect(() => {
     void load()
@@ -217,6 +248,21 @@ function EmployeeDetailPage() {
       reason: entry.reason ?? "",
     })
     setSalaryOpen(true)
+  }
+
+  const openCreateEmergencyContact = () => {
+    setEditingEmergencyContact(null)
+    setEmergencyContactForm(emptyEmergencyContactForm())
+    setEmergencyContactOpen(true)
+  }
+
+  const openEditEmergencyContact = (contact: EmployeeEmergencyContact) => {
+    setEditingEmergencyContact(contact)
+    setEmergencyContactForm({
+      fullName: contact.fullName,
+      phoneNumber: contact.phoneNumber,
+    })
+    setEmergencyContactOpen(true)
   }
 
   const interval = React.useMemo(() => {
@@ -304,6 +350,7 @@ function EmployeeDetailPage() {
   const activeProjects = new Set(involvementEntries.map((e) => e.projectId)).size
   const totalAllocation = involvementEntries.reduce((sum, e) => sum + e.percentage, 0)
   const activeAssignments = (employee.assignments ?? []).filter((a) => !a.unassignedAt)
+  const emergencyContacts = employee.emergencyContacts ?? []
 
   const stats = [
     {
@@ -612,7 +659,7 @@ function EmployeeDetailPage() {
                                   `/employees/${id}/salary-entries/${entry.id}`,
                                   { method: "DELETE" },
                                 )
-                                await load()
+                                await refresh()
                               }}
                             >
                               <IconTrash className="size-3.5" />
@@ -761,6 +808,70 @@ function EmployeeDetailPage() {
                 ) : null}
               </div>
 
+              <Separator />
+              <div>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground">
+                    Emergency contacts
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={openCreateEmergencyContact}
+                  >
+                    Add
+                  </Button>
+                </div>
+                {emergencyContacts.length === 0 ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    No emergency contacts
+                  </p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {emergencyContacts.map((contact) => (
+                      <li
+                        key={contact.id}
+                        className="flex items-start justify-between gap-2 rounded-md border p-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{contact.fullName}</p>
+                          <TelLink value={contact.phoneNumber} withCopy="hover" />
+                        </div>
+                        <div className="flex shrink-0 items-center gap-0.5">
+                          <TableActionButton
+                            label="Edit emergency contact"
+                            onClick={() => openEditEmergencyContact(contact)}
+                          >
+                            <IconPencil className="size-3.5" />
+                          </TableActionButton>
+                          <TableActionButton
+                            label="Delete emergency contact"
+                            variant="destructive"
+                            onClick={async () => {
+                              const ok = await confirm({
+                                title: "Delete emergency contact?",
+                                description: `${contact.fullName} will be removed from this employee.`,
+                                confirmLabel: "Delete",
+                                destructive: true,
+                              })
+                              if (!ok) return
+                              await api(
+                                `/employees/${id}/emergency-contacts/${contact.id}`,
+                                { method: "DELETE" },
+                              )
+                              await refresh()
+                            }}
+                          >
+                            <IconTrash className="size-3.5" />
+                          </TableActionButton>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
               {activeAssignments.length > 0 ? (
                 <>
                   <Separator />
@@ -789,6 +900,97 @@ function EmployeeDetailPage() {
         </aside>
       </div>
       {dialog}
+      <Dialog
+        open={emergencyContactOpen}
+        onOpenChange={(open) => {
+          setEmergencyContactOpen(open)
+          if (!open) setEditingEmergencyContact(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingEmergencyContact
+                ? "Edit emergency contact"
+                : "Add emergency contact"}
+            </DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              const body = {
+                fullName: emergencyContactForm.fullName.trim(),
+                phoneNumber: emergencyContactForm.phoneNumber.trim(),
+              }
+              try {
+                if (editingEmergencyContact) {
+                  await api(
+                    `/employees/${id}/emergency-contacts/${editingEmergencyContact.id}`,
+                    { method: "PATCH", body },
+                  )
+                } else {
+                  await api(`/employees/${id}/emergency-contacts`, {
+                    method: "POST",
+                    body,
+                  })
+                }
+                setEmergencyContactOpen(false)
+                setEditingEmergencyContact(null)
+                await refresh()
+              } catch (caughtError) {
+                alert(
+                  caughtError instanceof ApiError
+                    ? caughtError.message
+                    : "Failed to save emergency contact",
+                )
+              }
+            }}
+          >
+            <div className="space-y-2">
+              <Label>Full name</Label>
+              <Input
+                required
+                maxLength={200}
+                value={emergencyContactForm.fullName}
+                onChange={(event) =>
+                  setEmergencyContactForm((form) => ({
+                    ...form,
+                    fullName: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Phone number</Label>
+              <Input
+                type="tel"
+                required
+                maxLength={40}
+                value={emergencyContactForm.phoneNumber}
+                onChange={(event) =>
+                  setEmergencyContactForm((form) => ({
+                    ...form,
+                    phoneNumber: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEmergencyContactOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit">
+                {editingEmergencyContact ? "Save contact" : "Add contact"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={salaryOpen}
         onOpenChange={(open) => {
@@ -832,7 +1034,7 @@ function EmployeeDetailPage() {
               }
               setSalaryOpen(false)
               setEditingEntry(null)
-              await load()
+              await refresh()
             }}
           >
             <div className="space-y-2">
@@ -884,7 +1086,7 @@ function EmployeeDetailPage() {
               method: "POST",
               body: { dateLeft },
             })
-            await load()
+            await refresh()
           } catch (e) {
             alert(e instanceof ApiError ? e.message : "Failed to mark left")
             throw e

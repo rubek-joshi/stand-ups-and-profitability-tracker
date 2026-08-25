@@ -164,6 +164,7 @@ export type Employee = {
   dateOfBirth?: string | null
   dateLeft: string | null
   salaryEntries?: SalaryEntry[]
+  emergencyContacts?: EmployeeEmergencyContact[]
   attendanceSummary?: {
     firstHalfLeave: number
     secondHalfLeave: number
@@ -197,6 +198,14 @@ export type Employee = {
     }>
   }>
   groups?: Array<{ id: string; name: string }>
+}
+
+export type EmployeeEmergencyContact = {
+  id: string
+  fullName: string
+  phoneNumber: string
+  createdAt: string
+  updatedAt: string
 }
 
 export type StandupScopePreference = "ask" | "everyone" | "group"

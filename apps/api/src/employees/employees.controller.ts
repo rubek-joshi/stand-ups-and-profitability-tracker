@@ -16,9 +16,11 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
 import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import {
+  CreateEmergencyContactDto,
   CreateEmployeeDto,
   CreateSalaryEntryDto,
   MarkLeftDto,
+  UpdateEmergencyContactDto,
   UpdateEmployeeDto,
   UpdateSalaryEntryDto,
 } from "./dto/employee.dto";
@@ -86,6 +88,49 @@ export class EmployeesController {
   @ApiOperation({ summary: "Delete employee if no history" })
   async remove(@Param("id") id: string, @CurrentUser() user: AuthUser) {
     return this.employeesService.remove(id, user.id);
+  }
+
+  @Post(":id/emergency-contacts")
+  @RequirePermission("employees", "*")
+  @ApiOperation({ summary: "Create employee emergency contact" })
+  async createEmergencyContact(
+    @Param("id") id: string,
+    @Body() dto: CreateEmergencyContactDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.employeesService.createEmergencyContact(id, dto, user.id);
+  }
+
+  @Patch(":id/emergency-contacts/:contactId")
+  @RequirePermission("employees", "*")
+  @ApiOperation({ summary: "Update employee emergency contact" })
+  async updateEmergencyContact(
+    @Param("id") id: string,
+    @Param("contactId") contactId: string,
+    @Body() dto: UpdateEmergencyContactDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.employeesService.updateEmergencyContact(
+      id,
+      contactId,
+      dto,
+      user.id,
+    );
+  }
+
+  @Delete(":id/emergency-contacts/:contactId")
+  @RequirePermission("employees", "*")
+  @ApiOperation({ summary: "Delete employee emergency contact" })
+  async deleteEmergencyContact(
+    @Param("id") id: string,
+    @Param("contactId") contactId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.employeesService.deleteEmergencyContact(
+      id,
+      contactId,
+      user.id,
+    );
   }
 
   @Post(":id/salary-entries")

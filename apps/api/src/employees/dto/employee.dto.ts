@@ -88,6 +88,36 @@ export class UpdateEmployeeDto {
   dateOfBirth?: string | null;
 }
 
+export class CreateEmergencyContactDto {
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  fullName!: string;
+
+  @ApiProperty()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  phoneNumber!: string;
+}
+
+export class UpdateEmergencyContactDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  fullName?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(40)
+  phoneNumber?: string;
+}
+
 export class MarkLeftDto {
   @ApiProperty({ example: "2026-08-01" })
   @IsDateString()

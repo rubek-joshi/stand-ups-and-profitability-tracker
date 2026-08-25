@@ -108,6 +108,9 @@ enum AuditAction {
   EMPLOYEE_SALARY_CREATED
   EMPLOYEE_SALARY_UPDATED
   EMPLOYEE_SALARY_DELETED
+  EMPLOYEE_EMERGENCY_CONTACT_CREATED
+  EMPLOYEE_EMERGENCY_CONTACT_UPDATED
+  EMPLOYEE_EMERGENCY_CONTACT_DELETED
   CORE_MEMBER_CREATED
   CORE_MEMBER_UPDATED
   CORE_MEMBER_MARKED_LEFT
@@ -374,8 +377,23 @@ model Employee {
   attendanceRecords AttendanceRecord[]
   standupEntries    StandupEntry[]
   groupMemberships  EmployeeGroupMember[]
+  emergencyContacts EmployeeEmergencyContact[]
 
   @@map("employees")
+}
+
+model EmployeeEmergencyContact {
+  id          String   @id @default(cuid())
+  employeeId  String
+  fullName    String
+  phoneNumber String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId])
+  @@map("employee_emergency_contacts")
 }
 
 model EmployeeGroup {
