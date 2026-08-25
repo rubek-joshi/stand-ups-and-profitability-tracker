@@ -55,15 +55,16 @@ pnpm docker:up
 # or: docker compose up -d
 ```
 
-4. Install, migrate, seed, and build:
+4. Install, migrate, build, and seed:
 
 ```bash
 pnpm install
-pnpm db:generate
 pnpm db:deploy
-pnpm db:seed
 pnpm turbo build --filter=@workspace/api --filter=web
+pnpm db:seed
 ```
+
+The database package build generates the Prisma client before the API build.
 
 5. Start the API with PM2:
 
@@ -181,10 +182,11 @@ chmod +x scripts/deploy.sh
 2. `git pull --ff-only`
 3. `docker compose up -d` and wait for healthy Postgres/Redis
 4. `pnpm install --frozen-lockfile`
-5. Prisma generate, migrate deploy, and seed
-6. Build API + web (web is always rebuilt so a stale `VITE_API_URL` cannot bake `localhost:4101` into the bundle)
-7. Publish the web build to `/var/www/tracker`
-8. Restart PM2 via `ecosystem.config.cjs`
+5. Apply Prisma migrations
+6. Build the database package, API, and web together; the database build generates Prisma once
+7. Seed the database
+8. Publish the web build to `/var/www/tracker`
+9. Restart PM2 via `ecosystem.config.cjs`
 
 ## Logs and rollback
 

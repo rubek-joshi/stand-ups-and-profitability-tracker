@@ -11,6 +11,12 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+# Docker Compose, readiness checks, Turbo, and deployment probes share this env.
+set -a
+# shellcheck source=/dev/null
+source "$ROOT_DIR/.env"
+set +a
+
 if [[ -n "$(git status --porcelain)" ]]; then
   echo "Working tree is dirty. Commit or stash changes before deploying."
   exit 1
@@ -35,32 +41,20 @@ done
 echo "==> Installing dependencies"
 pnpm install --frozen-lockfile
 
-echo "==> Generating Prisma client"
-pnpm db:generate
-
 echo "==> Applying migrations"
 pnpm db:deploy
 
-echo "==> Seeding database"
-pnpm db:seed
-
-# Vite inlines VITE_* at build time from the root .env (see apps/web vite envDir).
-set -a
-# shellcheck source=/dev/null
-source "$ROOT_DIR/.env"
-set +a
-
-echo "==> Building API"
-rm -rf apps/api/dist
-pnpm turbo build --filter=@workspace/api --force
+echo "==> Building API and web"
+# The database dependency build generates Prisma once before the API build.
+rm -rf apps/api/dist apps/web/dist apps/web/.output
+pnpm turbo build --filter=@workspace/api --filter=web --force
 if [[ ! -f apps/api/dist/main.js ]]; then
   echo "ERROR: API build did not emit dist/main.js."
   exit 1
 fi
 
-echo "==> Building web (forced; browser calls same-origin /api, Vite/Nginx strip the prefix)"
-rm -rf apps/web/dist apps/web/.output
-pnpm turbo build --filter=web --force
+echo "==> Seeding database"
+pnpm db:seed
 
 if [[ -d apps/web/dist/client ]]; then
   WEB_DIST="apps/web/dist/client"
@@ -115,10 +109,10 @@ pm2 save
 # strip the prefix (proxy_pass ...4101/;). If it falls through to index.html,
 # the frontend parses HTML as JSON (marginPct undefined, .map is not a function).
 if command -v curl >/dev/null 2>&1 && [[ -n "${CORS_ORIGIN:-}" ]]; then
-  sleep 3
   PROBE_URL="${CORS_ORIGIN%/}/api/clients"
-  PROBE_BODY="$(curl -sS "$PROBE_URL" || true)"
-  PROBE_CT="$(curl -sS -o /dev/null -w '%{content_type}' "$PROBE_URL" || true)"
+  PROBE_RESPONSE="$(curl -sS -w $'\n%{content_type}' "$PROBE_URL" || true)"
+  PROBE_CT="${PROBE_RESPONSE##*$'\n'}"
+  PROBE_BODY="${PROBE_RESPONSE%$'\n'*}"
   if echo "$PROBE_BODY" | grep -q 'Cannot GET /api/clients'; then
     echo "WARNING: $PROBE_URL reached Nest without stripping /api."
     echo "         Use: location /api/ { proxy_pass http://127.0.0.1:4101/; }"

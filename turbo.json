@@ -32,7 +32,7 @@
       "cache": false
     },
     "build": {
-      "dependsOn": ["^build", "^db:generate"],
+      "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env*", "$TURBO_ROOT$/.env"],
       "outputs": [".output/**", "dist/**"]
     },
@@ -43,7 +43,7 @@
       "dependsOn": ["^format"]
     },
     "typecheck": {
-      "dependsOn": ["^typecheck", "^db:generate"]
+      "dependsOn": ["^typecheck"]
     },
     "dev": {
       "dependsOn": ["^db:generate"],
