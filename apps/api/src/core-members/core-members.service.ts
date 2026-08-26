@@ -72,7 +72,7 @@ export class CoreMembersService {
 
   async findAll() {
     const members = await this.prismaService.coreMember.findMany({
-      orderBy: { name: "asc" },
+      orderBy: [{ status: "asc" }, { name: "asc" }],
       include: {
         salaryEntries: { orderBy: { effectiveDate: "desc" }, take: 1 },
       },

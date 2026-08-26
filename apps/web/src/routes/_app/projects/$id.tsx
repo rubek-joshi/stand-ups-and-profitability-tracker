@@ -25,6 +25,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -218,6 +219,16 @@ function ProjectDetailPage() {
     string[]
   >([])
   const [addingCoreMembers, setAddingCoreMembers] = React.useState(false)
+  const [coreAssignedFrom, setCoreAssignedFrom] = React.useState(() =>
+    toIsoDateInput(new Date()),
+  )
+  const [coreLastDay, setCoreLastDay] = React.useState("")
+  const [releaseAssignment, setReleaseAssignment] =
+    React.useState<CoreMemberAssignment | null>(null)
+  const [releaseDate, setReleaseDate] = React.useState(() =>
+    toIsoDateInput(new Date()),
+  )
+  const [releasing, setReleasing] = React.useState(false)
   const [amcCreateOpen, setAmcCreateOpen] = React.useState(false)
   const [extensionOpen, setExtensionOpen] = React.useState(false)
   const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
@@ -246,7 +257,7 @@ function ProjectDetailPage() {
       setProject(p.data)
       setAssignments(a.data)
       setEmployees(emps.data.filter((employee) => employee.status === "active"))
-      setCoreMembers(cores.data.filter((member) => member.status === "active"))
+      setCoreMembers(cores.data)
       try {
         const amcRes = await api<Envelope<AmcRecord[]>>(`/amc/projects/${id}`)
         setAmcs(amcRes.data)
@@ -274,8 +285,12 @@ function ProjectDetailPage() {
   const dashboard = project.dashboard
   const summary = dashboard?.summary
   const laborSeries = dashboard?.laborSeries ?? []
-  const canManageAssignments =
+  const canManageEmployeeAssignments =
     project.status !== "closed" && project.status !== "under_amc"
+  const canManageAssignments = canManageEmployeeAssignments
+  const projectNeedsCoreEndDate =
+    project.status === "closed" || project.status === "under_amc"
+  const todayIso = toIsoDateInput(new Date())
   const canDeleteProject = Boolean(project.canDelete)
   const assignedEmployeeIds = new Set(
     assignments.employees
@@ -356,9 +371,17 @@ function ProjectDetailPage() {
   }
 
   const openAddCoreMembers = () => {
+    const today = toIsoDateInput(new Date())
     setCoreMemberQuery("")
     setSelectedCoreMemberIds([])
+    setCoreAssignedFrom(today)
+    setCoreLastDay(projectNeedsCoreEndDate ? today : "")
     setCoreMemberAddOpen(true)
+  }
+
+  const openReleaseCoreMember = (assignment: CoreMemberAssignment) => {
+    setReleaseAssignment(assignment)
+    setReleaseDate(toIsoDateInput(new Date()))
   }
 
   const toggleEmployee = (employeeId: string, checked: boolean) => {
@@ -880,10 +903,7 @@ function ProjectDetailPage() {
                     </p>
                   </div>
                   <Button
-                    disabled={
-                      !canManageAssignments ||
-                      availableCoreMembers.length === 0
-                    }
+                    disabled={availableCoreMembers.length === 0}
                     onClick={openAddCoreMembers}
                   >
                     <IconUserPlus className="size-3.5" />
@@ -898,8 +918,52 @@ function ProjectDetailPage() {
                     <DialogContent className="sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle>Add core members to project</DialogTitle>
+                        <DialogDescription>
+                          Assigned from is required. Last day assigned is
+                          inclusive; leave it blank if they are still on the
+                          project
+                          {projectNeedsCoreEndDate
+                            ? ". Closed projects require a last day."
+                            : "."}
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-2">
+                            <Label htmlFor="core-assigned-from">
+                              Assigned from
+                            </Label>
+                            <Input
+                              id="core-assigned-from"
+                              type="date"
+                              required
+                              max={todayIso}
+                              value={coreAssignedFrom}
+                              onChange={(e) =>
+                                setCoreAssignedFrom(e.target.value)
+                              }
+                            />
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="core-last-day">
+                              Last day assigned
+                            </Label>
+                            <Input
+                              id="core-last-day"
+                              type="date"
+                              required={projectNeedsCoreEndDate}
+                              min={coreAssignedFrom}
+                              max={todayIso}
+                              value={coreLastDay}
+                              onChange={(e) => setCoreLastDay(e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {projectNeedsCoreEndDate
+                                ? "Required for closed projects."
+                                : "Optional. Omit if still assigned."}
+                            </p>
+                          </div>
+                        </div>
                         <Input
                           value={coreMemberQuery}
                           onChange={(e) => setCoreMemberQuery(e.target.value)}
@@ -922,7 +986,7 @@ function ProjectDetailPage() {
                           {filteredAvailableCoreMembers.length === 0 ? (
                             <p className="py-6 text-center text-sm text-muted-foreground">
                               {availableCoreMembers.length === 0
-                                ? "All active core members are already assigned to this project."
+                                ? "Everyone with an open assignment on this project is already listed above."
                                 : "No core members match your search."}
                             </p>
                           ) : (
@@ -943,8 +1007,13 @@ function ProjectDetailPage() {
                                   }
                                 />
                                 <span className="min-w-0">
-                                  <span className="block text-sm font-medium">
-                                    {member.name}
+                                  <span className="flex items-center gap-2">
+                                    <span className="block text-sm font-medium">
+                                      {member.name}
+                                    </span>
+                                    {member.status === "left" ? (
+                                      <Badge variant="outline">Left</Badge>
+                                    ) : null}
                                   </span>
                                   <span className="block text-xs text-muted-foreground">
                                     {member.email}
@@ -969,6 +1038,22 @@ function ProjectDetailPage() {
                             addingCoreMembers
                           }
                           onClick={async () => {
+                            if (!coreAssignedFrom) {
+                              alert("Assigned from date is required")
+                              return
+                            }
+                            if (projectNeedsCoreEndDate && !coreLastDay) {
+                              alert(
+                                "Last day assigned is required for closed projects",
+                              )
+                              return
+                            }
+                            if (coreLastDay && coreLastDay < coreAssignedFrom) {
+                              alert(
+                                "Last day assigned must be on or after the assigned-from date",
+                              )
+                              return
+                            }
                             setAddingCoreMembers(true)
                             try {
                               await api(
@@ -977,6 +1062,8 @@ function ProjectDetailPage() {
                                   method: "POST",
                                   body: {
                                     coreMemberIds: selectedCoreMemberIds,
+                                    assignedAt: coreAssignedFrom,
+                                    unassignedAt: coreLastDay || undefined,
                                   },
                                 }
                               )
@@ -1000,6 +1087,96 @@ function ProjectDetailPage() {
                             : `Add ${selectedCoreMemberIds.length || ""} core member${selectedCoreMemberIds.length === 1 ? "" : "s"}`.trim()}
                         </Button>
                       </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog
+                    open={releaseAssignment !== null}
+                    onOpenChange={(open) => {
+                      if (!open) setReleaseAssignment(null)
+                    }}
+                  >
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Release core member</DialogTitle>
+                        <DialogDescription>
+                          {releaseAssignment
+                            ? `Set the last day ${releaseAssignment.coreMember?.name ?? "this core member"} is assigned. That day is included in cost.`
+                            : "Set the last day assigned. That day is included in cost."}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form
+                        className="space-y-2"
+                        onSubmit={async (e) => {
+                          e.preventDefault()
+                          if (!releaseAssignment || !releaseDate) return
+                          const assignedDay = String(
+                            releaseAssignment.assignedAt,
+                          ).slice(0, 10)
+                          if (releaseDate < assignedDay) {
+                            alert(
+                              "Last day assigned must be on or after the assigned-from date",
+                            )
+                            return
+                          }
+                          setReleasing(true)
+                          try {
+                            await api(
+                              `/projects/${id}/assignments/core-members/${releaseAssignment.coreMemberId}`,
+                              {
+                                method: "DELETE",
+                                body: { unassignedAt: releaseDate },
+                              },
+                            )
+                            setReleaseAssignment(null)
+                            await load()
+                          } catch (err) {
+                            alert(
+                              err instanceof ApiError
+                                ? err.message
+                                : "Failed to release core member",
+                            )
+                          } finally {
+                            setReleasing(false)
+                          }
+                        }}
+                      >
+                        <Label htmlFor="core-release-date">
+                          Last day assigned
+                        </Label>
+                        <Input
+                          id="core-release-date"
+                          type="date"
+                          required
+                          min={
+                            releaseAssignment
+                              ? String(releaseAssignment.assignedAt).slice(
+                                  0,
+                                  10,
+                                )
+                              : undefined
+                          }
+                          max={todayIso}
+                          value={releaseDate}
+                          onChange={(e) => setReleaseDate(e.target.value)}
+                        />
+                        <DialogFooter className="pt-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={releasing}
+                            onClick={() => setReleaseAssignment(null)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={releasing || !releaseDate}
+                          >
+                            {releasing ? "Releasing…" : "Release"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
                     </DialogContent>
                   </Dialog>
 
@@ -1034,13 +1211,9 @@ function ProjectDetailPage() {
                               variant="outline"
                               size="sm"
                               className="mt-4 w-full"
-                              onClick={async () => {
-                                await api(
-                                  `/projects/${id}/assignments/core-members/${assignment.coreMemberId}`,
-                                  { method: "DELETE" }
-                                )
-                                await load()
-                              }}
+                              onClick={() =>
+                                openReleaseCoreMember(assignment)
+                              }
                             >
                               <IconUserMinus className="size-3.5" />
                               Release
@@ -1102,13 +1275,9 @@ function ProjectDetailPage() {
                                 <TableActionButton
                                   label="Unassign"
                                   variant="destructive"
-                                  onClick={async () => {
-                                    await api(
-                                      `/projects/${id}/assignments/core-members/${assignment.coreMemberId}`,
-                                      { method: "DELETE" }
-                                    )
-                                    await load()
-                                  }}
+                                  onClick={() =>
+                                    openReleaseCoreMember(assignment)
+                                  }
                                 >
                                   <IconUserMinus className="size-3.5" />
                                 </TableActionButton>

@@ -125,6 +125,18 @@ export class AssignCoreMemberDto {
   @IsString()
   @IsNotEmpty()
   coreMemberId!: string;
+
+  @ApiProperty({ example: "2026-01-15", description: "First day assigned" })
+  @IsDateString()
+  assignedAt!: string;
+
+  @ApiPropertyOptional({
+    example: "2026-06-30",
+    description: "Last day assigned (inclusive). Omit if still assigned.",
+  })
+  @IsOptional()
+  @IsDateString()
+  unassignedAt?: string;
 }
 
 export class AssignCoreMembersBulkDto {
@@ -133,6 +145,28 @@ export class AssignCoreMembersBulkDto {
   @ArrayMinSize(1)
   @IsString({ each: true })
   coreMemberIds!: string[];
+
+  @ApiProperty({ example: "2026-01-15", description: "First day assigned" })
+  @IsDateString()
+  assignedAt!: string;
+
+  @ApiPropertyOptional({
+    example: "2026-06-30",
+    description: "Last day assigned (inclusive). Omit if still assigned.",
+  })
+  @IsOptional()
+  @IsDateString()
+  unassignedAt?: string;
+}
+
+export class UnassignCoreMemberDto {
+  @ApiPropertyOptional({
+    example: "2026-06-30",
+    description: "Last day assigned (inclusive). Defaults to today.",
+  })
+  @IsOptional()
+  @IsDateString()
+  unassignedAt?: string;
 }
 
 export class CreateExtensionDto {

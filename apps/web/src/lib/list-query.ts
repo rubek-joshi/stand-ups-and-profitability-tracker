@@ -34,6 +34,12 @@ export function parseOptionalString(value: unknown): string | undefined {
   return trimmed ? trimmed : undefined
 }
 
+export type SortDir = "asc" | "desc"
+
+export function parseSortDir(value: unknown): SortDir | undefined {
+  return value === "asc" || value === "desc" ? value : undefined
+}
+
 /** Shared list URL search defaults (q optional). */
 export function parseListSearch(search: Record<string, unknown>): ListSearch {
   return {

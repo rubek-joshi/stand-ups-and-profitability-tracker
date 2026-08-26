@@ -30,6 +30,20 @@ export function assignmentCoversDate(
   return toIsoDate(unassignedAt) >= day;
 }
 
+/** Inclusive calendar overlap. A null end is treated as still open. */
+export function assignmentPeriodsOverlap(
+  aAssignedAt: Date,
+  aUnassignedAt: Date | null,
+  bAssignedAt: Date,
+  bUnassignedAt: Date | null,
+): boolean {
+  const a1 = toIsoDate(aAssignedAt);
+  const a2 = aUnassignedAt ? toIsoDate(aUnassignedAt) : "9999-12-31";
+  const b1 = toIsoDate(bAssignedAt);
+  const b2 = bUnassignedAt ? toIsoDate(bUnassignedAt) : "9999-12-31";
+  return a1 <= b2 && b1 <= a2;
+}
+
 /** Calendar day immediately before the given date (UTC). */
 export function dayBefore(date: Date): Date {
   const day = parseIsoDate(toIsoDate(date));

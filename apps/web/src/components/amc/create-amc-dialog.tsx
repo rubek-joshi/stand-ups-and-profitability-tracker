@@ -24,7 +24,9 @@ import { addMonths } from "@/lib/amc"
 import { parseNprInput } from "@/lib/money"
 import type { AmcRecord, AmcType, Project } from "@/lib/types"
 
-const DURATIONS = [3, 6, 12, 24]
+const DURATION_PRESETS = [3, 6, 12, 24] as const
+
+type DurationPreset = (typeof DURATION_PRESETS)[number] | "custom"
 
 type ProjectOption = Pick<Project, "id" | "name" | "status"> & {
   client?: { id: string; name: string } | null
@@ -49,10 +51,16 @@ export function CreateAmcDialog({
   const [error, setError] = React.useState<string | null>(null)
   const [projectId, setProjectId] = React.useState(presetProjectId ?? "")
   const [type, setType] = React.useState<AmcType>("complimentary")
-  const [months, setMonths] = React.useState("12")
+  const [durationPreset, setDurationPreset] =
+    React.useState<DurationPreset>(12)
+  const [months, setMonths] = React.useState(12)
   const [startDate, setStartDate] = React.useState(
     () => new Date().toISOString().slice(0, 10),
   )
+  const [endDate, setEndDate] = React.useState(() =>
+    addMonths(new Date().toISOString().slice(0, 10), 12),
+  )
+  const [customEnd, setCustomEnd] = React.useState(false)
   const [value, setValue] = React.useState("")
   const [notes, setNotes] = React.useState("")
   const [isVatApplicable, setIsVatApplicable] = React.useState(true)
@@ -62,8 +70,12 @@ export function CreateAmcDialog({
     setError(null)
     setProjectId(presetProjectId ?? "")
     setType("complimentary")
-    setMonths("12")
-    setStartDate(new Date().toISOString().slice(0, 10))
+    setDurationPreset(12)
+    setMonths(12)
+    const today = new Date().toISOString().slice(0, 10)
+    setStartDate(today)
+    setEndDate(addMonths(today, 12))
+    setCustomEnd(false)
     setValue("")
     setNotes("")
     setIsVatApplicable(true)
@@ -105,7 +117,20 @@ export function CreateAmcDialog({
     [projects],
   )
 
-  const endDate = addMonths(startDate, Number(months))
+  const applyPreset = (presetMonths: number) => {
+    setDurationPreset(presetMonths as DurationPreset)
+    setMonths(presetMonths)
+    setCustomEnd(false)
+    setEndDate(addMonths(startDate, presetMonths))
+  }
+
+  const applyCustomMonths = (nextMonths: number) => {
+    const safe = Number.isFinite(nextMonths) ? Math.max(1, nextMonths) : 1
+    setDurationPreset("custom")
+    setMonths(safe)
+    setCustomEnd(false)
+    setEndDate(addMonths(startDate, safe))
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -123,6 +148,10 @@ export function CreateAmcDialog({
             e.preventDefault()
             if (!projectId) {
               setError("Pick a project first")
+              return
+            }
+            if (!endDate || endDate < startDate) {
+              setError("End date must be on or after start date")
               return
             }
             setSaving(true)
@@ -203,7 +232,7 @@ export function CreateAmcDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="amc-start">Start date</Label>
               <Input
@@ -211,30 +240,79 @@ export function CreateAmcDialog({
                 type="date"
                 required
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(e) => {
+                  const next = e.target.value
+                  setStartDate(next)
+                  if (!customEnd) {
+                    setEndDate(addMonths(next, months))
+                  }
+                }}
               />
             </div>
             <div className="grid gap-2">
               <Label>Duration</Label>
-              <Select
-                value={months}
-                onValueChange={(v) => setMonths(v ?? "12")}
-                items={Object.fromEntries(
-                  DURATIONS.map((m) => [String(m), `${m} months`]),
-                )}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {DURATIONS.map((m) => (
-                    <SelectItem key={m} value={String(m)}>
-                      {m} months
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">Ends {endDate}</p>
+              <div className="flex flex-wrap gap-2">
+                {DURATION_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => applyPreset(preset)}
+                    className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                      durationPreset === preset
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {preset} months
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setDurationPreset("custom")}
+                  className={`rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                    durationPreset === "custom"
+                      ? "border-primary bg-primary/10 text-primary"
+                      : "border-border bg-card text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  Custom
+                </button>
+              </div>
+              {durationPreset === "custom" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="grid gap-2">
+                    <Label htmlFor="amc-months">Months</Label>
+                    <Input
+                      id="amc-months"
+                      type="number"
+                      min={1}
+                      step={1}
+                      required
+                      value={months}
+                      onChange={(e) =>
+                        applyCustomMonths(Number.parseInt(e.target.value, 10))
+                      }
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="amc-end">End date</Label>
+                    <Input
+                      id="amc-end"
+                      type="date"
+                      required
+                      min={startDate}
+                      value={endDate}
+                      onChange={(e) => {
+                        setDurationPreset("custom")
+                        setCustomEnd(true)
+                        setEndDate(e.target.value)
+                      }}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">Ends {endDate}</p>
+              )}
             </div>
           </div>
 

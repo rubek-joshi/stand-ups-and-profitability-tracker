@@ -85,7 +85,9 @@ function StatCard({
       <CardContent>
         <div className="flex items-center gap-2 text-muted-foreground">
           <Icon className="size-4" />
-          <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+          <span className="text-xs font-medium tracking-wide uppercase">
+            {label}
+          </span>
         </div>
         <p className="mt-3 text-3xl font-semibold tabular-nums">{value}</p>
         <p className="mt-1 text-xs text-muted-foreground">{hint}</p>
@@ -136,7 +138,9 @@ function AmcPage() {
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [createOpen, setCreateOpen] = React.useState(false)
-  const [presetProjectId, setPresetProjectId] = React.useState<string | undefined>()
+  const [presetProjectId, setPresetProjectId] = React.useState<
+    string | undefined
+  >()
   const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
   const [editAmc, setEditAmc] = React.useState<AmcRecord | null>(null)
 
@@ -150,7 +154,7 @@ function AmcPage() {
         to,
       })
       const res = await api<PaginatedEnvelope<AmcRecord[]>>(
-        qs ? `/amc?${qs}` : "/amc",
+        qs ? `/amc?${qs}` : "/amc"
       )
       setAmcs(res.data)
     } catch (e) {
@@ -181,7 +185,7 @@ function AmcPage() {
 
   const clientItems = React.useMemo(
     () => Object.fromEntries(clients.map((c) => [c.id, c.name])),
-    [clients],
+    [clients]
   )
 
   const hasFilters = Boolean(clientId || from || to)
@@ -190,14 +194,17 @@ function AmcPage() {
     : undefined
 
   const groups = React.useMemo(() => {
-    const withStatus = amcs.map((a) => ({ amc: a, status: amcDisplayStatus(a) }))
+    const withStatus = amcs.map((a) => ({
+      amc: a,
+      status: amcDisplayStatus(a),
+    }))
     return {
       ongoing: withStatus.filter(
-        (x) => x.status === "ongoing" || x.status === "expiring",
+        (x) => x.status === "ongoing" || x.status === "expiring"
       ),
       upcoming: withStatus.filter((x) => x.status === "upcoming"),
       attention: withStatus.filter(
-        (x) => x.status === "awaiting-decision" || x.status === "expiring",
+        (x) => x.status === "awaiting-decision" || x.status === "expiring"
       ),
       expired: withStatus.filter((x) => x.status === "expired"),
       all: withStatus,
@@ -302,7 +309,9 @@ function AmcPage() {
       <div className="mb-6 space-y-3">
         <div className="flex flex-wrap items-end gap-3">
           <div className="grid gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">Client</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              Client
+            </span>
             <Select
               value={clientId || null}
               onValueChange={(v) => {
@@ -328,7 +337,9 @@ function AmcPage() {
             </Select>
           </div>
           <div className="grid gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">From</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              From
+            </span>
             <Input
               type="date"
               className="w-40"
@@ -342,7 +353,9 @@ function AmcPage() {
             />
           </div>
           <div className="grid gap-1.5">
-            <span className="text-xs font-medium text-muted-foreground">To</span>
+            <span className="text-xs font-medium text-muted-foreground">
+              To
+            </span>
             <Input
               type="date"
               className="w-40"
@@ -463,6 +476,7 @@ function AmcPage() {
               }}
             >
               <TabsList>
+                <TabsTrigger value="all">All ({groups.all.length})</TabsTrigger>
                 <TabsTrigger value="ongoing">
                   Ongoing ({groups.ongoing.length})
                 </TabsTrigger>
@@ -472,7 +486,6 @@ function AmcPage() {
                 <TabsTrigger value="attention">
                   Follow-up ({groups.attention.length})
                 </TabsTrigger>
-                <TabsTrigger value="all">All ({groups.all.length})</TabsTrigger>
               </TabsList>
 
               <TabsContent value="ongoing" className="mt-6">
@@ -481,7 +494,7 @@ function AmcPage() {
               <TabsContent value="upcoming" className="mt-6">
                 {list(
                   groups.upcoming,
-                  "Nothing scheduled yet — create an AMC to plan ahead.",
+                  "Nothing scheduled yet — create an AMC to plan ahead."
                 )}
               </TabsContent>
               <TabsContent value="attention" className="mt-6">

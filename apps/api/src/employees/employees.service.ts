@@ -98,7 +98,7 @@ export class EmployeesService {
     const [employees, total] = await Promise.all([
       this.prismaService.employee.findMany({
         where,
-        orderBy: { name: "asc" },
+        orderBy: [{ status: "asc" }, { name: "asc" }],
         include: {
           salaryEntries: { orderBy: { effectiveDate: "desc" }, take: 1 },
           groupMemberships: {

@@ -7,10 +7,17 @@ import {
   AuditAction,
   AmcRenewalDecision,
   AmcStatus,
+  PersonStatus,
+  Prisma,
   ProjectStatus,
 } from "@workspace/database";
 import { AuditService } from "../audit/audit.service";
-import { parseIsoDate } from "../_shared/utils/date.util";
+import {
+  assignmentPeriodsOverlap,
+  parseIsoDate,
+  toIsoDate,
+} from "../_shared/utils/date.util";
+import { nptTodayIso } from "../_shared/utils/standup-age.util";
 import { nprToPaisa } from "../_shared/utils/money.util";
 import {
   serializeMoneyFields,
@@ -30,11 +37,37 @@ import {
   CreateExtensionDto,
   CreateProjectDto,
   DEFAULT_PROJECT_THEME_COLOR,
+  UnassignCoreMemberDto,
   UpdateProjectDto,
 } from "./dto/project.dto";
 
+type CoreAssignmentPeriod = {
+  assignedAt: Date;
+  unassignedAt: Date | null;
+};
+
 const PROJECT_MONEY_FIELDS = ["budgetPaisa"] as const;
 const EXTENSION_MONEY_FIELDS = ["amountPaisa"] as const;
+
+const PROJECT_SORT_FIELDS = {
+  budget: "budgetPaisa",
+  startDate: "startDate",
+} as const;
+
+type ProjectSortBy = keyof typeof PROJECT_SORT_FIELDS;
+type SortDir = "asc" | "desc";
+
+function resolveProjectOrder(
+  sortBy?: string,
+  sortDir?: string,
+): Prisma.ProjectOrderByWithRelationInput[] {
+  const field = PROJECT_SORT_FIELDS[sortBy as ProjectSortBy];
+  if (!field) {
+    return [{ createdAt: "desc" }];
+  }
+  const dir: SortDir = sortDir === "asc" ? "asc" : "desc";
+  return [{ [field]: dir }, { createdAt: "desc" }];
+}
 
 @Injectable()
 export class ProjectsService {
@@ -85,6 +118,8 @@ export class ProjectsService {
     q?: string;
     page?: string;
     pageSize?: string;
+    sortBy?: string;
+    sortDir?: string;
   }) {
     const q = filters.q?.trim();
     const where = {
@@ -111,7 +146,7 @@ export class ProjectsService {
       this.prismaService.project.findMany({
         where,
         include: this.projectInclude,
-        orderBy: { createdAt: "desc" },
+        orderBy: resolveProjectOrder(filters.sortBy, filters.sortDir),
         ...(pagination
           ? { skip: pagination.skip, take: pagination.take }
           : {}),
@@ -400,36 +435,42 @@ export class ProjectsService {
     dto: AssignCoreMemberDto,
     actorId: string,
   ) {
-    await this.getProjectOrThrow(projectId);
+    const project = await this.getProjectOrThrow(projectId);
+    const period = this.resolveCoreMemberPeriod(dto, project.status);
     const coreMember = await this.prismaService.coreMember.findUnique({
       where: { id: dto.coreMemberId },
     });
     if (!coreMember) {
       throw new NotFoundException(`Core member ${dto.coreMemberId} not found`);
     }
-    const existing = await this.prismaService.coreMemberAssignment.findFirst({
-      where: {
+    this.assertCoreMemberTenure(coreMember, period);
+    const existing = await this.prismaService.coreMemberAssignment.findMany({
+      where: { projectId, coreMemberId: dto.coreMemberId },
+    });
+    this.assertNoCoreAssignmentOverlap(existing, period, coreMember.name);
+    const assignment = await this.prismaService.coreMemberAssignment.create({
+      data: {
         projectId,
         coreMemberId: dto.coreMemberId,
-        unassignedAt: null,
+        assignedAt: period.assignedAt,
+        unassignedAt: period.unassignedAt,
       },
-    });
-    if (existing) {
-      throw new BadRequestException(
-        "Core member is already assigned to this project",
-      );
-    }
-    const assignment = await this.prismaService.coreMemberAssignment.create({
-      data: { projectId, coreMemberId: dto.coreMemberId },
       include: { coreMember: true },
     });
-    this.profitabilityService.clearCache(projectId);
+    await this.clearCacheForCoreMembers([dto.coreMemberId]);
     await this.auditService.write({
       actorId,
       action: AuditAction.CORE_MEMBER_ASSIGNED,
       targetType: "CoreMemberAssignment",
       targetId: assignment.id,
-      metadata: { projectId, coreMemberId: dto.coreMemberId },
+      metadata: {
+        projectId,
+        coreMemberId: dto.coreMemberId,
+        assignedAt: toIsoDate(period.assignedAt),
+        unassignedAt: period.unassignedAt
+          ? toIsoDate(period.unassignedAt)
+          : null,
+      },
     });
     return assignment;
   }
@@ -439,11 +480,11 @@ export class ProjectsService {
     dto: AssignCoreMembersBulkDto,
     actorId: string,
   ) {
-    await this.getProjectOrThrow(projectId);
+    const project = await this.getProjectOrThrow(projectId);
+    const period = this.resolveCoreMemberPeriod(dto, project.status);
     const coreMemberIds = [...new Set(dto.coreMemberIds)];
     const members = await this.prismaService.coreMember.findMany({
       where: { id: { in: coreMemberIds } },
-      select: { id: true, name: true },
     });
     if (members.length !== coreMemberIds.length) {
       const foundIds = new Set(members.map((member) => member.id));
@@ -455,21 +496,20 @@ export class ProjectsService {
       );
     }
     const existing = await this.prismaService.coreMemberAssignment.findMany({
-      where: {
-        projectId,
-        coreMemberId: { in: coreMemberIds },
-        unassignedAt: null,
-      },
-      include: { coreMember: true },
+      where: { projectId, coreMemberId: { in: coreMemberIds } },
     });
-    if (existing.length > 0) {
-      throw new BadRequestException(
-        `Already assigned: ${existing
-          .map(
-            (assignment) =>
-              assignment.coreMember?.name ?? assignment.coreMemberId,
-          )
-          .join(", ")}`,
+    const existingByMember = new Map<string, typeof existing>();
+    for (const row of existing) {
+      const list = existingByMember.get(row.coreMemberId) ?? [];
+      list.push(row);
+      existingByMember.set(row.coreMemberId, list);
+    }
+    for (const member of members) {
+      this.assertCoreMemberTenure(member, period);
+      this.assertNoCoreAssignmentOverlap(
+        existingByMember.get(member.id) ?? [],
+        period,
+        member.name,
       );
     }
 
@@ -478,20 +518,23 @@ export class ProjectsService {
         data: coreMemberIds.map((coreMemberId) => ({
           projectId,
           coreMemberId,
+          assignedAt: period.assignedAt,
+          unassignedAt: period.unassignedAt,
         })),
       });
       return tx.coreMemberAssignment.findMany({
         where: {
           projectId,
           coreMemberId: { in: coreMemberIds },
-          unassignedAt: null,
+          assignedAt: period.assignedAt,
+          unassignedAt: period.unassignedAt,
         },
         include: { coreMember: true },
         orderBy: { assignedAt: "desc" },
       });
     });
 
-    this.profitabilityService.clearCache(projectId);
+    await this.clearCacheForCoreMembers(coreMemberIds);
     await this.auditService.write({
       actorId,
       action: AuditAction.CORE_MEMBER_ASSIGNED,
@@ -501,6 +544,10 @@ export class ProjectsService {
         projectId,
         coreMemberIds,
         count: created.length,
+        assignedAt: toIsoDate(period.assignedAt),
+        unassignedAt: period.unassignedAt
+          ? toIsoDate(period.unassignedAt)
+          : null,
       },
     });
 
@@ -511,24 +558,53 @@ export class ProjectsService {
     projectId: string,
     coreMemberId: string,
     actorId: string,
+    dto: UnassignCoreMemberDto = {},
   ) {
     const assignment = await this.prismaService.coreMemberAssignment.findFirst({
       where: { projectId, coreMemberId, unassignedAt: null },
+      include: { coreMember: true },
     });
     if (!assignment) {
       throw new NotFoundException("Active core member assignment not found");
     }
+    const period: CoreAssignmentPeriod = {
+      assignedAt: assignment.assignedAt,
+      unassignedAt: dto.unassignedAt
+        ? parseIsoDate(dto.unassignedAt)
+        : parseIsoDate(nptTodayIso()),
+    };
+    this.assertAssignmentDates(period);
+    this.assertCoreMemberTenure(assignment.coreMember, period);
+    const siblings = await this.prismaService.coreMemberAssignment.findMany({
+      where: {
+        projectId,
+        coreMemberId,
+        id: { not: assignment.id },
+      },
+    });
+    this.assertNoCoreAssignmentOverlap(
+      siblings,
+      period,
+      assignment.coreMember.name,
+    );
     const updated = await this.prismaService.coreMemberAssignment.update({
       where: { id: assignment.id },
-      data: { unassignedAt: new Date() },
+      data: { unassignedAt: period.unassignedAt },
     });
-    this.profitabilityService.clearCache(projectId);
+    await this.clearCacheForCoreMembers([coreMemberId]);
     await this.auditService.write({
       actorId,
       action: AuditAction.CORE_MEMBER_UNASSIGNED,
       targetType: "CoreMemberAssignment",
       targetId: updated.id,
-      metadata: { projectId, coreMemberId },
+      metadata: {
+        projectId,
+        coreMemberId,
+        assignedAt: toIsoDate(assignment.assignedAt),
+        unassignedAt: period.unassignedAt
+          ? toIsoDate(period.unassignedAt)
+          : null,
+      },
     });
     return updated;
   }
@@ -624,6 +700,125 @@ export class ProjectsService {
       status !== ProjectStatus.under_amc &&
       allocationCount === 0
     );
+  }
+
+  private isClosedProjectStatus(status: ProjectStatus) {
+    return (
+      status === ProjectStatus.closed || status === ProjectStatus.under_amc
+    );
+  }
+
+  private resolveCoreMemberPeriod(
+    dto: { assignedAt: string; unassignedAt?: string },
+    projectStatus: ProjectStatus,
+  ): CoreAssignmentPeriod {
+    const period: CoreAssignmentPeriod = {
+      assignedAt: parseIsoDate(dto.assignedAt),
+      unassignedAt: dto.unassignedAt ? parseIsoDate(dto.unassignedAt) : null,
+    };
+    this.assertAssignmentDates(period);
+    if (this.isClosedProjectStatus(projectStatus) && !period.unassignedAt) {
+      throw new BadRequestException(
+        "Last day assigned is required for closed projects",
+      );
+    }
+    return period;
+  }
+
+  private assertAssignmentDates(period: CoreAssignmentPeriod) {
+    if (Number.isNaN(period.assignedAt.getTime())) {
+      throw new BadRequestException("Invalid assigned from date");
+    }
+    const today = nptTodayIso();
+    const assignedDay = toIsoDate(period.assignedAt);
+    if (assignedDay > today) {
+      throw new BadRequestException("Assigned from date cannot be in the future");
+    }
+    if (!period.unassignedAt) {
+      return;
+    }
+    if (Number.isNaN(period.unassignedAt.getTime())) {
+      throw new BadRequestException("Invalid last day assigned");
+    }
+    const lastDay = toIsoDate(period.unassignedAt);
+    if (lastDay > today) {
+      throw new BadRequestException("Last day assigned cannot be in the future");
+    }
+    if (lastDay < assignedDay) {
+      throw new BadRequestException(
+        "Last day assigned must be on or after the assigned-from date",
+      );
+    }
+  }
+
+  private assertCoreMemberTenure(
+    member: {
+      name: string;
+      status: PersonStatus;
+      dateJoined: Date;
+      dateLeft: Date | null;
+    },
+    period: CoreAssignmentPeriod,
+  ) {
+    const assignedDay = toIsoDate(period.assignedAt);
+    const joinedDay = toIsoDate(member.dateJoined);
+    if (assignedDay < joinedDay) {
+      throw new BadRequestException(
+        `${member.name} joined on ${joinedDay}; assigned from cannot be earlier`,
+      );
+    }
+    const hasLeft =
+      member.status === PersonStatus.left || member.dateLeft !== null;
+    if (!hasLeft) {
+      return;
+    }
+    if (!period.unassignedAt) {
+      throw new BadRequestException(
+        `${member.name} has left; last day assigned is required`,
+      );
+    }
+    if (member.dateLeft) {
+      const leftDay = toIsoDate(member.dateLeft);
+      if (toIsoDate(period.unassignedAt) > leftDay) {
+        throw new BadRequestException(
+          `${member.name} left on ${leftDay}; last day assigned cannot be later`,
+        );
+      }
+    }
+  }
+
+  private assertNoCoreAssignmentOverlap(
+    existing: Array<{ assignedAt: Date; unassignedAt: Date | null }>,
+    period: CoreAssignmentPeriod,
+    memberName: string,
+  ) {
+    const overlaps = existing.some((row) =>
+      assignmentPeriodsOverlap(
+        row.assignedAt,
+        row.unassignedAt,
+        period.assignedAt,
+        period.unassignedAt,
+      ),
+    );
+    if (overlaps) {
+      throw new BadRequestException(
+        `${memberName} already has an overlapping assignment on this project`,
+      );
+    }
+  }
+
+  private async clearCacheForCoreMembers(coreMemberIds: string[]) {
+    if (coreMemberIds.length === 0) {
+      return;
+    }
+    const rows = await this.prismaService.coreMemberAssignment.findMany({
+      where: { coreMemberId: { in: coreMemberIds } },
+      select: { projectId: true },
+      distinct: ["projectId"],
+    });
+    for (const row of rows) {
+      this.profitabilityService.clearCache(row.projectId);
+    }
   }
 
   private async getProjectOrThrow(id: string) {

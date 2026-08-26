@@ -1,6 +1,13 @@
 import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
-import { IconEye, IconPencil, IconSearch } from "@tabler/icons-react"
+import {
+  IconChevronDown,
+  IconChevronUp,
+  IconEye,
+  IconPencil,
+  IconSearch,
+  IconSelector,
+} from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import {
@@ -34,23 +41,42 @@ import {
   buildListQuery,
   parseListSearch,
   parseOptionalString,
+  parseSortDir,
   totalPagesFor,
+  type SortDir,
 } from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
 import type { Project } from "@/lib/types"
 
 const PROJECT_STATUSES = ["active", "extended", "closed", "under_amc"] as const
+const PROJECT_SORT_FIELDS = ["budget", "startDate"] as const
+
+type ProjectSortBy = (typeof PROJECT_SORT_FIELDS)[number]
+
+function parseProjectSortBy(value: unknown): ProjectSortBy | undefined {
+  return PROJECT_SORT_FIELDS.includes(value as ProjectSortBy)
+    ? (value as ProjectSortBy)
+    : undefined
+}
+
+function defaultSortDir(): SortDir {
+  return "desc"
+}
 
 export const Route = createFileRoute("/_app/projects/")({
   validateSearch: (search: Record<string, unknown>) => {
     const base = parseListSearch(search)
     const status = parseOptionalString(search.status)
+    const sortBy = parseProjectSortBy(search.sortBy)
+    const sortDir = parseSortDir(search.sortDir)
     return {
       ...base,
       status:
         status && (PROJECT_STATUSES as readonly string[]).includes(status)
           ? status
           : undefined,
+      sortBy,
+      sortDir: sortBy ? (sortDir ?? defaultSortDir()) : undefined,
     }
   },
   component: ProjectsPage,
@@ -58,7 +84,7 @@ export const Route = createFileRoute("/_app/projects/")({
 
 function ProjectsPage() {
   const navigate = Route.useNavigate()
-  const { q, page, pageSize, status } = Route.useSearch()
+  const { q, page, pageSize, status, sortBy, sortDir } = Route.useSearch()
   const [projects, setProjects] = React.useState<Project[]>([])
   const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
@@ -91,6 +117,8 @@ function ProjectsPage() {
         page,
         pageSize,
         status: status || undefined,
+        sortBy,
+        sortDir,
       })
       const p = await api<PaginatedEnvelope<Project[]>>(`/projects?${qs}`)
       setProjects(p.data)
@@ -100,13 +128,34 @@ function ProjectsPage() {
     } finally {
       setLoading(false)
     }
-  }, [q, page, pageSize, status])
+  }, [q, page, pageSize, status, sortBy, sortDir])
 
   React.useEffect(() => {
     void load()
   }, [load])
 
   const totalPages = totalPagesFor(total, pageSize)
+
+  const toggleSort = (column: ProjectSortBy) => {
+    void navigate({
+      search: (prev) => {
+        if (prev.sortBy !== column) {
+          return {
+            ...prev,
+            sortBy: column,
+            sortDir: defaultSortDir(),
+            page: 1,
+          }
+        }
+        return {
+          ...prev,
+          sortBy: column,
+          sortDir: prev.sortDir === "desc" ? "asc" : "desc",
+          page: 1,
+        }
+      },
+    })
+  }
 
   return (
     <div>
@@ -192,8 +241,20 @@ function ProjectsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Client</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Budget</TableHead>
-                  <TableHead>Dates</TableHead>
+                  <SortableTableHead
+                    label="Budget"
+                    column="budget"
+                    active={sortBy === "budget"}
+                    dir={sortDir}
+                    onSort={toggleSort}
+                  />
+                  <SortableTableHead
+                    label="Dates"
+                    column="startDate"
+                    active={sortBy === "startDate"}
+                    dir={sortDir}
+                    onSort={toggleSort}
+                  />
                   <TableActionsHead />
                 </TableRow>
               </TableHeader>
@@ -281,5 +342,49 @@ function ProjectsPage() {
         onCreated={() => load()}
       />
     </div>
+  )
+}
+
+function SortableTableHead({
+  label,
+  column,
+  active,
+  dir,
+  onSort,
+}: {
+  label: string
+  column: ProjectSortBy
+  active: boolean
+  dir?: SortDir
+  onSort: (column: ProjectSortBy) => void
+}) {
+  const sortState = active ? (dir === "asc" ? "ascending" : "descending") : "none"
+  const Icon = !active
+    ? IconSelector
+    : dir === "asc"
+      ? IconChevronUp
+      : IconChevronDown
+  return (
+    <TableHead aria-sort={sortState}>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+        onClick={() => onSort(column)}
+        aria-label={
+          active
+            ? `Sort by ${label}, currently ${sortState}. Click to reverse.`
+            : `Sort by ${label}`
+        }
+      >
+        {label}
+        <Icon
+          className={
+            active
+              ? "size-3.5 text-foreground"
+              : "size-3.5 text-muted-foreground"
+          }
+        />
+      </button>
+    </TableHead>
   )
 }

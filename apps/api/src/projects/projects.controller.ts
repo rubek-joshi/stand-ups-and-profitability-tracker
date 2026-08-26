@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  createParamDecorator,
   Delete,
+  ExecutionContext,
   Get,
   Param,
   Patch,
@@ -9,7 +11,7 @@ import {
   Query,
   UseGuards,
 } from "@nestjs/common";
-import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { ProjectStatus } from "@workspace/database";
 import { CurrentUser } from "../_shared/decorators/current-user.decorator";
 import { AuthUser } from "../auth/types/auth-user.type";
@@ -23,10 +25,22 @@ import {
   AssignEmployeesBulkDto,
   CreateExtensionDto,
   CreateProjectDto,
+  UnassignCoreMemberDto,
   UpdateProjectDto,
 } from "./dto/project.dto";
 import { ProjectsService } from "./projects.service";
 import { StandupsService } from "../standups/standups.service";
+
+const OptionalJsonBody = createParamDecorator(
+  (_data: unknown, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest<{ body?: unknown }>();
+    return request.body &&
+      typeof request.body === "object" &&
+      !Array.isArray(request.body)
+      ? request.body
+      : {};
+  },
+);
 
 @ApiTags("projects")
 @ApiBearerAuth()
@@ -57,8 +71,18 @@ export class ProjectsController {
     @Query("q") q?: string,
     @Query("page") page?: string,
     @Query("pageSize") pageSize?: string,
+    @Query("sortBy") sortBy?: string,
+    @Query("sortDir") sortDir?: string,
   ) {
-    return this.projectsService.findAll({ clientId, status, q, page, pageSize });
+    return this.projectsService.findAll({
+      clientId,
+      status,
+      q,
+      page,
+      pageSize,
+      sortBy,
+      sortDir,
+    });
   }
 
   @Get(":id")
@@ -187,11 +211,21 @@ export class ProjectsController {
   @Delete(":id/assignments/core-members/:coreMemberId")
   @RequirePermission("projects", "*")
   @ApiOperation({ summary: "Unassign core member" })
+  @ApiBody({ type: UnassignCoreMemberDto, required: false })
   async unassignCoreMember(
     @Param("id") id: string,
     @Param("coreMemberId") coreMemberId: string,
+    @OptionalJsonBody() dto: UnassignCoreMemberDto,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.projectsService.unassignCoreMember(id, coreMemberId, user.id);
+    return this.projectsService.unassignCoreMember(
+      id,
+      coreMemberId,
+      user.id,
+      {
+        unassignedAt:
+          typeof dto?.unassignedAt === "string" ? dto.unassignedAt : undefined,
+      },
+    );
   }
 }
