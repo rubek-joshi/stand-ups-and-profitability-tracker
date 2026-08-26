@@ -75,6 +75,23 @@ export function CoreMemberLink({
   )
 }
 
+export function InvoiceLink({
+  id,
+  children,
+  className,
+}: ResourceLinkProps & { id: string }) {
+  return (
+    <Link
+      to="/invoices/$id"
+      params={{ id }}
+      className={cn("font-medium hover:underline", className)}
+      onClick={(event) => event.stopPropagation()}
+    >
+      {children}
+    </Link>
+  )
+}
+
 export function StandupLink({
   id,
   children,
@@ -122,6 +139,12 @@ export function EntityLink({
         <ClientLink id={id} className={className}>
           {children}
         </ClientLink>
+      )
+    case "Invoice":
+      return (
+        <InvoiceLink id={id} className={className}>
+          {children}
+        </InvoiceLink>
       )
     case "Project":
       return (

@@ -15,6 +15,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
 import { EmployeesModule } from "./employees/employees.module";
 import { EmployeeGroupsModule } from "./employee-groups/employee-groups.module";
 import { HealthModule } from "./health/health.module";
+import { InvoicesModule } from "./invoices/invoices.module";
 import { JobsModule } from "./jobs/jobs.module";
 import { MailModule } from "./mail/mail.module";
 import { PrismaModule } from "./prisma/prisma.module";
@@ -55,6 +56,7 @@ import { VatModule } from "./vat/vat.module";
     StandupsModule,
     AmcModule,
     VatModule,
+    InvoicesModule,
     DashboardModule,
     SnapshotsModule,
     JobsModule,

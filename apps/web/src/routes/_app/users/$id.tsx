@@ -71,6 +71,7 @@ export const Route = createFileRoute("/_app/users/$id")({
 
 const ENTITY_ROUTES: Record<string, string> = {
   Client: "/clients/$id",
+  Invoice: "/invoices/$id",
   Project: "/projects/$id",
   Employee: "/employees/$id",
   CoreMember: "/core-members/$id",

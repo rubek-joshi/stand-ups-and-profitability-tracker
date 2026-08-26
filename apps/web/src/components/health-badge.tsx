@@ -34,6 +34,8 @@ export function StatusBadge({ status }: { status: string }) {
     draft: "outline",
     in_progress: "secondary",
     completed: "default",
+    paid: "default",
+    pending: "secondary",
     overdue: "destructive",
     reminder_due: "secondary",
     free_period: "default",

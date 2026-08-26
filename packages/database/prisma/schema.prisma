@@ -83,6 +83,11 @@ enum StandupTaskState {
   progress
 }
 
+enum InvoiceStatus {
+  pending
+  paid
+}
+
 enum AuditAction {
   CLIENT_CREATED
   CLIENT_UPDATED
@@ -153,6 +158,9 @@ enum AuditAction {
   EMPLOYEE_GROUP_DELETED
   EMPLOYEE_GROUP_MEMBER_ADDED
   EMPLOYEE_GROUP_MEMBER_REMOVED
+  INVOICE_CREATED
+  INVOICE_MARKED_PAID
+  INVOICE_DELETED
 }
 
 model User {
@@ -177,6 +185,7 @@ model User {
   employeeSalaryChanges   EmployeeSalaryEntry[]    @relation("EmployeeSalaryChangedBy")
   coreMemberSalaryChanges CoreMemberSalaryEntry[]  @relation("CoreMemberSalaryChangedBy")
   vatClearances           VatClearance[]
+  createdInvoices         Invoice[]                @relation("InvoiceCreator")
   dbSnapshots             DbSnapshot[]
   passkeys                UserPasskey[]
   standupPreferredGroup   EmployeeGroup?           @relation("StandupPreferredGroup", fields: [standupPreferredGroupId], references: [id], onDelete: SetNull)
@@ -299,6 +308,7 @@ model Project {
   allocations           ProjectAllocation[]
   amcRecords            AmcRecord[]
   links                 ProjectLink[]
+  invoices              Invoice[]
 
   @@index([clientId])
   @@index([status])
@@ -360,6 +370,31 @@ model ProjectLink {
 
   @@index([projectId])
   @@map("project_links")
+}
+
+model Invoice {
+  id             String        @id @default(cuid())
+  projectId      String
+  invoiceNumber  String        @unique
+  invoiceDate    DateTime      @db.Date
+  amountPaisa    BigInt
+  vatPaisa       BigInt        @default(0)
+  totalPaisa     BigInt
+  vatRateApplied Int           @default(0)
+  status         InvoiceStatus @default(pending)
+  paymentDate    DateTime?     @db.Date
+  notes          String?
+  createdById    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("InvoiceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([invoiceDate])
+  @@map("invoices")
 }
 
 model ProjectExtension {

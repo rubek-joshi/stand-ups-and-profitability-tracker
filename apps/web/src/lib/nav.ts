@@ -4,6 +4,7 @@ import {
   IconCategory,
   IconClipboardList,
   IconLayoutDashboard,
+  IconFileInvoice,
   IconReceiptTax,
   IconSettings,
   IconUsers,
@@ -54,6 +55,13 @@ export const NAV_ITEMS: NavItem[] = [
   },
   { title: "Core Members", to: "/core-members", icon: IconUserStar, keywords: ["core"], roles: STAFF_ROLES },
   { title: "Categories", to: "/categories", icon: IconCategory, roles: STAFF_ROLES },
+  {
+    title: "Invoices",
+    to: "/invoices",
+    icon: IconFileInvoice,
+    keywords: ["billing", "payment"],
+    roles: STAFF_ROLES,
+  },
   { title: "VAT", to: "/vat", icon: IconReceiptTax, roles: STAFF_ROLES },
   {
     title: "Users",
@@ -84,6 +92,12 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [byTo["/clients"]!, byTo["/projects"]!, byTo["/amc"]!],
   },
   {
+    id: "finance",
+    title: "Finance",
+    collapsible: true,
+    items: [byTo["/invoices"]!, byTo["/vat"]!],
+  },
+  {
     id: "Resources",
     title: "Resources",
     collapsible: true,
@@ -97,7 +111,7 @@ export const NAV_GROUPS: NavGroup[] = [
   {
     id: "admin",
     title: "Admin",
-    items: [byTo["/vat"]!, byTo["/users"]!, byTo["/audit"]!, byTo["/settings"]!],
+    items: [byTo["/users"]!, byTo["/audit"]!, byTo["/settings"]!],
   },
 ]
 

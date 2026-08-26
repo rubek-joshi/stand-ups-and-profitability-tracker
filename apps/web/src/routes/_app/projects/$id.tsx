@@ -82,6 +82,7 @@ import { AmcCard } from "@/components/amc/amc-card"
 import { CreateAmcDialog } from "@/components/amc/create-amc-dialog"
 import { DeclineAmcDialog } from "@/components/amc/decline-amc-dialog"
 import { EditAmcDialog } from "@/components/amc/edit-amc-dialog"
+import { ProjectInvoicesTab } from "@/components/invoices/project-invoices-tab"
 import {
   DEFAULT_PRESET_DAYS,
   rangeFromDays,
@@ -121,7 +122,7 @@ import type {
   ProjectLink,
 } from "@/lib/types"
 
-const PROJECT_TABS = ["team", "standups", "extensions", "amc", "labor"] as const
+const PROJECT_TABS = ["team", "standups", "extensions", "invoices", "amc", "labor"] as const
 
 type ProjectTab = (typeof PROJECT_TABS)[number]
 
@@ -701,6 +702,7 @@ function ProjectDetailPage() {
               <TabsTrigger value="team">Team</TabsTrigger>
               <TabsTrigger value="standups">Stand-ups</TabsTrigger>
               <TabsTrigger value="extensions">Extensions</TabsTrigger>
+              <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="amc">AMC</TabsTrigger>
               <TabsTrigger value="labor">Labor</TabsTrigger>
             </TabsList>
@@ -1776,6 +1778,13 @@ function ProjectDetailPage() {
                   </form>
                 </DialogContent>
               </Dialog>
+            </TabsContent>
+
+            <TabsContent value="invoices" className="mt-4 space-y-4">
+              <ProjectInvoicesTab
+                project={project}
+                canMutate={canManageLinks}
+              />
             </TabsContent>
 
             <TabsContent value="amc" className="mt-4 space-y-4">

@@ -98,6 +98,9 @@ const ACTIONS = [
   "EMPLOYEE_SALARY_DELETED",
   "EMPLOYEE_SALARY_UPDATED",
   "EMPLOYEE_UPDATED",
+  "INVOICE_CREATED",
+  "INVOICE_DELETED",
+  "INVOICE_MARKED_PAID",
   "PROJECT_ASSIGNMENT_CREATED",
   "PROJECT_ASSIGNMENT_ENDED",
   "PROJECT_AUTO_EXTENDED",
@@ -123,6 +126,7 @@ const ACTIONS = [
 
 const ENTITY_ROUTES: Record<string, string> = {
   Client: "/clients/$id",
+  Invoice: "/invoices/$id",
   Project: "/projects/$id",
   Employee: "/employees/$id",
   CoreMember: "/core-members/$id",

@@ -68,6 +68,33 @@ export type ProjectLink = {
   updatedAt?: string
 }
 
+export type InvoiceStatus = "pending" | "paid"
+
+export type Invoice = {
+  id: string
+  projectId: string
+  invoiceNumber: string
+  invoiceDate: string
+  amountPaisa: string
+  vatPaisa: string
+  totalPaisa: string
+  vatRateApplied: number
+  status: InvoiceStatus
+  paymentDate: string | null
+  notes: string | null
+  createdAt: string
+  updatedAt?: string
+  project?: {
+    id: string
+    name: string
+    clientId?: string
+    isVatApplicable?: boolean
+    vatRateApplied?: number
+    budgetPaisa?: string
+    client?: { id: string; name: string }
+  }
+}
+
 export type ProjectDashboard = {
   summary: {
     activeEmployeeCount: number

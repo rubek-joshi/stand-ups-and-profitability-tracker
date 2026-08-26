@@ -20,6 +20,7 @@ import { Route as AppAuditRouteImport } from './routes/_app/audit'
 import { Route as AppUsersIndexRouteImport } from './routes/_app/users/index'
 import { Route as AppStandUpsIndexRouteImport } from './routes/_app/stand-ups/index'
 import { Route as AppProjectsIndexRouteImport } from './routes/_app/projects/index'
+import { Route as AppInvoicesIndexRouteImport } from './routes/_app/invoices/index'
 import { Route as AppEmployeesIndexRouteImport } from './routes/_app/employees/index'
 import { Route as AppEmployeeGroupsIndexRouteImport } from './routes/_app/employee-groups/index'
 import { Route as AppCoreMembersIndexRouteImport } from './routes/_app/core-members/index'
@@ -29,6 +30,7 @@ import { Route as AppAmcIndexRouteImport } from './routes/_app/amc/index'
 import { Route as AppUsersIdRouteImport } from './routes/_app/users/$id'
 import { Route as AppStandUpsIdRouteImport } from './routes/_app/stand-ups/$id'
 import { Route as AppProjectsIdRouteImport } from './routes/_app/projects/$id'
+import { Route as AppInvoicesIdRouteImport } from './routes/_app/invoices/$id'
 import { Route as AppEmployeesIdRouteImport } from './routes/_app/employees/$id'
 import { Route as AppEmployeeGroupsIdRouteImport } from './routes/_app/employee-groups/$id'
 import { Route as AppCoreMembersIdRouteImport } from './routes/_app/core-members/$id'
@@ -94,6 +96,11 @@ const AppProjectsIndexRoute = AppProjectsIndexRouteImport.update({
   path: '/projects/',
   getParentRoute: () => AppRoute,
 } as any)
+const AppInvoicesIndexRoute = AppInvoicesIndexRouteImport.update({
+  id: '/invoices/',
+  path: '/invoices/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppEmployeesIndexRoute = AppEmployeesIndexRouteImport.update({
   id: '/employees/',
   path: '/employees/',
@@ -137,6 +144,11 @@ const AppStandUpsIdRoute = AppStandUpsIdRouteImport.update({
 const AppProjectsIdRoute = AppProjectsIdRouteImport.update({
   id: '/projects/$id',
   path: '/projects/$id',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppInvoicesIdRoute = AppInvoicesIdRouteImport.update({
+  id: '/invoices/$id',
+  path: '/invoices/$id',
   getParentRoute: () => AppRoute,
 } as any)
 const AppEmployeesIdRoute = AppEmployeesIdRouteImport.update({
@@ -203,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/core-members/$id': typeof AppCoreMembersIdRoute
   '/employee-groups/$id': typeof AppEmployeeGroupsIdRoute
   '/employees/$id': typeof AppEmployeesIdRoute
+  '/invoices/$id': typeof AppInvoicesIdRoute
   '/projects/$id': typeof AppProjectsIdRoute
   '/stand-ups/$id': typeof AppStandUpsIdRoute
   '/users/$id': typeof AppUsersIdRoute
@@ -212,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/core-members/': typeof AppCoreMembersIndexRoute
   '/employee-groups/': typeof AppEmployeeGroupsIndexRoute
   '/employees/': typeof AppEmployeesIndexRoute
+  '/invoices/': typeof AppInvoicesIndexRoute
   '/projects/': typeof AppProjectsIndexRoute
   '/stand-ups/': typeof AppStandUpsIndexRoute
   '/users/': typeof AppUsersIndexRoute
@@ -234,6 +248,7 @@ export interface FileRoutesByTo {
   '/core-members/$id': typeof AppCoreMembersIdRoute
   '/employee-groups/$id': typeof AppEmployeeGroupsIdRoute
   '/employees/$id': typeof AppEmployeesIdRoute
+  '/invoices/$id': typeof AppInvoicesIdRoute
   '/projects/$id': typeof AppProjectsIdRoute
   '/stand-ups/$id': typeof AppStandUpsIdRoute
   '/users/$id': typeof AppUsersIdRoute
@@ -243,6 +258,7 @@ export interface FileRoutesByTo {
   '/core-members': typeof AppCoreMembersIndexRoute
   '/employee-groups': typeof AppEmployeeGroupsIndexRoute
   '/employees': typeof AppEmployeesIndexRoute
+  '/invoices': typeof AppInvoicesIndexRoute
   '/projects': typeof AppProjectsIndexRoute
   '/stand-ups': typeof AppStandUpsIndexRoute
   '/users': typeof AppUsersIndexRoute
@@ -267,6 +283,7 @@ export interface FileRoutesById {
   '/_app/core-members/$id': typeof AppCoreMembersIdRoute
   '/_app/employee-groups/$id': typeof AppEmployeeGroupsIdRoute
   '/_app/employees/$id': typeof AppEmployeesIdRoute
+  '/_app/invoices/$id': typeof AppInvoicesIdRoute
   '/_app/projects/$id': typeof AppProjectsIdRoute
   '/_app/stand-ups/$id': typeof AppStandUpsIdRoute
   '/_app/users/$id': typeof AppUsersIdRoute
@@ -276,6 +293,7 @@ export interface FileRoutesById {
   '/_app/core-members/': typeof AppCoreMembersIndexRoute
   '/_app/employee-groups/': typeof AppEmployeeGroupsIndexRoute
   '/_app/employees/': typeof AppEmployeesIndexRoute
+  '/_app/invoices/': typeof AppInvoicesIndexRoute
   '/_app/projects/': typeof AppProjectsIndexRoute
   '/_app/stand-ups/': typeof AppStandUpsIndexRoute
   '/_app/users/': typeof AppUsersIndexRoute
@@ -300,6 +318,7 @@ export interface FileRouteTypes {
     | '/core-members/$id'
     | '/employee-groups/$id'
     | '/employees/$id'
+    | '/invoices/$id'
     | '/projects/$id'
     | '/stand-ups/$id'
     | '/users/$id'
@@ -309,6 +328,7 @@ export interface FileRouteTypes {
     | '/core-members/'
     | '/employee-groups/'
     | '/employees/'
+    | '/invoices/'
     | '/projects/'
     | '/stand-ups/'
     | '/users/'
@@ -331,6 +351,7 @@ export interface FileRouteTypes {
     | '/core-members/$id'
     | '/employee-groups/$id'
     | '/employees/$id'
+    | '/invoices/$id'
     | '/projects/$id'
     | '/stand-ups/$id'
     | '/users/$id'
@@ -340,6 +361,7 @@ export interface FileRouteTypes {
     | '/core-members'
     | '/employee-groups'
     | '/employees'
+    | '/invoices'
     | '/projects'
     | '/stand-ups'
     | '/users'
@@ -363,6 +385,7 @@ export interface FileRouteTypes {
     | '/_app/core-members/$id'
     | '/_app/employee-groups/$id'
     | '/_app/employees/$id'
+    | '/_app/invoices/$id'
     | '/_app/projects/$id'
     | '/_app/stand-ups/$id'
     | '/_app/users/$id'
@@ -372,6 +395,7 @@ export interface FileRouteTypes {
     | '/_app/core-members/'
     | '/_app/employee-groups/'
     | '/_app/employees/'
+    | '/_app/invoices/'
     | '/_app/projects/'
     | '/_app/stand-ups/'
     | '/_app/users/'
@@ -467,6 +491,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppProjectsIndexRouteImport
       parentRoute: typeof AppRoute
     }
+    '/_app/invoices/': {
+      id: '/_app/invoices/'
+      path: '/invoices'
+      fullPath: '/invoices/'
+      preLoaderRoute: typeof AppInvoicesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/employees/': {
       id: '/_app/employees/'
       path: '/employees'
@@ -528,6 +559,13 @@ declare module '@tanstack/react-router' {
       path: '/projects/$id'
       fullPath: '/projects/$id'
       preLoaderRoute: typeof AppProjectsIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/invoices/$id': {
+      id: '/_app/invoices/$id'
+      path: '/invoices/$id'
+      fullPath: '/invoices/$id'
+      preLoaderRoute: typeof AppInvoicesIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/employees/$id': {
@@ -614,6 +652,7 @@ interface AppRouteChildren {
   AppCoreMembersIdRoute: typeof AppCoreMembersIdRoute
   AppEmployeeGroupsIdRoute: typeof AppEmployeeGroupsIdRoute
   AppEmployeesIdRoute: typeof AppEmployeesIdRoute
+  AppInvoicesIdRoute: typeof AppInvoicesIdRoute
   AppProjectsIdRoute: typeof AppProjectsIdRoute
   AppStandUpsIdRoute: typeof AppStandUpsIdRoute
   AppUsersIdRoute: typeof AppUsersIdRoute
@@ -623,6 +662,7 @@ interface AppRouteChildren {
   AppCoreMembersIndexRoute: typeof AppCoreMembersIndexRoute
   AppEmployeeGroupsIndexRoute: typeof AppEmployeeGroupsIndexRoute
   AppEmployeesIndexRoute: typeof AppEmployeesIndexRoute
+  AppInvoicesIndexRoute: typeof AppInvoicesIndexRoute
   AppProjectsIndexRoute: typeof AppProjectsIndexRoute
   AppStandUpsIndexRoute: typeof AppStandUpsIndexRoute
   AppUsersIndexRoute: typeof AppUsersIndexRoute
@@ -644,6 +684,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCoreMembersIdRoute: AppCoreMembersIdRoute,
   AppEmployeeGroupsIdRoute: AppEmployeeGroupsIdRoute,
   AppEmployeesIdRoute: AppEmployeesIdRoute,
+  AppInvoicesIdRoute: AppInvoicesIdRoute,
   AppProjectsIdRoute: AppProjectsIdRoute,
   AppStandUpsIdRoute: AppStandUpsIdRoute,
   AppUsersIdRoute: AppUsersIdRoute,
@@ -653,6 +694,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppCoreMembersIndexRoute: AppCoreMembersIndexRoute,
   AppEmployeeGroupsIndexRoute: AppEmployeeGroupsIndexRoute,
   AppEmployeesIndexRoute: AppEmployeesIndexRoute,
+  AppInvoicesIndexRoute: AppInvoicesIndexRoute,
   AppProjectsIndexRoute: AppProjectsIndexRoute,
   AppStandUpsIndexRoute: AppStandUpsIndexRoute,
   AppUsersIndexRoute: AppUsersIndexRoute,
