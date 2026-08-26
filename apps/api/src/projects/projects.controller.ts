@@ -28,6 +28,7 @@ import {
   CreateExtensionDto,
   CreateProjectDto,
   CreateProjectLinkDto,
+  CloseProjectDto,
   UnassignCoreMemberDto,
   UnassignEmployeeDto,
   UpdateProjectDto,
@@ -128,8 +129,12 @@ export class ProjectsController {
   @Post(":id/close")
   @RequirePermission("projects", "*")
   @ApiOperation({ summary: "Close project" })
-  async close(@Param("id") id: string, @CurrentUser() user: AuthUser) {
-    return this.projectsService.close(id, user.id);
+  async close(
+    @Param("id") id: string,
+    @Body() dto: CloseProjectDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.projectsService.close(id, dto ?? {}, user.id);
   }
 
   @Delete(":id")

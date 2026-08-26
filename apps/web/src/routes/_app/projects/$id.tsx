@@ -147,6 +147,16 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+function maxIsoDate(
+  ...values: Array<string | null | undefined>
+): string | undefined {
+  const dates = values
+    .map((value) => (value ? String(value).slice(0, 10) : ""))
+    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+  if (dates.length === 0) return undefined
+  return dates.reduce((latest, next) => (next > latest ? next : latest))
+}
+
 function parseEmployeeIdsSearch(search: Record<string, unknown>): string[] {
   const fromList =
     typeof search.employeeIds === "string"
@@ -253,6 +263,9 @@ function ProjectDetailPage() {
   const [editingLink, setEditingLink] = React.useState<ProjectLink | null>(null)
   const [linkForm, setLinkForm] = React.useState({ label: "", url: "" })
   const [savingLink, setSavingLink] = React.useState(false)
+  const [closeOpen, setCloseOpen] = React.useState(false)
+  const [closeDate, setCloseDate] = React.useState("")
+  const [closing, setClosing] = React.useState(false)
   const [amcCreateOpen, setAmcCreateOpen] = React.useState(false)
   const [extensionOpen, setExtensionOpen] = React.useState(false)
   const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
@@ -387,6 +400,46 @@ function ProjectDetailPage() {
     coreLogPageSafe * coreLogPageSize
   )
 
+  const hasManualExtension = (project.extensions ?? []).some(
+    (extension) => !extension.isAuto
+  )
+  const wasAutoExtended = Boolean(project.autoExtended)
+  const projectStartDay = String(project.startDate).slice(0, 10)
+  const projectEndDay = String(project.endDate).slice(0, 10)
+  const latestAssignmentEnd = maxIsoDate(
+    ...assignments.employees.map((assignment) => assignment.unassignedAt),
+    ...assignments.coreMembers.map((assignment) => assignment.unassignedAt)
+  )
+  const latestOpenAssignedFrom = maxIsoDate(
+    ...activeAssignments.map((assignment) => assignment.assignedAt),
+    ...activeCoreAssignments.map((assignment) => assignment.assignedAt)
+  )
+  const minCloseDate =
+    maxIsoDate(
+      projectStartDay,
+      latestAssignmentEnd,
+      latestOpenAssignedFrom,
+      hasManualExtension ? projectEndDay : undefined
+    ) ?? projectStartDay
+  const closeDateTooEarly = Boolean(closeDate && closeDate < minCloseDate)
+  const closeDateInFuture = Boolean(closeDate && closeDate > todayIso)
+  const cannotCloseYet = minCloseDate > todayIso
+  const closeBlockedReason = cannotCloseYet
+    ? hasManualExtension
+      ? `This project has a manual extension until ${projectEndDay}. It cannot be closed before that date.`
+      : latestAssignmentEnd && latestAssignmentEnd > todayIso
+        ? `Close date cannot be before ${latestAssignmentEnd}, the latest assignment end date.`
+        : `Close date cannot be before ${minCloseDate}.`
+    : closeDateTooEarly
+      ? hasManualExtension && closeDate < projectEndDay
+        ? `This project has a manual extension until ${projectEndDay}. Close date cannot be before that date.`
+        : latestAssignmentEnd && closeDate < latestAssignmentEnd
+          ? `Close date cannot be before ${latestAssignmentEnd}, the latest assignment end date.`
+          : `Close date cannot be before ${minCloseDate}.`
+      : closeDateInFuture
+        ? "Close date cannot be in the future."
+        : null
+
   const openAddEmployees = () => {
     const today = toIsoDateInput(new Date())
     setEmployeeQuery("")
@@ -419,6 +472,11 @@ function ProjectDetailPage() {
     setEditingLink(null)
     setLinkForm({ label: "", url: "" })
     setLinkOpen(true)
+  }
+
+  const openCloseProject = () => {
+    setCloseDate(toIsoDateInput(new Date()))
+    setCloseOpen(true)
   }
 
   const openEditLink = (link: ProjectLink) => {
@@ -512,18 +570,7 @@ function ProjectDetailPage() {
                 <DropdownMenuGroup>
                   <DropdownMenuItem
                     variant="destructive"
-                    onClick={async () => {
-                      const ok = await confirm({
-                        title: "Close project?",
-                        description:
-                          "Closing the project will end all active employee and core member assignments and preserve their history logs.",
-                        confirmLabel: "Close project",
-                        destructive: true,
-                      })
-                      if (!ok) return
-                      await api(`/projects/${id}/close`, { method: "POST" })
-                      await load()
-                    }}
+                    onClick={openCloseProject}
                   >
                     <IconLock />
                     Close
@@ -2171,6 +2218,100 @@ function ProjectDetailPage() {
                   : editingLink
                     ? "Save link"
                     : "Add link"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Close project?</DialogTitle>
+            <DialogDescription>
+              Closing ends all active employee and core member assignments on
+              the close date (inclusive) and keeps assignment history.
+            </DialogDescription>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              if (!closeDate || closeBlockedReason) return
+              setClosing(true)
+              try {
+                await api(`/projects/${id}/close`, {
+                  method: "POST",
+                  body: { closeDate },
+                })
+                setCloseOpen(false)
+                await load()
+              } catch (err) {
+                alert(
+                  err instanceof ApiError
+                    ? err.message
+                    : "Failed to close project",
+                )
+              } finally {
+                setClosing(false)
+              }
+            }}
+          >
+            <div className="grid gap-2">
+              <Label htmlFor="project-close-date">Close date</Label>
+              <Input
+                id="project-close-date"
+                type="date"
+                required
+                min={minCloseDate > todayIso ? undefined : minCloseDate}
+                max={todayIso}
+                value={closeDate}
+                onChange={(event) => setCloseDate(event.target.value)}
+              />
+              {latestAssignmentEnd ? (
+                <p className="text-xs text-muted-foreground">
+                  Cannot be before {latestAssignmentEnd}, the latest assignment
+                  end date.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Cannot be before the project start date
+                  {latestOpenAssignedFrom
+                    ? ` or an active assignment start (${latestOpenAssignedFrom})`
+                    : ""}
+                  .
+                </p>
+              )}
+              {wasAutoExtended ? (
+                <p className="text-xs text-muted-foreground">
+                  This project was auto-extended. Closing will remove that auto
+                  extension.
+                </p>
+              ) : null}
+              {hasManualExtension ? (
+                <p className="text-xs text-muted-foreground">
+                  This project has a manual extension until {projectEndDay}.
+                  Close date cannot be before that date.
+                </p>
+              ) : null}
+              {closeBlockedReason ? (
+                <p className="text-sm text-destructive">{closeBlockedReason}</p>
+              ) : null}
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={closing}
+                onClick={() => setCloseOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                disabled={closing || !closeDate || Boolean(closeBlockedReason)}
+              >
+                {closing ? "Closing…" : "Close project"}
               </Button>
             </DialogFooter>
           </form>

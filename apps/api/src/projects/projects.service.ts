@@ -37,6 +37,7 @@ import {
   CreateExtensionDto,
   CreateProjectDto,
   CreateProjectLinkDto,
+  CloseProjectDto,
   DEFAULT_PROJECT_THEME_COLOR,
   UnassignCoreMemberDto,
   UnassignEmployeeDto,
@@ -235,12 +236,70 @@ export class ProjectsService {
     return this.serializeProject(project);
   }
 
-  async close(id: string, actorId: string) {
+  async close(id: string, dto: CloseProjectDto = {}, actorId: string) {
     const before = await this.getProjectOrThrow(id);
-    if (before.status === ProjectStatus.closed || before.status === ProjectStatus.under_amc) {
+    if (
+      before.status === ProjectStatus.closed ||
+      before.status === ProjectStatus.under_amc
+    ) {
       throw new BadRequestException("Project is already closed");
     }
-    const closedAt = new Date();
+
+    const closeDateIso = dto.closeDate ?? nptTodayIso();
+    const closedAt = parseIsoDate(closeDateIso);
+    if (Number.isNaN(closedAt.getTime())) {
+      throw new BadRequestException("Invalid close date");
+    }
+    const today = nptTodayIso();
+    if (closeDateIso > today) {
+      throw new BadRequestException("Close date cannot be in the future");
+    }
+    const startDay = toIsoDate(before.startDate);
+    if (closeDateIso < startDay) {
+      throw new BadRequestException(
+        "Close date cannot be before the project start date",
+      );
+    }
+
+    const assignmentRows = [
+      ...before.employeeAssignments,
+      ...before.coreMemberAssignments,
+    ];
+    let latestAssignmentEnd: string | null = null;
+    for (const row of assignmentRows) {
+      if (row.unassignedAt) {
+        const ended = toIsoDate(row.unassignedAt);
+        if (!latestAssignmentEnd || ended > latestAssignmentEnd) {
+          latestAssignmentEnd = ended;
+        }
+      } else {
+        const assignedDay = toIsoDate(row.assignedAt);
+        if (closeDateIso < assignedDay) {
+          throw new BadRequestException(
+            `Close date cannot be before ${assignedDay}, when an assignment starts`,
+          );
+        }
+      }
+    }
+    if (latestAssignmentEnd && closeDateIso < latestAssignmentEnd) {
+      throw new BadRequestException(
+        `Close date cannot be before ${latestAssignmentEnd}, the latest assignment end date`,
+      );
+    }
+
+    const hasManualExtension = before.extensions.some(
+      (extension) => !extension.isAuto,
+    );
+    const endDay = toIsoDate(before.endDate);
+    if (hasManualExtension && closeDateIso < endDay) {
+      throw new BadRequestException(
+        `This project has a manual extension until ${endDay}. Close date cannot be before that date.`,
+      );
+    }
+
+    const removeAutoExtension = before.autoExtended;
+    const shortenEndDate = closeDateIso < endDay;
+
     const project = await this.prismaService.$transaction(async (tx) => {
       await tx.projectAssignment.updateMany({
         where: { projectId: id, unassignedAt: null },
@@ -250,13 +309,30 @@ export class ProjectsService {
         where: { projectId: id, unassignedAt: null },
         data: { unassignedAt: closedAt },
       });
+      if (removeAutoExtension) {
+        await tx.projectExtension.deleteMany({
+          where: { projectId: id, isAuto: true },
+        });
+      }
       return tx.project.update({
         where: { id },
-        data: { status: ProjectStatus.closed },
+        data: {
+          status: ProjectStatus.closed,
+          ...(removeAutoExtension ? { autoExtended: false } : {}),
+          ...(shortenEndDate ? { endDate: closedAt } : {}),
+        },
         include: this.projectInclude,
       });
     });
+
+    const coreMemberIds = [
+      ...new Set(
+        before.coreMemberAssignments.map((assignment) => assignment.coreMemberId),
+      ),
+    ];
+    await this.clearCacheForCoreMembers(coreMemberIds);
     this.profitabilityService.clearCache(id);
+
     await this.auditService.write({
       actorId,
       action: AuditAction.PROJECT_CLOSED,
@@ -271,7 +347,8 @@ export class ProjectsService {
         autoReleasedCoreMemberIds: before.coreMemberAssignments
           .filter((assignment) => !assignment.unassignedAt)
           .map((assignment) => assignment.coreMemberId),
-        closedAt,
+        closedAt: closeDateIso,
+        removedAutoExtension: removeAutoExtension,
       },
     });
     return this.serializeProject(project);

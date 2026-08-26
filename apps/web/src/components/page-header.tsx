@@ -3,6 +3,7 @@ import {
   PageBreadcrumbs,
   type BreadcrumbEntry,
 } from "@/components/page-breadcrumbs"
+import { useDocumentTitle } from "@/hooks/use-document-title"
 
 export function PageHeader({
   title,
@@ -18,6 +19,8 @@ export function PageHeader({
   actions?: ReactNode
   breadcrumbs?: BreadcrumbEntry[]
 }) {
+  useDocumentTitle(title)
+
   return (
     <div className="mb-6">
       {breadcrumbs?.length ? (

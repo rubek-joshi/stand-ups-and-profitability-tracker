@@ -251,3 +251,14 @@ export class CreateExtensionDto {
   @IsDateString()
   endDate!: string;
 }
+
+export class CloseProjectDto {
+  @ApiPropertyOptional({
+    example: "2026-08-26",
+    description:
+      "Last day of the project (inclusive). Defaults to today. Open assignments end on this date.",
+  })
+  @IsOptional()
+  @IsDateString()
+  closeDate?: string;
+}

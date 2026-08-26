@@ -8,5 +8,6 @@
         "permissioned",
         "rollups",
         "timesheets"
-    ]
+    ],
+    "svg.preview.background": "black"
 }

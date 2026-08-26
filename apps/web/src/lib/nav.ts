@@ -127,6 +127,14 @@ function matchingNavItem(pathname: string): NavItem | undefined {
   ).sort((a, b) => b.to.length - a.to.length)[0]
 }
 
+/** Section label for the current path (lists, nested routes, and auth screens). */
+export function navTitleForPath(pathname: string): string | undefined {
+  if (pathname === "/login") return "Login"
+  if (pathname === "/change-password") return "Change password"
+  if (pathname === "/profile" || pathname.startsWith("/profile")) return "Profile"
+  return matchingNavItem(pathname)?.title
+}
+
 export function isAppPathAllowed(
   pathname: string,
   role: string | null | undefined,
