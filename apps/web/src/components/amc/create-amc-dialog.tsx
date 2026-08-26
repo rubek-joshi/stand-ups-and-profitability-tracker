@@ -24,7 +24,7 @@ import { addMonths } from "@/lib/amc"
 import { parseNprInput } from "@/lib/money"
 import type { AmcRecord, AmcType, Project } from "@/lib/types"
 
-const DURATION_PRESETS = [3, 6, 12, 24] as const
+const DURATION_PRESETS = [3, 6, 12] as const
 
 type DurationPreset = (typeof DURATION_PRESETS)[number] | "custom"
 
@@ -209,6 +209,10 @@ export function CreateAmcDialog({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                A project must be closed to appear here. Projects already under
+                AMC are listed too.
+              </p>
             </div>
           ) : null}
 

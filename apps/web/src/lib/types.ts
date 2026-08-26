@@ -54,8 +54,18 @@ export type Project = {
   amcRecord?: AmcRecord | null
   employeeAssignments?: ProjectAssignment[]
   coreMemberAssignments?: CoreMemberAssignment[]
+  links?: ProjectLink[]
   dashboard?: ProjectDashboard
   canDelete?: boolean
+}
+
+export type ProjectLink = {
+  id: string
+  projectId?: string
+  label: string
+  url: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export type ProjectDashboard = {

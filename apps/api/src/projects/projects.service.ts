@@ -36,12 +36,15 @@ import {
   AssignEmployeesBulkDto,
   CreateExtensionDto,
   CreateProjectDto,
+  CreateProjectLinkDto,
   DEFAULT_PROJECT_THEME_COLOR,
   UnassignCoreMemberDto,
+  UnassignEmployeeDto,
   UpdateProjectDto,
+  UpdateProjectLinkDto,
 } from "./dto/project.dto";
 
-type CoreAssignmentPeriod = {
+type AssignmentPeriod = {
   assignedAt: Date;
   unassignedAt: Date | null;
 };
@@ -294,6 +297,7 @@ export class ProjectsService {
       await tx.projectAssignment.deleteMany({ where: { projectId: id } });
       await tx.coreMemberAssignment.deleteMany({ where: { projectId: id } });
       await tx.projectExtension.deleteMany({ where: { projectId: id } });
+      await tx.projectLink.deleteMany({ where: { projectId: id } });
       await tx.project.delete({ where: { id } });
     });
     this.profitabilityService.clearCache(id);
@@ -312,33 +316,42 @@ export class ProjectsService {
     dto: AssignEmployeeDto,
     actorId: string,
   ) {
-    await this.getProjectOrThrow(projectId);
+    const project = await this.getProjectOrThrow(projectId);
+    const period = this.resolveAssignmentPeriod(dto, project.status);
     const employee = await this.prismaService.employee.findUnique({
       where: { id: dto.employeeId },
     });
     if (!employee) {
       throw new NotFoundException(`Employee ${dto.employeeId} not found`);
     }
-    const existing = await this.prismaService.projectAssignment.findFirst({
-      where: {
+    this.assertPersonTenure(employee, period);
+    const existing = await this.prismaService.projectAssignment.findMany({
+      where: { projectId, employeeId: dto.employeeId },
+    });
+    this.assertNoAssignmentOverlap(existing, period, employee.name);
+    const assignment = await this.prismaService.projectAssignment.create({
+      data: {
         projectId,
         employeeId: dto.employeeId,
-        unassignedAt: null,
+        assignedAt: period.assignedAt,
+        unassignedAt: period.unassignedAt,
       },
-    });
-    if (existing) {
-      throw new BadRequestException("Employee is already assigned to this project");
-    }
-    const assignment = await this.prismaService.projectAssignment.create({
-      data: { projectId, employeeId: dto.employeeId },
       include: { employee: true },
     });
+    this.profitabilityService.clearCache(projectId);
     await this.auditService.write({
       actorId,
       action: AuditAction.PROJECT_ASSIGNMENT_CREATED,
       targetType: "ProjectAssignment",
       targetId: assignment.id,
-      metadata: { projectId, employeeId: dto.employeeId },
+      metadata: {
+        projectId,
+        employeeId: dto.employeeId,
+        assignedAt: toIsoDate(period.assignedAt),
+        unassignedAt: period.unassignedAt
+          ? toIsoDate(period.unassignedAt)
+          : null,
+      },
     });
     return assignment;
   }
@@ -348,48 +361,61 @@ export class ProjectsService {
     dto: AssignEmployeesBulkDto,
     actorId: string,
   ) {
-    await this.getProjectOrThrow(projectId);
+    const project = await this.getProjectOrThrow(projectId);
+    const period = this.resolveAssignmentPeriod(dto, project.status);
     const employeeIds = [...new Set(dto.employeeIds)];
     const employees = await this.prismaService.employee.findMany({
       where: { id: { in: employeeIds } },
-      select: { id: true, name: true, email: true },
     });
     if (employees.length !== employeeIds.length) {
       const foundIds = new Set(employees.map((employee) => employee.id));
-      const missingIds = employeeIds.filter((employeeId) => !foundIds.has(employeeId));
-      throw new NotFoundException(`Employees not found: ${missingIds.join(", ")}`);
+      const missingIds = employeeIds.filter(
+        (employeeId) => !foundIds.has(employeeId),
+      );
+      throw new NotFoundException(
+        `Employees not found: ${missingIds.join(", ")}`,
+      );
     }
     const existing = await this.prismaService.projectAssignment.findMany({
-      where: {
-        projectId,
-        employeeId: { in: employeeIds },
-        unassignedAt: null,
-      },
-      include: { employee: true },
+      where: { projectId, employeeId: { in: employeeIds } },
     });
-    if (existing.length > 0) {
-      throw new BadRequestException(
-        `Already assigned: ${existing
-          .map((assignment) => assignment.employee?.name ?? assignment.employeeId)
-          .join(", ")}`,
+    const existingByEmployee = new Map<string, typeof existing>();
+    for (const row of existing) {
+      const list = existingByEmployee.get(row.employeeId) ?? [];
+      list.push(row);
+      existingByEmployee.set(row.employeeId, list);
+    }
+    for (const employee of employees) {
+      this.assertPersonTenure(employee, period);
+      this.assertNoAssignmentOverlap(
+        existingByEmployee.get(employee.id) ?? [],
+        period,
+        employee.name,
       );
     }
 
     const created = await this.prismaService.$transaction(async (tx) => {
       await tx.projectAssignment.createMany({
-        data: employeeIds.map((employeeId) => ({ projectId, employeeId })),
+        data: employeeIds.map((employeeId) => ({
+          projectId,
+          employeeId,
+          assignedAt: period.assignedAt,
+          unassignedAt: period.unassignedAt,
+        })),
       });
       return tx.projectAssignment.findMany({
         where: {
           projectId,
           employeeId: { in: employeeIds },
-          unassignedAt: null,
+          assignedAt: period.assignedAt,
+          unassignedAt: period.unassignedAt,
         },
         include: { employee: true },
         orderBy: { assignedAt: "desc" },
       });
     });
 
+    this.profitabilityService.clearCache(projectId);
     await this.auditService.write({
       actorId,
       action: AuditAction.PROJECT_ASSIGNMENT_CREATED,
@@ -399,6 +425,10 @@ export class ProjectsService {
         projectId,
         employeeIds,
         count: created.length,
+        assignedAt: toIsoDate(period.assignedAt),
+        unassignedAt: period.unassignedAt
+          ? toIsoDate(period.unassignedAt)
+          : null,
       },
     });
 
@@ -409,25 +439,86 @@ export class ProjectsService {
     projectId: string,
     employeeId: string,
     actorId: string,
+    dto: UnassignEmployeeDto = {},
   ) {
     const assignment = await this.prismaService.projectAssignment.findFirst({
       where: { projectId, employeeId, unassignedAt: null },
+      include: { employee: true },
     });
     if (!assignment) {
       throw new NotFoundException("Active assignment not found");
     }
+    const period: AssignmentPeriod = {
+      assignedAt: assignment.assignedAt,
+      unassignedAt: dto.unassignedAt
+        ? parseIsoDate(dto.unassignedAt)
+        : parseIsoDate(nptTodayIso()),
+    };
+    this.assertAssignmentDates(period);
+    this.assertPersonTenure(assignment.employee, period);
+    const siblings = await this.prismaService.projectAssignment.findMany({
+      where: {
+        projectId,
+        employeeId,
+        id: { not: assignment.id },
+      },
+    });
+    this.assertNoAssignmentOverlap(siblings, period, assignment.employee.name);
     const updated = await this.prismaService.projectAssignment.update({
       where: { id: assignment.id },
-      data: { unassignedAt: new Date() },
+      data: { unassignedAt: period.unassignedAt },
     });
+    this.profitabilityService.clearCache(projectId);
     await this.auditService.write({
       actorId,
       action: AuditAction.PROJECT_ASSIGNMENT_ENDED,
       targetType: "ProjectAssignment",
       targetId: updated.id,
-      metadata: { projectId, employeeId },
+      metadata: {
+        projectId,
+        employeeId,
+        assignedAt: toIsoDate(assignment.assignedAt),
+        unassignedAt: period.unassignedAt
+          ? toIsoDate(period.unassignedAt)
+          : null,
+      },
     });
     return updated;
+  }
+
+  async deleteEmployeeAssignmentLog(
+    projectId: string,
+    assignmentId: string,
+    actorId: string,
+  ) {
+    const assignment = await this.prismaService.projectAssignment.findFirst({
+      where: { id: assignmentId, projectId },
+    });
+    if (!assignment) {
+      throw new NotFoundException("Assignment log not found");
+    }
+    if (!assignment.unassignedAt) {
+      throw new BadRequestException(
+        "Cannot delete an active assignment. Release it first.",
+      );
+    }
+    await this.prismaService.projectAssignment.delete({
+      where: { id: assignment.id },
+    });
+    this.profitabilityService.clearCache(projectId);
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.PROJECT_ASSIGNMENT_DELETED,
+      targetType: "ProjectAssignment",
+      targetId: assignment.id,
+      metadata: {
+        projectId,
+        employeeId: assignment.employeeId,
+        assignedAt: toIsoDate(assignment.assignedAt),
+        unassignedAt: toIsoDate(assignment.unassignedAt),
+      },
+    });
+    return { id: assignment.id };
   }
 
   async assignCoreMember(
@@ -436,18 +527,18 @@ export class ProjectsService {
     actorId: string,
   ) {
     const project = await this.getProjectOrThrow(projectId);
-    const period = this.resolveCoreMemberPeriod(dto, project.status);
+    const period = this.resolveAssignmentPeriod(dto, project.status);
     const coreMember = await this.prismaService.coreMember.findUnique({
       where: { id: dto.coreMemberId },
     });
     if (!coreMember) {
       throw new NotFoundException(`Core member ${dto.coreMemberId} not found`);
     }
-    this.assertCoreMemberTenure(coreMember, period);
+    this.assertPersonTenure(coreMember, period);
     const existing = await this.prismaService.coreMemberAssignment.findMany({
       where: { projectId, coreMemberId: dto.coreMemberId },
     });
-    this.assertNoCoreAssignmentOverlap(existing, period, coreMember.name);
+    this.assertNoAssignmentOverlap(existing, period, coreMember.name);
     const assignment = await this.prismaService.coreMemberAssignment.create({
       data: {
         projectId,
@@ -481,7 +572,7 @@ export class ProjectsService {
     actorId: string,
   ) {
     const project = await this.getProjectOrThrow(projectId);
-    const period = this.resolveCoreMemberPeriod(dto, project.status);
+    const period = this.resolveAssignmentPeriod(dto, project.status);
     const coreMemberIds = [...new Set(dto.coreMemberIds)];
     const members = await this.prismaService.coreMember.findMany({
       where: { id: { in: coreMemberIds } },
@@ -505,8 +596,8 @@ export class ProjectsService {
       existingByMember.set(row.coreMemberId, list);
     }
     for (const member of members) {
-      this.assertCoreMemberTenure(member, period);
-      this.assertNoCoreAssignmentOverlap(
+      this.assertPersonTenure(member, period);
+      this.assertNoAssignmentOverlap(
         existingByMember.get(member.id) ?? [],
         period,
         member.name,
@@ -567,14 +658,14 @@ export class ProjectsService {
     if (!assignment) {
       throw new NotFoundException("Active core member assignment not found");
     }
-    const period: CoreAssignmentPeriod = {
+    const period: AssignmentPeriod = {
       assignedAt: assignment.assignedAt,
       unassignedAt: dto.unassignedAt
         ? parseIsoDate(dto.unassignedAt)
         : parseIsoDate(nptTodayIso()),
     };
     this.assertAssignmentDates(period);
-    this.assertCoreMemberTenure(assignment.coreMember, period);
+    this.assertPersonTenure(assignment.coreMember, period);
     const siblings = await this.prismaService.coreMemberAssignment.findMany({
       where: {
         projectId,
@@ -582,7 +673,7 @@ export class ProjectsService {
         id: { not: assignment.id },
       },
     });
-    this.assertNoCoreAssignmentOverlap(
+    this.assertNoAssignmentOverlap(
       siblings,
       period,
       assignment.coreMember.name,
@@ -607,6 +698,41 @@ export class ProjectsService {
       },
     });
     return updated;
+  }
+
+  async deleteCoreMemberAssignmentLog(
+    projectId: string,
+    assignmentId: string,
+    actorId: string,
+  ) {
+    const assignment = await this.prismaService.coreMemberAssignment.findFirst({
+      where: { id: assignmentId, projectId },
+    });
+    if (!assignment) {
+      throw new NotFoundException("Assignment log not found");
+    }
+    if (!assignment.unassignedAt) {
+      throw new BadRequestException(
+        "Cannot delete an active assignment. Release it first.",
+      );
+    }
+    await this.prismaService.coreMemberAssignment.delete({
+      where: { id: assignment.id },
+    });
+    await this.clearCacheForCoreMembers([assignment.coreMemberId]);
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.CORE_MEMBER_ASSIGNMENT_DELETED,
+      targetType: "CoreMemberAssignment",
+      targetId: assignment.id,
+      metadata: {
+        projectId,
+        coreMemberId: assignment.coreMemberId,
+        assignedAt: toIsoDate(assignment.assignedAt),
+        unassignedAt: toIsoDate(assignment.unassignedAt),
+      },
+    });
+    return { id: assignment.id };
   }
 
   async addExtension(
@@ -683,6 +809,66 @@ export class ProjectsService {
     return { employees, coreMembers };
   }
 
+  async createLink(
+    projectId: string,
+    dto: CreateProjectLinkDto,
+    actorId: string,
+  ) {
+    await this.getProjectOrThrow(projectId);
+    const link = await this.prismaService.projectLink.create({
+      data: {
+        projectId,
+        label: dto.label.trim(),
+        url: dto.url.trim(),
+      },
+    });
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.PROJECT_LINK_CREATED,
+      targetType: "ProjectLink",
+      targetId: link.id,
+      metadata: { after: link },
+    });
+    return link;
+  }
+
+  async updateLink(
+    projectId: string,
+    linkId: string,
+    dto: UpdateProjectLinkDto,
+    actorId: string,
+  ) {
+    const before = await this.getLinkOrThrow(projectId, linkId);
+    const link = await this.prismaService.projectLink.update({
+      where: { id: linkId },
+      data: {
+        label: dto.label === undefined ? undefined : dto.label.trim(),
+        url: dto.url === undefined ? undefined : dto.url.trim(),
+      },
+    });
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.PROJECT_LINK_UPDATED,
+      targetType: "ProjectLink",
+      targetId: link.id,
+      metadata: { before, after: link },
+    });
+    return link;
+  }
+
+  async deleteLink(projectId: string, linkId: string, actorId: string) {
+    const before = await this.getLinkOrThrow(projectId, linkId);
+    await this.prismaService.projectLink.delete({ where: { id: linkId } });
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.PROJECT_LINK_DELETED,
+      targetType: "ProjectLink",
+      targetId: linkId,
+      metadata: { before },
+    });
+    return { id: linkId };
+  }
+
   private readonly projectInclude = {
     client: true,
     projectCategories: { include: { category: true } },
@@ -692,6 +878,7 @@ export class ProjectsService {
     amcRecords: {
       orderBy: { endDate: "desc" as const },
     },
+    links: { orderBy: { createdAt: "asc" as const } },
   } as const;
 
   private canDeleteProject(status: ProjectStatus, allocationCount: number) {
@@ -708,11 +895,11 @@ export class ProjectsService {
     );
   }
 
-  private resolveCoreMemberPeriod(
+  private resolveAssignmentPeriod(
     dto: { assignedAt: string; unassignedAt?: string },
     projectStatus: ProjectStatus,
-  ): CoreAssignmentPeriod {
-    const period: CoreAssignmentPeriod = {
+  ): AssignmentPeriod {
+    const period: AssignmentPeriod = {
       assignedAt: parseIsoDate(dto.assignedAt),
       unassignedAt: dto.unassignedAt ? parseIsoDate(dto.unassignedAt) : null,
     };
@@ -725,7 +912,7 @@ export class ProjectsService {
     return period;
   }
 
-  private assertAssignmentDates(period: CoreAssignmentPeriod) {
+  private assertAssignmentDates(period: AssignmentPeriod) {
     if (Number.isNaN(period.assignedAt.getTime())) {
       throw new BadRequestException("Invalid assigned from date");
     }
@@ -751,46 +938,46 @@ export class ProjectsService {
     }
   }
 
-  private assertCoreMemberTenure(
-    member: {
+  private assertPersonTenure(
+    person: {
       name: string;
       status: PersonStatus;
       dateJoined: Date;
       dateLeft: Date | null;
     },
-    period: CoreAssignmentPeriod,
+    period: AssignmentPeriod,
   ) {
     const assignedDay = toIsoDate(period.assignedAt);
-    const joinedDay = toIsoDate(member.dateJoined);
+    const joinedDay = toIsoDate(person.dateJoined);
     if (assignedDay < joinedDay) {
       throw new BadRequestException(
-        `${member.name} joined on ${joinedDay}; assigned from cannot be earlier`,
+        `${person.name} joined on ${joinedDay}; assigned from cannot be earlier`,
       );
     }
     const hasLeft =
-      member.status === PersonStatus.left || member.dateLeft !== null;
+      person.status === PersonStatus.left || person.dateLeft !== null;
     if (!hasLeft) {
       return;
     }
     if (!period.unassignedAt) {
       throw new BadRequestException(
-        `${member.name} has left; last day assigned is required`,
+        `${person.name} has left; last day assigned is required`,
       );
     }
-    if (member.dateLeft) {
-      const leftDay = toIsoDate(member.dateLeft);
+    if (person.dateLeft) {
+      const leftDay = toIsoDate(person.dateLeft);
       if (toIsoDate(period.unassignedAt) > leftDay) {
         throw new BadRequestException(
-          `${member.name} left on ${leftDay}; last day assigned cannot be later`,
+          `${person.name} left on ${leftDay}; last day assigned cannot be later`,
         );
       }
     }
   }
 
-  private assertNoCoreAssignmentOverlap(
+  private assertNoAssignmentOverlap(
     existing: Array<{ assignedAt: Date; unassignedAt: Date | null }>,
-    period: CoreAssignmentPeriod,
-    memberName: string,
+    period: AssignmentPeriod,
+    personName: string,
   ) {
     const overlaps = existing.some((row) =>
       assignmentPeriodsOverlap(
@@ -802,7 +989,7 @@ export class ProjectsService {
     );
     if (overlaps) {
       throw new BadRequestException(
-        `${memberName} already has an overlapping assignment on this project`,
+        `${personName} already has an overlapping assignment on this project`,
       );
     }
   }
@@ -830,6 +1017,16 @@ export class ProjectsService {
       throw new NotFoundException(`Project ${id} not found`);
     }
     return project;
+  }
+
+  private async getLinkOrThrow(projectId: string, linkId: string) {
+    const link = await this.prismaService.projectLink.findFirst({
+      where: { id: linkId, projectId },
+    });
+    if (!link) {
+      throw new NotFoundException("Project link not found");
+    }
+    return link;
   }
 
   private async ensureClientAndCategories(

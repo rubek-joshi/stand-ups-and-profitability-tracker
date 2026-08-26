@@ -4,6 +4,7 @@ import {
   createParamDecorator,
   Delete,
   ExecutionContext,
+  ForbiddenException,
   Get,
   Param,
   Patch,
@@ -16,6 +17,7 @@ import { ProjectStatus } from "@workspace/database";
 import { CurrentUser } from "../_shared/decorators/current-user.decorator";
 import { AuthUser } from "../auth/types/auth-user.type";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { CasbinService } from "../casbin/casbin.service";
 import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
 import { PoliciesGuard } from "../casbin/guards/policies.guard";
 import {
@@ -25,8 +27,11 @@ import {
   AssignEmployeesBulkDto,
   CreateExtensionDto,
   CreateProjectDto,
+  CreateProjectLinkDto,
   UnassignCoreMemberDto,
+  UnassignEmployeeDto,
   UpdateProjectDto,
+  UpdateProjectLinkDto,
 } from "./dto/project.dto";
 import { ProjectsService } from "./projects.service";
 import { StandupsService } from "../standups/standups.service";
@@ -50,6 +55,7 @@ export class ProjectsController {
   constructor(
     private readonly projectsService: ProjectsService,
     private readonly standupsService: StandupsService,
+    private readonly casbinService: CasbinService,
   ) {}
 
   @Post()
@@ -178,12 +184,35 @@ export class ProjectsController {
   @Delete(":id/assignments/employees/:employeeId")
   @RequirePermission("projects", "*")
   @ApiOperation({ summary: "Unassign employee" })
+  @ApiBody({ type: UnassignEmployeeDto, required: false })
   async unassignEmployee(
     @Param("id") id: string,
     @Param("employeeId") employeeId: string,
+    @OptionalJsonBody() dto: UnassignEmployeeDto,
     @CurrentUser() user: AuthUser,
   ) {
-    return this.projectsService.unassignEmployee(id, employeeId, user.id);
+    return this.projectsService.unassignEmployee(id, employeeId, user.id, {
+      unassignedAt:
+        typeof dto?.unassignedAt === "string" ? dto.unassignedAt : undefined,
+    });
+  }
+
+  @Delete(":id/assignment-logs/employees/:assignmentId")
+  @RequirePermission("projects", "*")
+  @ApiOperation({
+    summary: "Delete ended employee assignment log (super admin only)",
+  })
+  async deleteEmployeeAssignmentLog(
+    @Param("id") id: string,
+    @Param("assignmentId") assignmentId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    await this.assertSuperAdmin(user.id);
+    return this.projectsService.deleteEmployeeAssignmentLog(
+      id,
+      assignmentId,
+      user.id,
+    );
   }
 
   @Post(":id/assignments/core-members")
@@ -227,5 +256,66 @@ export class ProjectsController {
           typeof dto?.unassignedAt === "string" ? dto.unassignedAt : undefined,
       },
     );
+  }
+
+  @Delete(":id/assignment-logs/core-members/:assignmentId")
+  @RequirePermission("projects", "*")
+  @ApiOperation({
+    summary: "Delete ended core member assignment log (super admin only)",
+  })
+  async deleteCoreMemberAssignmentLog(
+    @Param("id") id: string,
+    @Param("assignmentId") assignmentId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    await this.assertSuperAdmin(user.id);
+    return this.projectsService.deleteCoreMemberAssignmentLog(
+      id,
+      assignmentId,
+      user.id,
+    );
+  }
+
+  @Post(":id/links")
+  @RequirePermission("projects", "*")
+  @ApiOperation({ summary: "Add a project link" })
+  async createLink(
+    @Param("id") id: string,
+    @Body() dto: CreateProjectLinkDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.projectsService.createLink(id, dto, user.id);
+  }
+
+  @Patch(":id/links/:linkId")
+  @RequirePermission("projects", "*")
+  @ApiOperation({ summary: "Update a project link" })
+  async updateLink(
+    @Param("id") id: string,
+    @Param("linkId") linkId: string,
+    @Body() dto: UpdateProjectLinkDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.projectsService.updateLink(id, linkId, dto, user.id);
+  }
+
+  @Delete(":id/links/:linkId")
+  @RequirePermission("projects", "*")
+  @ApiOperation({ summary: "Delete a project link" })
+  async deleteLink(
+    @Param("id") id: string,
+    @Param("linkId") linkId: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.projectsService.deleteLink(id, linkId, user.id);
+  }
+
+  private async assertSuperAdmin(userId: string) {
+    const role = await this.casbinService.getPrimaryRoleForUser(userId);
+    if (role !== "super_admin") {
+      throw new ForbiddenException(
+        "Only super admins can delete assignment logs",
+      );
+    }
   }
 }

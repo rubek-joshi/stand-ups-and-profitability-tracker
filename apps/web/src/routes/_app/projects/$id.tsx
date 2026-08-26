@@ -5,6 +5,7 @@ import {
   IconEye,
   IconLock,
   IconPencil,
+  IconPlus,
   IconShieldCheck,
   IconTrash,
   IconUserMinus,
@@ -99,6 +100,7 @@ import {
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { StandupHistoryView } from "@/components/standup/standup-history-view"
 import { ErrorState, LoadingState } from "@/components/ui-states"
+import { AUDIT_ROLES } from "@/lib/access"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { toIsoDateInput } from "@/lib/dashboard-metrics"
@@ -116,15 +118,10 @@ import type {
   Employee,
   Project,
   ProjectAssignment,
+  ProjectLink,
 } from "@/lib/types"
 
-const PROJECT_TABS = [
-  "team",
-  "standups",
-  "extensions",
-  "amc",
-  "labor",
-] as const
+const PROJECT_TABS = ["team", "standups", "extensions", "amc", "labor"] as const
 
 type ProjectTab = (typeof PROJECT_TABS)[number]
 
@@ -141,6 +138,15 @@ function parseIsoSearchDate(value: unknown): string {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ""
 }
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === "http:" || parsed.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 function parseEmployeeIdsSearch(search: Record<string, unknown>): string[] {
   const fromList =
     typeof search.employeeIds === "string"
@@ -151,7 +157,7 @@ function parseEmployeeIdsSearch(search: Record<string, unknown>): string[] {
       : Array.isArray(search.employeeIds)
         ? search.employeeIds.filter(
             (value): value is string =>
-              typeof value === "string" && value.trim().length > 0,
+              typeof value === "string" && value.trim().length > 0
           )
         : []
   return [...new Set(fromList)]
@@ -189,11 +195,15 @@ function ProjectDetailPage() {
         .split(",")
         .map((value) => value.trim())
         .filter(Boolean),
-    [employeeIds],
+    [employeeIds]
   )
   const { user } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
   const canDeleteAmc = user?.role === "super_admin"
+  const canDeleteAssignmentLogs = user?.role === "super_admin"
+  const canManageLinks = Boolean(
+    user?.role && (AUDIT_ROLES as string[]).includes(user.role)
+  )
   const [project, setProject] = React.useState<Project | null>(null)
   const [assignments, setAssignments] = React.useState<{
     employees: ProjectAssignment[]
@@ -213,6 +223,16 @@ function ProjectDetailPage() {
     string[]
   >([])
   const [addingEmployees, setAddingEmployees] = React.useState(false)
+  const [employeeAssignedFrom, setEmployeeAssignedFrom] = React.useState(() =>
+    toIsoDateInput(new Date())
+  )
+  const [employeeLastDay, setEmployeeLastDay] = React.useState("")
+  const [releaseEmployeeAssignment, setReleaseEmployeeAssignment] =
+    React.useState<ProjectAssignment | null>(null)
+  const [employeeReleaseDate, setEmployeeReleaseDate] = React.useState(() =>
+    toIsoDateInput(new Date())
+  )
+  const [releasingEmployee, setReleasingEmployee] = React.useState(false)
   const [coreMemberAddOpen, setCoreMemberAddOpen] = React.useState(false)
   const [coreMemberQuery, setCoreMemberQuery] = React.useState("")
   const [selectedCoreMemberIds, setSelectedCoreMemberIds] = React.useState<
@@ -220,15 +240,19 @@ function ProjectDetailPage() {
   >([])
   const [addingCoreMembers, setAddingCoreMembers] = React.useState(false)
   const [coreAssignedFrom, setCoreAssignedFrom] = React.useState(() =>
-    toIsoDateInput(new Date()),
+    toIsoDateInput(new Date())
   )
   const [coreLastDay, setCoreLastDay] = React.useState("")
   const [releaseAssignment, setReleaseAssignment] =
     React.useState<CoreMemberAssignment | null>(null)
   const [releaseDate, setReleaseDate] = React.useState(() =>
-    toIsoDateInput(new Date()),
+    toIsoDateInput(new Date())
   )
   const [releasing, setReleasing] = React.useState(false)
+  const [linkOpen, setLinkOpen] = React.useState(false)
+  const [editingLink, setEditingLink] = React.useState<ProjectLink | null>(null)
+  const [linkForm, setLinkForm] = React.useState({ label: "", url: "" })
+  const [savingLink, setSavingLink] = React.useState(false)
   const [amcCreateOpen, setAmcCreateOpen] = React.useState(false)
   const [extensionOpen, setExtensionOpen] = React.useState(false)
   const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
@@ -256,7 +280,7 @@ function ProjectDetailPage() {
       ])
       setProject(p.data)
       setAssignments(a.data)
-      setEmployees(emps.data.filter((employee) => employee.status === "active"))
+      setEmployees(emps.data)
       setCoreMembers(cores.data)
       try {
         const amcRes = await api<Envelope<AmcRecord[]>>(`/amc/projects/${id}`)
@@ -285,10 +309,9 @@ function ProjectDetailPage() {
   const dashboard = project.dashboard
   const summary = dashboard?.summary
   const laborSeries = dashboard?.laborSeries ?? []
-  const canManageEmployeeAssignments =
+  const canManageAssignments =
     project.status !== "closed" && project.status !== "under_amc"
-  const canManageAssignments = canManageEmployeeAssignments
-  const projectNeedsCoreEndDate =
+  const projectNeedsEndDate =
     project.status === "closed" || project.status === "under_amc"
   const todayIso = toIsoDateInput(new Date())
   const canDeleteProject = Boolean(project.canDelete)
@@ -365,8 +388,11 @@ function ProjectDetailPage() {
   )
 
   const openAddEmployees = () => {
+    const today = toIsoDateInput(new Date())
     setEmployeeQuery("")
     setSelectedEmployeeIds([])
+    setEmployeeAssignedFrom(today)
+    setEmployeeLastDay(projectNeedsEndDate ? today : "")
     setEmployeeAddOpen(true)
   }
 
@@ -375,13 +401,30 @@ function ProjectDetailPage() {
     setCoreMemberQuery("")
     setSelectedCoreMemberIds([])
     setCoreAssignedFrom(today)
-    setCoreLastDay(projectNeedsCoreEndDate ? today : "")
+    setCoreLastDay(projectNeedsEndDate ? today : "")
     setCoreMemberAddOpen(true)
+  }
+
+  const openReleaseEmployee = (assignment: ProjectAssignment) => {
+    setReleaseEmployeeAssignment(assignment)
+    setEmployeeReleaseDate(toIsoDateInput(new Date()))
   }
 
   const openReleaseCoreMember = (assignment: CoreMemberAssignment) => {
     setReleaseAssignment(assignment)
     setReleaseDate(toIsoDateInput(new Date()))
+  }
+
+  const openCreateLink = () => {
+    setEditingLink(null)
+    setLinkForm({ label: "", url: "" })
+    setLinkOpen(true)
+  }
+
+  const openEditLink = (link: ProjectLink) => {
+    setEditingLink(link)
+    setLinkForm({ label: link.label, url: link.url })
+    setLinkOpen(true)
   }
 
   const toggleEmployee = (employeeId: string, checked: boolean) => {
@@ -505,7 +548,7 @@ function ProjectDetailPage() {
                           })
                         } catch (e) {
                           alert(
-                            e instanceof ApiError ? e.message : "Delete failed",
+                            e instanceof ApiError ? e.message : "Delete failed"
                           )
                         }
                       }}
@@ -628,9 +671,7 @@ function ProjectDetailPage() {
                     </p>
                   </div>
                   <Button
-                    disabled={
-                      !canManageAssignments || availableEmployees.length === 0
-                    }
+                    disabled={availableEmployees.length === 0}
                     onClick={openAddEmployees}
                   >
                     <IconUserPlus className="size-3.5" />
@@ -645,8 +686,57 @@ function ProjectDetailPage() {
                     <DialogContent className="sm:max-w-lg">
                       <DialogHeader>
                         <DialogTitle>Add employees to project</DialogTitle>
+                        <DialogDescription>
+                          Assigned from is required. Last day assigned is
+                          inclusive; leave it blank if they are still on the
+                          project
+                          {projectNeedsEndDate
+                            ? ". Closed projects require a last day."
+                            : "."}
+                        </DialogDescription>
                       </DialogHeader>
                       <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="grid gap-2">
+                            <Label htmlFor="employee-assigned-from">
+                              Assigned from
+                            </Label>
+                            <Input
+                              id="employee-assigned-from"
+                              type="date"
+                              required
+                              max={todayIso}
+                              value={employeeAssignedFrom}
+                              onChange={(e) =>
+                                setEmployeeAssignedFrom(e.target.value)
+                              }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Required.
+                            </p>
+                          </div>
+                          <div className="grid gap-2">
+                            <Label htmlFor="employee-last-day">
+                              Last day assigned
+                            </Label>
+                            <Input
+                              id="employee-last-day"
+                              type="date"
+                              required={projectNeedsEndDate}
+                              min={employeeAssignedFrom}
+                              max={todayIso}
+                              value={employeeLastDay}
+                              onChange={(e) =>
+                                setEmployeeLastDay(e.target.value)
+                              }
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {projectNeedsEndDate
+                                ? "Required for closed projects."
+                                : "Optional. Omit if still assigned."}
+                            </p>
+                          </div>
+                        </div>
                         <Input
                           value={employeeQuery}
                           onChange={(e) => setEmployeeQuery(e.target.value)}
@@ -669,7 +759,7 @@ function ProjectDetailPage() {
                           {filteredAvailableEmployees.length === 0 ? (
                             <p className="py-6 text-center text-sm text-muted-foreground">
                               {availableEmployees.length === 0
-                                ? "All active employees are already assigned to this project."
+                                ? "Everyone with an open assignment on this project is already listed above."
                                 : "No employees match your search."}
                             </p>
                           ) : (
@@ -690,8 +780,13 @@ function ProjectDetailPage() {
                                   }
                                 />
                                 <span className="min-w-0">
-                                  <span className="block text-sm font-medium">
-                                    {employee.name}
+                                  <span className="flex items-center gap-2">
+                                    <span className="block text-sm font-medium">
+                                      {employee.name}
+                                    </span>
+                                    {employee.status === "left" ? (
+                                      <Badge variant="outline">Left</Badge>
+                                    ) : null}
                                   </span>
                                   <span className="block text-xs text-muted-foreground">
                                     {employee.email}
@@ -715,13 +810,36 @@ function ProjectDetailPage() {
                             selectedEmployeeIds.length === 0 || addingEmployees
                           }
                           onClick={async () => {
+                            if (!employeeAssignedFrom) {
+                              alert("Assigned from date is required")
+                              return
+                            }
+                            if (projectNeedsEndDate && !employeeLastDay) {
+                              alert(
+                                "Last day assigned is required for closed projects"
+                              )
+                              return
+                            }
+                            if (
+                              employeeLastDay &&
+                              employeeLastDay < employeeAssignedFrom
+                            ) {
+                              alert(
+                                "Last day assigned must be on or after the assigned-from date"
+                              )
+                              return
+                            }
                             setAddingEmployees(true)
                             try {
                               await api(
                                 `/projects/${id}/assignments/employees/bulk`,
                                 {
                                   method: "POST",
-                                  body: { employeeIds: selectedEmployeeIds },
+                                  body: {
+                                    employeeIds: selectedEmployeeIds,
+                                    assignedAt: employeeAssignedFrom,
+                                    unassignedAt: employeeLastDay || undefined,
+                                  },
                                 }
                               )
                               setEmployeeAddOpen(false)
@@ -744,6 +862,101 @@ function ProjectDetailPage() {
                             : `Add ${selectedEmployeeIds.length || ""} employee${selectedEmployeeIds.length === 1 ? "" : "s"}`.trim()}
                         </Button>
                       </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog
+                    open={releaseEmployeeAssignment !== null}
+                    onOpenChange={(open) => {
+                      if (!open) setReleaseEmployeeAssignment(null)
+                    }}
+                  >
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Release employee</DialogTitle>
+                        <DialogDescription>
+                          {releaseEmployeeAssignment
+                            ? `Set the last day ${releaseEmployeeAssignment.employee?.name ?? "this employee"} is assigned.`
+                            : "Set the last day assigned."}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form
+                        className="space-y-2"
+                        onSubmit={async (e) => {
+                          e.preventDefault()
+                          if (
+                            !releaseEmployeeAssignment ||
+                            !employeeReleaseDate
+                          )
+                            return
+                          const assignedDay = String(
+                            releaseEmployeeAssignment.assignedAt
+                          ).slice(0, 10)
+                          if (employeeReleaseDate < assignedDay) {
+                            alert(
+                              "Last day assigned must be on or after the assigned-from date"
+                            )
+                            return
+                          }
+                          setReleasingEmployee(true)
+                          try {
+                            await api(
+                              `/projects/${id}/assignments/employees/${releaseEmployeeAssignment.employeeId}`,
+                              {
+                                method: "DELETE",
+                                body: { unassignedAt: employeeReleaseDate },
+                              }
+                            )
+                            setReleaseEmployeeAssignment(null)
+                            await load()
+                          } catch (err) {
+                            alert(
+                              err instanceof ApiError
+                                ? err.message
+                                : "Failed to release employee"
+                            )
+                          } finally {
+                            setReleasingEmployee(false)
+                          }
+                        }}
+                      >
+                        <Label htmlFor="employee-release-date">
+                          Last day assigned
+                        </Label>
+                        <Input
+                          id="employee-release-date"
+                          type="date"
+                          required
+                          min={
+                            releaseEmployeeAssignment
+                              ? String(
+                                  releaseEmployeeAssignment.assignedAt
+                                ).slice(0, 10)
+                              : undefined
+                          }
+                          max={todayIso}
+                          value={employeeReleaseDate}
+                          onChange={(e) =>
+                            setEmployeeReleaseDate(e.target.value)
+                          }
+                        />
+                        <DialogFooter className="pt-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={releasingEmployee}
+                            onClick={() => setReleaseEmployeeAssignment(null)}
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            type="submit"
+                            disabled={releasingEmployee || !employeeReleaseDate}
+                          >
+                            {releasingEmployee ? "Releasing…" : "Release"}
+                          </Button>
+                        </DialogFooter>
+                      </form>
                     </DialogContent>
                   </Dialog>
 
@@ -778,15 +991,7 @@ function ProjectDetailPage() {
                               variant="outline"
                               size="sm"
                               className="mt-4 w-full"
-                              onClick={async () => {
-                                await api(
-                                  `/projects/${id}/assignments/employees/${assignment.employeeId}`,
-                                  {
-                                    method: "DELETE",
-                                  }
-                                )
-                                await load()
-                              }}
+                              onClick={() => openReleaseEmployee(assignment)}
                             >
                               <IconUserMinus className="size-3.5" />
                               Release
@@ -847,17 +1052,32 @@ function ProjectDetailPage() {
                                 <TableActionButton
                                   label="Unassign"
                                   variant="destructive"
+                                  onClick={() =>
+                                    openReleaseEmployee(assignment)
+                                  }
+                                >
+                                  <IconUserMinus className="size-3.5" />
+                                </TableActionButton>
+                              ) : canDeleteAssignmentLogs ? (
+                                <TableActionButton
+                                  label="Delete log"
+                                  variant="destructive"
                                   onClick={async () => {
+                                    const ok = await confirm({
+                                      title: "Delete assignment log?",
+                                      description: `This removes the ${String(assignment.assignedAt).slice(0, 10)}–${String(assignment.unassignedAt).slice(0, 10)} period for ${assignment.employee?.name ?? "this employee"}. Stand-up history is not deleted.`,
+                                      confirmLabel: "Delete",
+                                      destructive: true,
+                                    })
+                                    if (!ok) return
                                     await api(
-                                      `/projects/${id}/assignments/employees/${assignment.employeeId}`,
-                                      {
-                                        method: "DELETE",
-                                      }
+                                      `/projects/${id}/assignment-logs/employees/${assignment.id}`,
+                                      { method: "DELETE" }
                                     )
                                     await load()
                                   }}
                                 >
-                                  <IconUserMinus className="size-3.5" />
+                                  <IconTrash className="size-3.5" />
                                 </TableActionButton>
                               ) : null}
                             </TableActionsCell>
@@ -922,7 +1142,7 @@ function ProjectDetailPage() {
                           Assigned from is required. Last day assigned is
                           inclusive; leave it blank if they are still on the
                           project
-                          {projectNeedsCoreEndDate
+                          {projectNeedsEndDate
                             ? ". Closed projects require a last day."
                             : "."}
                         </DialogDescription>
@@ -943,6 +1163,9 @@ function ProjectDetailPage() {
                                 setCoreAssignedFrom(e.target.value)
                               }
                             />
+                            <p className="text-xs text-muted-foreground">
+                              Required.
+                            </p>
                           </div>
                           <div className="grid gap-2">
                             <Label htmlFor="core-last-day">
@@ -951,14 +1174,14 @@ function ProjectDetailPage() {
                             <Input
                               id="core-last-day"
                               type="date"
-                              required={projectNeedsCoreEndDate}
+                              required={projectNeedsEndDate}
                               min={coreAssignedFrom}
                               max={todayIso}
                               value={coreLastDay}
                               onChange={(e) => setCoreLastDay(e.target.value)}
                             />
                             <p className="text-xs text-muted-foreground">
-                              {projectNeedsCoreEndDate
+                              {projectNeedsEndDate
                                 ? "Required for closed projects."
                                 : "Optional. Omit if still assigned."}
                             </p>
@@ -1042,15 +1265,15 @@ function ProjectDetailPage() {
                               alert("Assigned from date is required")
                               return
                             }
-                            if (projectNeedsCoreEndDate && !coreLastDay) {
+                            if (projectNeedsEndDate && !coreLastDay) {
                               alert(
-                                "Last day assigned is required for closed projects",
+                                "Last day assigned is required for closed projects"
                               )
                               return
                             }
                             if (coreLastDay && coreLastDay < coreAssignedFrom) {
                               alert(
-                                "Last day assigned must be on or after the assigned-from date",
+                                "Last day assigned must be on or after the assigned-from date"
                               )
                               return
                             }
@@ -1111,11 +1334,11 @@ function ProjectDetailPage() {
                           e.preventDefault()
                           if (!releaseAssignment || !releaseDate) return
                           const assignedDay = String(
-                            releaseAssignment.assignedAt,
+                            releaseAssignment.assignedAt
                           ).slice(0, 10)
                           if (releaseDate < assignedDay) {
                             alert(
-                              "Last day assigned must be on or after the assigned-from date",
+                              "Last day assigned must be on or after the assigned-from date"
                             )
                             return
                           }
@@ -1126,7 +1349,7 @@ function ProjectDetailPage() {
                               {
                                 method: "DELETE",
                                 body: { unassignedAt: releaseDate },
-                              },
+                              }
                             )
                             setReleaseAssignment(null)
                             await load()
@@ -1134,7 +1357,7 @@ function ProjectDetailPage() {
                             alert(
                               err instanceof ApiError
                                 ? err.message
-                                : "Failed to release core member",
+                                : "Failed to release core member"
                             )
                           } finally {
                             setReleasing(false)
@@ -1152,7 +1375,7 @@ function ProjectDetailPage() {
                             releaseAssignment
                               ? String(releaseAssignment.assignedAt).slice(
                                   0,
-                                  10,
+                                  10
                                 )
                               : undefined
                           }
@@ -1211,9 +1434,7 @@ function ProjectDetailPage() {
                               variant="outline"
                               size="sm"
                               className="mt-4 w-full"
-                              onClick={() =>
-                                openReleaseCoreMember(assignment)
-                              }
+                              onClick={() => openReleaseCoreMember(assignment)}
                             >
                               <IconUserMinus className="size-3.5" />
                               Release
@@ -1280,6 +1501,27 @@ function ProjectDetailPage() {
                                   }
                                 >
                                   <IconUserMinus className="size-3.5" />
+                                </TableActionButton>
+                              ) : canDeleteAssignmentLogs ? (
+                                <TableActionButton
+                                  label="Delete log"
+                                  variant="destructive"
+                                  onClick={async () => {
+                                    const ok = await confirm({
+                                      title: "Delete assignment log?",
+                                      description: `This removes the ${String(assignment.assignedAt).slice(0, 10)}–${String(assignment.unassignedAt).slice(0, 10)} period for ${assignment.coreMember?.name ?? "this core member"} and recalculates cost.`,
+                                      confirmLabel: "Delete",
+                                      destructive: true,
+                                    })
+                                    if (!ok) return
+                                    await api(
+                                      `/projects/${id}/assignment-logs/core-members/${assignment.id}`,
+                                      { method: "DELETE" }
+                                    )
+                                    await load()
+                                  }}
+                                >
+                                  <IconTrash className="size-3.5" />
                                 </TableActionButton>
                               ) : null}
                             </TableActionsCell>
@@ -1749,11 +1991,191 @@ function ProjectDetailPage() {
                 label="Extensions"
                 value={`${summary?.extensionCount ?? project.extensions?.length ?? 0} total`}
               />
+              <div className="min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-xs tracking-wide text-muted-foreground uppercase">
+                    Project links
+                  </dt>
+                  {canManageLinks ? (
+                    <Button
+                      type="button"
+                      size="icon-sm"
+                      variant="ghost"
+                      aria-label="Add project link"
+                      onClick={openCreateLink}
+                    >
+                      <IconPlus className="size-3.5" />
+                    </Button>
+                  ) : null}
+                </div>
+                {(project.links ?? []).length === 0 ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    No project links
+                  </p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {(project.links ?? []).map((link) => (
+                      <li
+                        key={link.id}
+                        className="flex items-start justify-between gap-2 rounded-md border p-2"
+                      >
+                        <a
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="min-w-0 truncate font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          {link.label}
+                        </a>
+                        {canManageLinks ? (
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            <TableActionButton
+                              label="Edit project link"
+                              onClick={() => openEditLink(link)}
+                            >
+                              <IconPencil className="size-3.5" />
+                            </TableActionButton>
+                            <TableActionButton
+                              label="Delete project link"
+                              variant="destructive"
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: "Delete project link?",
+                                  description: `${link.label} will be removed from this project.`,
+                                  confirmLabel: "Delete",
+                                  destructive: true,
+                                })
+                                if (!ok) return
+                                await api(`/projects/${id}/links/${link.id}`, {
+                                  method: "DELETE",
+                                })
+                                await load()
+                              }}
+                            >
+                              <IconTrash className="size-3.5" />
+                            </TableActionButton>
+                          </div>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </CardContent>
           </Card>
         </aside>
       </div>
       {dialog}
+      <Dialog
+        open={linkOpen}
+        onOpenChange={(open) => {
+          setLinkOpen(open)
+          if (!open) setEditingLink(null)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingLink ? "Edit project link" : "Add project link"}
+            </DialogTitle>
+          </DialogHeader>
+          <form
+            className="space-y-3"
+            onSubmit={async (event) => {
+              event.preventDefault()
+              const label = linkForm.label.trim()
+              const url = linkForm.url.trim()
+              if (!label) {
+                alert("Label is required")
+                return
+              }
+              if (!isHttpUrl(url)) {
+                alert("URL must start with http:// or https://")
+                return
+              }
+              setSavingLink(true)
+              try {
+                const body = { label, url }
+                if (editingLink) {
+                  await api(`/projects/${id}/links/${editingLink.id}`, {
+                    method: "PATCH",
+                    body,
+                  })
+                } else {
+                  await api(`/projects/${id}/links`, {
+                    method: "POST",
+                    body,
+                  })
+                }
+                setLinkOpen(false)
+                setEditingLink(null)
+                await load()
+              } catch (caughtError) {
+                alert(
+                  caughtError instanceof ApiError
+                    ? caughtError.message
+                    : "Failed to save project link"
+                )
+              } finally {
+                setSavingLink(false)
+              }
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="project-link-label">Label</Label>
+              <Input
+                id="project-link-label"
+                required
+                maxLength={200}
+                value={linkForm.label}
+                onChange={(event) =>
+                  setLinkForm((form) => ({
+                    ...form,
+                    label: event.target.value,
+                  }))
+                }
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="project-link-url">URL</Label>
+              <Input
+                id="project-link-url"
+                type="url"
+                required
+                maxLength={2048}
+                placeholder="https://"
+                value={linkForm.url}
+                onChange={(event) =>
+                  setLinkForm((form) => ({
+                    ...form,
+                    url: event.target.value,
+                  }))
+                }
+              />
+              <p className="text-xs text-muted-foreground">
+                Must be an http or https URL. Opens in a new tab.
+              </p>
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={savingLink}
+                onClick={() => setLinkOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={savingLink}>
+                {savingLink
+                  ? "Saving…"
+                  : editingLink
+                    ? "Save link"
+                    : "Add link"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -100,8 +100,13 @@ enum AuditAction {
   PROJECT_AUTO_EXTENDED
   PROJECT_ASSIGNMENT_CREATED
   PROJECT_ASSIGNMENT_ENDED
+  PROJECT_ASSIGNMENT_DELETED
   CORE_MEMBER_ASSIGNED
   CORE_MEMBER_UNASSIGNED
+  CORE_MEMBER_ASSIGNMENT_DELETED
+  PROJECT_LINK_CREATED
+  PROJECT_LINK_UPDATED
+  PROJECT_LINK_DELETED
   EMPLOYEE_CREATED
   EMPLOYEE_UPDATED
   EMPLOYEE_MARKED_LEFT
@@ -293,6 +298,7 @@ model Project {
   extensions            ProjectExtension[]
   allocations           ProjectAllocation[]
   amcRecords            AmcRecord[]
+  links                 ProjectLink[]
 
   @@index([clientId])
   @@index([status])
@@ -340,6 +346,20 @@ model CoreMemberAssignment {
   @@index([projectId])
   @@index([coreMemberId])
   @@map("core_member_assignments")
+}
+
+model ProjectLink {
+  id        String   @id @default(cuid())
+  projectId String
+  label     String
+  url       String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("project_links")
 }
 
 model ProjectExtension {

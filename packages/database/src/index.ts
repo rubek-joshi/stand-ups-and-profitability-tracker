@@ -10,6 +10,7 @@ export type {
   ProjectCategory,
   ProjectAssignment,
   CoreMemberAssignment,
+  ProjectLink,
   ProjectExtension,
   Employee,
   EmployeeGroup,

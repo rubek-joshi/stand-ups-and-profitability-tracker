@@ -9,6 +9,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUrl,
   MaxLength,
   Min,
 } from "class-validator";
@@ -110,6 +111,18 @@ export class AssignEmployeeDto {
   @IsString()
   @IsNotEmpty()
   employeeId!: string;
+
+  @ApiProperty({ example: "2026-01-15", description: "First day assigned" })
+  @IsDateString()
+  assignedAt!: string;
+
+  @ApiPropertyOptional({
+    example: "2026-06-30",
+    description: "Last day assigned (inclusive). Omit if still assigned.",
+  })
+  @IsOptional()
+  @IsDateString()
+  unassignedAt?: string;
 }
 
 export class AssignEmployeesBulkDto {
@@ -118,6 +131,28 @@ export class AssignEmployeesBulkDto {
   @ArrayMinSize(1)
   @IsString({ each: true })
   employeeIds!: string[];
+
+  @ApiProperty({ example: "2026-01-15", description: "First day assigned" })
+  @IsDateString()
+  assignedAt!: string;
+
+  @ApiPropertyOptional({
+    example: "2026-06-30",
+    description: "Last day assigned (inclusive). Omit if still assigned.",
+  })
+  @IsOptional()
+  @IsDateString()
+  unassignedAt?: string;
+}
+
+export class UnassignEmployeeDto {
+  @ApiPropertyOptional({
+    example: "2026-06-30",
+    description: "Last day assigned (inclusive). Defaults to today.",
+  })
+  @IsOptional()
+  @IsDateString()
+  unassignedAt?: string;
 }
 
 export class AssignCoreMemberDto {
@@ -167,6 +202,34 @@ export class UnassignCoreMemberDto {
   @IsOptional()
   @IsDateString()
   unassignedAt?: string;
+}
+
+export class CreateProjectLinkDto {
+  @ApiProperty({ example: "Figma" })
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  label!: string;
+
+  @ApiProperty({ example: "https://www.figma.com/design/abc" })
+  @IsUrl({ protocols: ["http", "https"], require_protocol: true })
+  @MaxLength(2048)
+  url!: string;
+}
+
+export class UpdateProjectLinkDto {
+  @ApiPropertyOptional({ example: "Figma" })
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  @MaxLength(200)
+  label?: string;
+
+  @ApiPropertyOptional({ example: "https://www.figma.com/design/abc" })
+  @IsOptional()
+  @IsUrl({ protocols: ["http", "https"], require_protocol: true })
+  @MaxLength(2048)
+  url?: string;
 }
 
 export class CreateExtensionDto {
