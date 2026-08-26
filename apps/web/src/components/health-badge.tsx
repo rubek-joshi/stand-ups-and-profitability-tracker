@@ -42,9 +42,13 @@ export function StatusBadge({ status }: { status: string }) {
     paid_pending: "secondary",
     cancelled: "outline",
   }
+  const labels: Record<string, string> = {
+    under_amc: "Under AMC",
+  }
+  const label = labels[status] ?? status.replaceAll("_", " ")
   return (
-    <Badge variant={map[status] ?? "outline"} className="capitalize">
-      {status.replaceAll("_", " ")}
+    <Badge variant={map[status] ?? "outline"} className={labels[status] ? undefined : "capitalize"}>
+      {label}
     </Badge>
   )
 }

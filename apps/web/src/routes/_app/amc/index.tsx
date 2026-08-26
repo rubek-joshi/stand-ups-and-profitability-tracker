@@ -3,7 +3,9 @@ import { createFileRoute } from "@tanstack/react-router"
 import {
   IconAlertTriangle,
   IconCalendarClock,
+  IconLayoutGrid,
   IconShieldCheck,
+  IconTable,
   IconWallet,
   IconX,
 } from "@tabler/icons-react"
@@ -21,49 +23,80 @@ import {
 } from "@workspace/ui/components/select"
 import {
   Tabs,
-  TabsContent,
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
 import { AmcCard } from "@/components/amc/amc-card"
+import { AmcTable } from "@/components/amc/amc-table"
 import { CreateAmcDialog } from "@/components/amc/create-amc-dialog"
 import { DeclineAmcDialog } from "@/components/amc/decline-amc-dialog"
 import { EditAmcDialog } from "@/components/amc/edit-amc-dialog"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { PageHeader } from "@/components/page-header"
+import { PaginationBar } from "@/components/pagination-bar"
 import { ErrorState, LoadingState, EmptyState } from "@/components/ui-states"
-import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
+import { api, ApiError } from "@/lib/api"
+import type { PaginatedEnvelope } from "@/lib/api"
 import { amcDisplayStatus } from "@/lib/amc"
 import { useAuth } from "@/lib/auth"
-import { buildListQuery, parseOptionalString } from "@/lib/list-query"
+import {
+  buildListQuery,
+  clampPage,
+  parseListSearch,
+  parseOptionalString,
+  totalPagesFor,
+} from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
 import type { AmcRecord, Client } from "@/lib/types"
 
 const AMC_TABS = ["ongoing", "upcoming", "attention", "all"] as const
+const AMC_VIEWS = ["card", "table"] as const
 type AmcTab = (typeof AMC_TABS)[number]
+type AmcView = (typeof AMC_VIEWS)[number]
 
 function parseAmcTab(value: unknown): AmcTab {
   return AMC_TABS.includes(value as AmcTab) ? (value as AmcTab) : "ongoing"
 }
 
-type AmcSearch = {
-  clientId?: string
-  from?: string
-  to?: string
-  tab?: AmcTab
+function parseAmcView(value: unknown): AmcView | undefined {
+  return AMC_VIEWS.includes(value as AmcView) ? (value as AmcView) : undefined
+}
+
+const AMC_VIEW_KEY = "pt_amc_view"
+
+function getStoredAmcView(): AmcView {
+  if (typeof window === "undefined") return "card"
+  return parseAmcView(localStorage.getItem(AMC_VIEW_KEY)) ?? "card"
+}
+
+function setStoredAmcView(view: AmcView) {
+  if (typeof window === "undefined") return
+  localStorage.setItem(AMC_VIEW_KEY, view)
+}
+
+const EMPTY_COPY: Record<AmcTab, string> = {
+  ongoing: "No AMCs are currently running.",
+  upcoming: "Nothing scheduled yet — create an AMC to plan ahead.",
+  attention: "All clear. No renewals pending.",
+  all: "No AMCs yet.",
 }
 
 export const Route = createFileRoute("/_app/amc/")({
-  validateSearch: (search: Record<string, unknown>): AmcSearch => {
+  validateSearch: (search: Record<string, unknown>) => {
+    const { page, pageSize } = parseListSearch(search)
     const clientId = parseOptionalString(search.clientId)
     const from = parseOptionalString(search.from)
     const to = parseOptionalString(search.to)
     const tab = search.tab === undefined ? undefined : parseAmcTab(search.tab)
+    const view = parseAmcView(search.view)
     return {
+      page,
+      pageSize,
       ...(clientId ? { clientId } : {}),
       ...(from ? { from } : {}),
       ...(to ? { to } : {}),
       ...(tab ? { tab } : {}),
+      ...(view && view !== "card" ? { view } : {}),
     }
   },
   component: AmcPage,
@@ -128,8 +161,40 @@ function FilterChip({
 
 function AmcPage() {
   const navigate = Route.useNavigate()
-  const { clientId, from, to, tab = "ongoing" } = Route.useSearch()
+  const {
+    clientId,
+    from,
+    to,
+    tab = "ongoing",
+    view = "card",
+    page,
+    pageSize,
+  } = Route.useSearch()
   const { user } = useAuth()
+
+  React.useLayoutEffect(() => {
+    if (view === "table") {
+      setStoredAmcView("table")
+      return
+    }
+    if (getStoredAmcView() !== "table") return
+    void navigate({
+      search: (prev) => ({ ...prev, view: "table" }),
+      replace: true,
+    })
+    // Restore once per visit; later toggles write storage themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const setView = (next: AmcView) => {
+    setStoredAmcView(next)
+    void navigate({
+      search: (prev) => ({
+        ...prev,
+        view: next === "card" ? undefined : next,
+      }),
+    })
+  }
   const { confirm, dialog } = useConfirmDialog()
   const canDelete = user?.role === "super_admin"
 
@@ -169,17 +234,17 @@ function AmcPage() {
   }, [load])
 
   React.useEffect(() => {
-    let cancelled = false
+    const request = { cancelled: false }
     void (async () => {
       try {
         const res = await api<PaginatedEnvelope<Client[]>>("/clients")
-        if (!cancelled) setClients(res.data)
+        if (!request.cancelled) setClients(res.data)
       } catch {
         // Client filter stays empty if load fails
       }
     })()
     return () => {
-      cancelled = true
+      request.cancelled = true
     }
   }, [])
 
@@ -268,26 +333,21 @@ function AmcPage() {
     }
   }
 
-  const list = (items: { amc: AmcRecord }[], empty: string) =>
-    items.length ? (
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {items.map(({ amc }) => (
-          <AmcCard
-            key={amc.id}
-            amc={amc}
-            onRenew={(a) => void handleRenew(a)}
-            onDecline={(a) => void handleDecline(a)}
-            onEdit={setEditAmc}
-            onDelete={(a) => void handleDelete(a)}
-            canDelete={canDelete}
-          />
-        ))}
-      </div>
-    ) : (
-      <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
-        {empty}
-      </div>
-    )
+  const tabItems = groups[tab]
+  const total = tabItems.length
+  const totalPages = totalPagesFor(total, pageSize)
+  const safePage = clampPage(page, totalPages)
+  const pagedItems = tabItems.slice(
+    (safePage - 1) * pageSize,
+    safePage * pageSize
+  )
+  const cardActions = {
+    onRenew: (a: AmcRecord) => void handleRenew(a),
+    onDecline: (a: AmcRecord) => void handleDecline(a),
+    onEdit: setEditAmc,
+    onDelete: (a: AmcRecord) => void handleDelete(a),
+    canDelete,
+  }
 
   return (
     <div>
@@ -319,6 +379,7 @@ function AmcPage() {
                   search: (prev) => ({
                     ...prev,
                     clientId: v || undefined,
+                    page: 1,
                   }),
                 })
               }}
@@ -347,7 +408,7 @@ function AmcPage() {
               onChange={(e) => {
                 const next = e.target.value || undefined
                 void navigate({
-                  search: (prev) => ({ ...prev, from: next }),
+                  search: (prev) => ({ ...prev, from: next, page: 1 }),
                 })
               }}
             />
@@ -363,7 +424,7 @@ function AmcPage() {
               onChange={(e) => {
                 const next = e.target.value || undefined
                 void navigate({
-                  search: (prev) => ({ ...prev, to: next }),
+                  search: (prev) => ({ ...prev, to: next, page: 1 }),
                 })
               }}
             />
@@ -373,12 +434,13 @@ function AmcPage() {
               variant="outline"
               onClick={() => {
                 void navigate({
-                  search: {
-                    tab,
+                  search: (prev) => ({
+                    ...prev,
                     clientId: undefined,
                     from: undefined,
                     to: undefined,
-                  },
+                    page: 1,
+                  }),
                 })
               }}
             >
@@ -394,7 +456,11 @@ function AmcPage() {
                 label={`Client: ${selectedClientName ?? "Unknown"}`}
                 onRemove={() => {
                   void navigate({
-                    search: (prev) => ({ ...prev, clientId: undefined }),
+                    search: (prev) => ({
+                      ...prev,
+                      clientId: undefined,
+                      page: 1,
+                    }),
                   })
                 }}
               />
@@ -404,7 +470,7 @@ function AmcPage() {
                 label={`From: ${formatFilterDate(from)}`}
                 onRemove={() => {
                   void navigate({
-                    search: (prev) => ({ ...prev, from: undefined }),
+                    search: (prev) => ({ ...prev, from: undefined, page: 1 }),
                   })
                 }}
               />
@@ -414,7 +480,7 @@ function AmcPage() {
                 label={`To: ${formatFilterDate(to)}`}
                 onRemove={() => {
                   void navigate({
-                    search: (prev) => ({ ...prev, to: undefined }),
+                    search: (prev) => ({ ...prev, to: undefined, page: 1 }),
                   })
                 }}
               />
@@ -464,46 +530,101 @@ function AmcPage() {
               }
             />
           ) : (
-            <Tabs
-              value={tab}
-              onValueChange={(next) => {
-                void navigate({
-                  search: (prev) => ({
-                    ...prev,
-                    tab: parseAmcTab(next),
-                  }),
-                })
-              }}
-            >
-              <TabsList>
-                <TabsTrigger value="all">All ({groups.all.length})</TabsTrigger>
-                <TabsTrigger value="ongoing">
-                  Ongoing ({groups.ongoing.length})
-                </TabsTrigger>
-                <TabsTrigger value="upcoming">
-                  Upcoming ({groups.upcoming.length})
-                </TabsTrigger>
-                <TabsTrigger value="attention">
-                  Follow-up ({groups.attention.length})
-                </TabsTrigger>
-              </TabsList>
+            <div className="space-y-6">
+              <Tabs
+                value={tab}
+                onValueChange={(next) => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      tab: parseAmcTab(next),
+                      page: 1,
+                    }),
+                  })
+                }}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <TabsList>
+                    <TabsTrigger value="all">
+                      All ({groups.all.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="ongoing">
+                      Ongoing ({groups.ongoing.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="upcoming">
+                      Upcoming ({groups.upcoming.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="attention">
+                      Follow-up ({groups.attention.length})
+                    </TabsTrigger>
+                  </TabsList>
+                  <div className="flex items-center gap-1 rounded-md border p-0.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={view === "card" ? "secondary" : "ghost"}
+                      className="h-8 gap-1.5 px-2.5"
+                      aria-pressed={view === "card"}
+                      onClick={() => setView("card")}
+                    >
+                      <IconLayoutGrid className="size-3.5" />
+                      Cards
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={view === "table" ? "secondary" : "ghost"}
+                      className="h-8 gap-1.5 px-2.5"
+                      aria-pressed={view === "table"}
+                      onClick={() => setView("table")}
+                    >
+                      <IconTable className="size-3.5" />
+                      Table
+                    </Button>
+                  </div>
+                </div>
+              </Tabs>
 
-              <TabsContent value="ongoing" className="mt-6">
-                {list(groups.ongoing, "No AMCs are currently running.")}
-              </TabsContent>
-              <TabsContent value="upcoming" className="mt-6">
-                {list(
-                  groups.upcoming,
-                  "Nothing scheduled yet — create an AMC to plan ahead."
-                )}
-              </TabsContent>
-              <TabsContent value="attention" className="mt-6">
-                {list(groups.attention, "All clear. No renewals pending.")}
-              </TabsContent>
-              <TabsContent value="all" className="mt-6">
-                {list(groups.all, "No AMCs yet.")}
-              </TabsContent>
-            </Tabs>
+              {pagedItems.length === 0 ? (
+                <div className="rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground">
+                  {EMPTY_COPY[tab]}
+                </div>
+              ) : view === "table" ? (
+                <AmcTable
+                  items={pagedItems.map(({ amc }) => amc)}
+                  {...cardActions}
+                />
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {pagedItems.map(({ amc }) => (
+                    <AmcCard key={amc.id} amc={amc} {...cardActions} />
+                  ))}
+                </div>
+              )}
+
+              {total > 0 ? (
+                <PaginationBar
+                  page={safePage}
+                  totalPages={totalPages}
+                  total={total}
+                  pageSize={pageSize}
+                  onPageChange={(nextPage) => {
+                    void navigate({
+                      search: (prev) => ({ ...prev, page: nextPage }),
+                    })
+                  }}
+                  onPageSizeChange={(size) => {
+                    void navigate({
+                      search: (prev) => ({
+                        ...prev,
+                        pageSize: size,
+                        page: 1,
+                      }),
+                    })
+                  }}
+                />
+              ) : null}
+            </div>
           )}
         </>
       ) : null}

@@ -21,26 +21,15 @@ import {
 import { Progress } from "@workspace/ui/components/progress"
 import {
   amcDisplayStatus,
+  AMC_STATUS_META,
   amcEnd,
   amcProgress,
   amcStart,
   daysBetween,
   fmtAmcDate,
-  type AmcDisplayStatus,
 } from "@/lib/amc"
 import { formatNpr } from "@/lib/money"
 import type { AmcRecord } from "@/lib/types"
-
-const STATUS_META: Record<
-  AmcDisplayStatus,
-  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
-> = {
-  ongoing: { label: "Ongoing", variant: "default" },
-  expiring: { label: "Expiring soon", variant: "secondary" },
-  upcoming: { label: "Upcoming", variant: "outline" },
-  "awaiting-decision": { label: "Awaiting decision", variant: "destructive" },
-  expired: { label: "Expired", variant: "outline" },
-}
 
 export function AmcCard({
   amc,
@@ -58,7 +47,7 @@ export function AmcCard({
   canDelete?: boolean
 }) {
   const status = amcDisplayStatus(amc)
-  const meta = STATUS_META[status]
+  const meta = AMC_STATUS_META[status]
   const today = new Date()
   const pct = amcProgress(amc, today)
   const end = amcEnd(amc)

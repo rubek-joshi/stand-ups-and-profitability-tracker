@@ -43,6 +43,17 @@ export function amcDisplayStatus(
   return "ongoing"
 }
 
+export const AMC_STATUS_META: Record<
+  AmcDisplayStatus,
+  { label: string; variant: "default" | "secondary" | "destructive" | "outline" }
+> = {
+  ongoing: { label: "Ongoing", variant: "default" },
+  expiring: { label: "Expiring soon", variant: "secondary" },
+  upcoming: { label: "Upcoming", variant: "outline" },
+  "awaiting-decision": { label: "Awaiting decision", variant: "destructive" },
+  expired: { label: "Expired", variant: "outline" },
+}
+
 export function amcProgress(amc: AmcRecord, today = new Date()) {
   const start = day(amcStart(amc)).getTime()
   const end = day(amcEnd(amc)).getTime()

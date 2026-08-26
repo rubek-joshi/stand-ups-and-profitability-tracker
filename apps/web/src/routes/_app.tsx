@@ -11,6 +11,7 @@ import { getToken } from "@/lib/api"
 import { homePathForRole } from "@/lib/access"
 import { useAuth } from "@/lib/auth"
 import { isAppPathAllowed } from "@/lib/nav"
+import { getSidebarOpen, setSidebarOpen } from "@/lib/nav-storage"
 import { PAGE_CONTAINER_CLASS } from "@/lib/layout"
 import { LoadingState } from "@/components/ui-states"
 
@@ -29,6 +30,7 @@ function AppLayout() {
   const { loading, token, user } = useAuth()
   const navigate = Route.useNavigate()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const [sidebarOpen, setSidebarOpenState] = React.useState(getSidebarOpen)
 
   React.useEffect(() => {
     if (!loading && !token) {
@@ -62,7 +64,13 @@ function AppLayout() {
 
   return (
     <TooltipProvider>
-      <SidebarProvider>
+      <SidebarProvider
+        open={sidebarOpen}
+        onOpenChange={(open) => {
+          setSidebarOpenState(open)
+          setSidebarOpen(open)
+        }}
+      >
         <AppSidebar />
         <SidebarInset>
           <AppHeader />

@@ -23,6 +23,10 @@ import {
 } from "@workspace/ui/components/sidebar"
 import { cn } from "@workspace/ui/lib/utils"
 import { navGroupsForRole, type NavGroup, type NavItem } from "@/lib/nav"
+import {
+  getNavGroupOpen,
+  setNavGroupOpen,
+} from "@/lib/nav-storage"
 import { homePathForRole } from "@/lib/access"
 import { useAuth } from "@/lib/auth"
 
@@ -73,18 +77,26 @@ function CollapsibleNavGroup({
   const hasActiveChild = group.items.some((item) =>
     isItemActive(pathname, item),
   )
-  const [open, setOpen] = React.useState(
-    () => group.id === "work" || hasActiveChild,
+  const [open, setOpen] = React.useState(() =>
+    getNavGroupOpen(group.id, group.id === "work" || hasActiveChild),
   )
+  const wasActive = React.useRef(hasActiveChild)
 
   React.useEffect(() => {
-    if (hasActiveChild) setOpen(true)
-  }, [hasActiveChild])
+    if (hasActiveChild && !wasActive.current) {
+      setOpen(true)
+      setNavGroupOpen(group.id, true)
+    }
+    wasActive.current = hasActiveChild
+  }, [group.id, hasActiveChild])
 
   return (
     <Collapsible
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={(next) => {
+        setOpen(next)
+        setNavGroupOpen(group.id, next)
+      }}
       className="group/collapsible"
     >
       <SidebarGroup className="py-0">
