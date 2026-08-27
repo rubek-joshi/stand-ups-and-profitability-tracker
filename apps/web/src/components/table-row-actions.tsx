@@ -121,6 +121,7 @@ type TableActionButtonProps = {
   label: string
   children: React.ReactNode
   variant?: React.ComponentProps<typeof Button>["variant"]
+  size?: React.ComponentProps<typeof Button>["size"]
   disabled?: boolean
   onClick?: React.MouseEventHandler<HTMLButtonElement>
   className?: string
@@ -131,6 +132,7 @@ export function TableActionButton({
   label,
   children,
   variant = "ghost",
+  size = "icon-xs",
   disabled,
   onClick,
   className,
@@ -141,7 +143,7 @@ export function TableActionButton({
         render={
           <Button
             type="button"
-            size="icon-xs"
+            size={size}
             variant={variant}
             disabled={disabled}
             aria-label={label}

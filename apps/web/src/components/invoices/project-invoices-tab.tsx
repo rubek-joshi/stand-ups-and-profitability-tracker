@@ -4,6 +4,7 @@ import {
   IconAlertTriangle,
   IconCalendarOff,
   IconCircleCheck,
+  IconDotsVertical,
   IconPencil,
   IconPlus,
   IconReceipt,
@@ -11,7 +12,20 @@ import {
 } from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import {
   Empty,
   EmptyContent,
@@ -27,6 +41,7 @@ import { InvoiceTable } from "@/components/invoices/invoice-table"
 import { MarkPaidDialog } from "@/components/invoices/mark-paid-dialog"
 import { ListViewToggle } from "@/components/list-view-toggle"
 import { PaginationBar } from "@/components/pagination-bar"
+import { TableActionButton } from "@/components/table-row-actions"
 import { StatusBadge } from "@/components/health-badge"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError } from "@/lib/api"
@@ -64,8 +79,12 @@ function SummaryCard({
     <Card>
       <CardContent className="p-4">
         <div className="text-sm text-muted-foreground">{label}</div>
-        <div className={`mt-1 text-xl font-semibold ${accent ?? ""}`}>{value}</div>
-        {sub ? <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div> : null}
+        <div className={`mt-1 text-xl font-semibold ${accent ?? ""}`}>
+          {value}
+        </div>
+        {sub ? (
+          <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>
+        ) : null}
       </CardContent>
     </Card>
   )
@@ -82,7 +101,9 @@ function Row({
 }) {
   return (
     <div className="flex justify-between gap-3">
-      <span className={bold ? "font-medium" : "text-muted-foreground"}>{label}</span>
+      <span className={bold ? "font-medium" : "text-muted-foreground"}>
+        {label}
+      </span>
       <span className={bold ? "font-semibold" : ""}>{value}</span>
     </div>
   )
@@ -134,11 +155,13 @@ export function ProjectInvoicesTab({
     setError(null)
     try {
       const res = await api<PaginatedEnvelope<Invoice[]>>(
-        `/invoices?projectId=${encodeURIComponent(project.id)}`,
+        `/invoices?projectId=${encodeURIComponent(project.id)}`
       )
       setInvoices(res.data)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to load invoices")
+      setError(
+        err instanceof ApiError ? err.message : "Failed to load invoices"
+      )
     } finally {
       setLoading(false)
     }
@@ -149,17 +172,16 @@ export function ProjectInvoicesTab({
   }, [load])
 
   const analytics = computeInvoiceAnalytics(invoices)
-  const budgetPaisa =
-    project.profitability?.revenuePaisa ?? project.budgetPaisa
+  const budgetPaisa = project.profitability?.revenuePaisa ?? project.budgetPaisa
   const budget = paisaNumber(budgetPaisa)
   const remainingToInvoice = budget - analytics.totalAmountPaisa
   const stale = isInvoiceListStale(invoices)
   const sorted = React.useMemo(
     () =>
       [...invoices].sort((a, b) =>
-        String(b.invoiceDate).localeCompare(String(a.invoiceDate)),
+        String(b.invoiceDate).localeCompare(String(a.invoiceDate))
       ),
-    [invoices],
+    [invoices]
   )
   const totalPages = totalPagesFor(sorted.length, pageSize)
   const safePage = clampPage(page, totalPages)
@@ -174,7 +196,9 @@ export function ProjectInvoicesTab({
       })
       await load()
     } catch (err) {
-      alert(err instanceof ApiError ? err.message : "Failed to mark invoice paid")
+      alert(
+        err instanceof ApiError ? err.message : "Failed to mark invoice paid"
+      )
       throw err
     }
   }
@@ -229,7 +253,9 @@ export function ProjectInvoicesTab({
           {stale ? (
             <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200">
               <IconCalendarOff className="mt-0.5 size-4 shrink-0" />
-              <span>No invoice issued for this project in the last 30 days.</span>
+              <span>
+                No invoice issued for this project in the last 30 days.
+              </span>
             </div>
           ) : null}
         </div>
@@ -308,99 +334,114 @@ export function ProjectInvoicesTab({
                   onEdit={setEditing}
                 />
               ) : (
-                <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
                   {paged.map((invoice) => {
                     const overdue = isInvoiceOverdue(invoice)
                     return (
-                      <Card key={invoice.id}>
-                        <CardContent className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
+                      <Card key={invoice.id} size="sm">
+                        <CardHeader className="items-center">
+                          <div className="flex min-w-0 flex-wrap items-center gap-2">
+                            <CardTitle>
                               <Link
                                 to="/invoices/$id"
                                 params={{ id: invoice.id }}
-                                className="font-medium hover:underline"
+                                className="hover:underline"
                               >
                                 {invoice.invoiceNumber}
                               </Link>
-                              <StatusBadge status={invoice.status} />
-                              {overdue ? (
-                                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">
-                                  Overdue
-                                </Badge>
-                              ) : null}
-                            </div>
-                            <div className="mt-1 text-sm text-muted-foreground">
-                              {toDateKey(invoice.invoiceDate)}
-                              {invoice.status === "paid" && invoice.paymentDate ? (
-                                <span className="ml-2">
-                                  · Paid {toDateKey(invoice.paymentDate)}
-                                  <span className="ml-1 text-xs">
-                                    (
-                                    {calendarDaysBetween(
-                                      invoice.invoiceDate,
-                                      invoice.paymentDate,
-                                    )}
-                                    d)
-                                  </span>
-                                </span>
-                              ) : null}
-                            </div>
+                            </CardTitle>
+                            <StatusBadge status={invoice.status} />
+                            {overdue ? (
+                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">
+                                Overdue
+                              </Badge>
+                            ) : null}
                           </div>
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <div className="text-sm text-muted-foreground">
-                                {formatNpr(invoice.amountPaisa)}
-                                {paisaNumber(invoice.vatPaisa) > 0 ? (
-                                  <span className="text-xs">
-                                    {" "}
-                                    +{formatNpr(invoice.vatPaisa)} VAT
-                                  </span>
+                          {canMutate ? (
+                            <CardAction>
+                              <div className="flex items-center">
+                                {invoice.status === "pending" ? (
+                                  <TableActionButton
+                                    label="Mark paid"
+                                    size="icon-sm"
+                                    onClick={() => setPaying(invoice)}
+                                  >
+                                    <IconCircleCheck />
+                                  </TableActionButton>
                                 ) : null}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger
+                                    render={
+                                      <Button
+                                        size="icon-sm"
+                                        variant="ghost"
+                                        aria-label="Invoice actions"
+                                      />
+                                    }
+                                  >
+                                    <IconDotsVertical />
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent
+                                    align="end"
+                                    className="min-w-40"
+                                  >
+                                    <DropdownMenuGroup>
+                                      {invoice.status === "pending" ? (
+                                        <DropdownMenuItem
+                                          onClick={() => setEditing(invoice)}
+                                        >
+                                          <IconPencil />
+                                          Edit
+                                        </DropdownMenuItem>
+                                      ) : null}
+                                      <DropdownMenuItem
+                                        variant="destructive"
+                                        onClick={() =>
+                                          void deleteInvoice(invoice)
+                                        }
+                                      >
+                                        <IconTrash />
+                                        Delete
+                                      </DropdownMenuItem>
+                                    </DropdownMenuGroup>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
-                              <div className="font-semibold">
-                                {formatNpr(invoice.totalPaisa)}
-                              </div>
-                              {budget > 0 ? (
-                                <div className="text-xs text-muted-foreground">
-                                  {(
-                                    (paisaNumber(invoice.amountPaisa) / budget) *
-                                    100
-                                  ).toFixed(1)}
-                                  % of budget
-                                </div>
+                            </CardAction>
+                          ) : null}
+                        </CardHeader>
+                        <CardContent className="flex flex-row items-start justify-between gap-1">
+                          <div>
+                            <div className="text-xs text-muted-foreground">
+                              {formatNpr(invoice.amountPaisa)}
+                              {paisaNumber(invoice.vatPaisa) > 0 ? (
+                                <span> +{formatNpr(invoice.vatPaisa)} VAT</span>
                               ) : null}
                             </div>
-                            {canMutate ? (
-                              <div className="flex flex-col gap-1.5">
-                                {invoice.status === "pending" ? (
-                                  <>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => setEditing(invoice)}
-                                    >
-                                      <IconPencil className="size-4" />
-                                      Edit
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => setPaying(invoice)}
-                                    >
-                                      <IconCircleCheck className="size-4" />
-                                      Mark paid
-                                    </Button>
-                                  </>
-                                ) : null}
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className="text-destructive hover:text-destructive"
-                                  onClick={() => void deleteInvoice(invoice)}
-                                >
-                                  <IconTrash className="size-4" />
-                                </Button>
+                            <div className="font-semibold">
+                              {formatNpr(invoice.totalPaisa)}
+                            </div>
+                            {budget > 0 ? (
+                              <div className="mt-0.5 text-xs text-muted-foreground">
+                                {(
+                                  (paisaNumber(invoice.amountPaisa) / budget) *
+                                  100
+                                ).toFixed(1)}
+                                % of budget
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className="text-sm text-muted-foreground text-right">
+                            <div>{toDateKey(invoice.invoiceDate)}</div>
+                            {invoice.status === "paid" &&
+                            invoice.paymentDate ? (
+                              <div className="text-xs">
+                                Paid {toDateKey(invoice.paymentDate)} (
+                                {calendarDaysBetween(
+                                  invoice.invoiceDate,
+                                  invoice.paymentDate
+                                )}
+                                d)
                               </div>
                             ) : null}
                           </div>
@@ -425,12 +466,16 @@ export function ProjectInvoicesTab({
         <div className="space-y-4">
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Budget breakdown</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Budget breakdown
+              </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <Row
                 label="Quoted budget"
-                value={formatNpr(project.profitability?.budgetPaisa ?? project.budgetPaisa)}
+                value={formatNpr(
+                  project.profitability?.budgetPaisa ?? project.budgetPaisa
+                )}
               />
               <Row
                 label="Extensions"
@@ -456,7 +501,9 @@ export function ProjectInvoicesTab({
           {analytics.lastPaid?.paymentDate ? (
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium">Last payment</CardTitle>
+                <CardTitle className="text-sm font-medium">
+                  Last payment
+                </CardTitle>
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
                 {formatNpr(analytics.lastPaid.totalPaisa)} on{" "}
