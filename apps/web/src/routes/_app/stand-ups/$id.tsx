@@ -511,11 +511,12 @@ function StandupDetailPage() {
     user?.role === "super_admin" &&
     Boolean(standup && !isStandupDeletable(String(standup.date)))
   const navigate = Route.useNavigate()
+  const skipLeaveBlockRef = React.useRef(false)
   const isDirty =
     Boolean(standup) && !readonly && baseline !== "" && serializeDrafts(drafts) !== baseline
 
   const blocker = useBlocker({
-    shouldBlockFn: () => isDirty,
+    shouldBlockFn: () => isDirty && !skipLeaveBlockRef.current,
     withResolver: true,
     enableBeforeUnload: isDirty,
   })
@@ -638,6 +639,7 @@ function StandupDetailPage() {
 
   const saveAll = React.useCallback(async (options?: {
     assignmentResolutions?: AssignmentResolution[]
+    redirectToList?: boolean
   }) => {
     if (!standup || readonly) return false
     const currentDrafts = draftsRef.current
@@ -682,6 +684,26 @@ function StandupDetailPage() {
       setMissingAssignments([])
       setResolutionChoices({})
       setMissingAssignmentOpen(false)
+      toast.add({
+        title: "Stand-up saved successfully",
+        type: "success",
+      })
+      if (options?.redirectToList !== false) {
+        skipLeaveBlockRef.current = true
+        await navigate({
+          to: "/stand-ups",
+          search: {
+            page: 1,
+            pageSize: 25,
+            view: "list",
+            q: "",
+            employeeIds: "",
+            projectId: "",
+            from: "",
+            to: "",
+          },
+        })
+      }
       return true
     } catch (e) {
       if (e instanceof ApiError) {
@@ -699,7 +721,7 @@ function StandupDetailPage() {
     } finally {
       setSaving(false)
     }
-  }, [id, standup, readonly, projects, user, groupMemberIds, showAllEmployees])
+  }, [id, standup, readonly, projects, user, groupMemberIds, showAllEmployees, navigate])
 
   const handleDraftChange = React.useCallback(
     (entryId: string, next: EntryDraft) => {
@@ -851,7 +873,7 @@ function StandupDetailPage() {
               const proceed = blocker.proceed
               setLeaveBusy(true)
               try {
-                const saved = await saveAll()
+                const saved = await saveAll({ redirectToList: false })
                 if (saved) proceed?.()
                 else blocker.reset?.()
               } finally {

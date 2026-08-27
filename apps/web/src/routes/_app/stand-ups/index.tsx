@@ -420,8 +420,14 @@ function StandupsPage() {
             }}
           >
             <div className="space-y-2">
-              <Label>Date</Label>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="standup-date">Date</Label>
+                {date === maxDate ? (
+                  <span className="text-xs text-muted-foreground">Today</span>
+                ) : null}
+              </div>
               <Input
+                id="standup-date"
                 type="date"
                 required
                 max={maxDate}

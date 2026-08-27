@@ -162,59 +162,11 @@ function ProjectsPage() {
       <PageHeader
         title="Projects"
         description="Budgets, assignments, and profitability"
-        actions={
-          <>
-            <Select
-              value={status || null}
-              onValueChange={(v) => {
-                void navigate({
-                  search: (prev) => ({
-                    ...prev,
-                    status: v || undefined,
-                    page: 1,
-                  }),
-                })
-              }}
-              items={{
-                active: "Active",
-                extended: "Extended",
-                closed: "Closed",
-                under_amc: "Under AMC",
-              }}
-            >
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="All statuses" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="extended">Extended</SelectItem>
-                <SelectItem value="closed">Closed</SelectItem>
-                <SelectItem value="under_amc">Under AMC</SelectItem>
-              </SelectContent>
-            </Select>
-            {status ? (
-              <Button
-                variant="outline"
-                onClick={() => {
-                  void navigate({
-                    search: (prev) => ({
-                      ...prev,
-                      status: undefined,
-                      page: 1,
-                    }),
-                  })
-                }}
-              >
-                Clear filter
-              </Button>
-            ) : null}
-            <Button onClick={() => setOpen(true)}>New project</Button>
-          </>
-        }
+        actions={<Button onClick={() => setOpen(true)}>New project</Button>}
       />
 
-      <div className="mb-4">
-        <div className="relative max-w-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-48 max-w-sm flex-1">
           <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="pl-8"
@@ -223,6 +175,50 @@ function ProjectsPage() {
             onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
+        <Select
+          value={status || null}
+          onValueChange={(v) => {
+            void navigate({
+              search: (prev) => ({
+                ...prev,
+                status: v || undefined,
+                page: 1,
+              }),
+            })
+          }}
+          items={{
+            active: "Active",
+            extended: "Extended",
+            closed: "Closed",
+            under_amc: "Under AMC",
+          }}
+        >
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="extended">Extended</SelectItem>
+            <SelectItem value="closed">Closed</SelectItem>
+            <SelectItem value="under_amc">Under AMC</SelectItem>
+          </SelectContent>
+        </Select>
+        {status ? (
+          <Button
+            variant="outline"
+            onClick={() => {
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  status: undefined,
+                  page: 1,
+                }),
+              })
+            }}
+          >
+            Clear filter
+          </Button>
+        ) : null}
       </div>
 
       {loading ? <LoadingState /> : null}

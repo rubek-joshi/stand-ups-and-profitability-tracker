@@ -76,9 +76,7 @@ export class StandupsService {
       select: { id: true },
     });
     if (existing) {
-      throw new BadRequestException(
-        `A stand-up already exists for ${dto.date}`,
-      );
+      return this.loadStandupOrThrow(existing.id);
     }
 
     const employees = await this.findActiveEmployeesForDate(date);
