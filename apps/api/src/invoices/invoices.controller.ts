@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -14,7 +15,11 @@ import { AuthUser } from '../auth/types/auth-user.type';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RequirePermission } from '../casbin/decorators/require-permission.decorator';
 import { PoliciesGuard } from '../casbin/guards/policies.guard';
-import { CreateInvoiceDto, MarkInvoicePaidDto } from './dto/invoice.dto';
+import {
+  CreateInvoiceDto,
+  MarkInvoicePaidDto,
+  UpdateInvoiceDto,
+} from './dto/invoice.dto';
 import { InvoicesService } from './invoices.service';
 
 @ApiTags('invoices')
@@ -31,6 +36,7 @@ export class InvoicesController {
     @Query('q') q?: string,
     @Query('status') status?: string,
     @Query('projectId') projectId?: string,
+    @Query('clientId') clientId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('page') page?: string,
@@ -40,6 +46,7 @@ export class InvoicesController {
       q,
       status,
       projectId,
+      clientId,
       from,
       to,
       page,
@@ -66,6 +73,17 @@ export class InvoicesController {
   @ApiOperation({ summary: 'Create an invoice on a project' })
   async create(@Body() dto: CreateInvoiceDto, @CurrentUser() user: AuthUser) {
     return this.invoicesService.create(dto, user.id);
+  }
+
+  @Patch(':id')
+  @RequirePermission('invoices', '*')
+  @ApiOperation({ summary: 'Update a pending invoice' })
+  async update(
+    @Param('id') id: string,
+    @Body() dto: UpdateInvoiceDto,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.invoicesService.update(id, dto, user.id);
   }
 
   @Post(':id/mark-paid')

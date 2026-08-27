@@ -48,30 +48,14 @@ import {
 } from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
 import type { AmcRecord, Client } from "@/lib/types"
+import { getStoredView, parseListView, setStoredView } from "@/lib/view-pref"
 
 const AMC_TABS = ["ongoing", "upcoming", "attention", "all"] as const
-const AMC_VIEWS = ["card", "table"] as const
 type AmcTab = (typeof AMC_TABS)[number]
-type AmcView = (typeof AMC_VIEWS)[number]
+const AMC_VIEW_KEY = "pt_amc_view"
 
 function parseAmcTab(value: unknown): AmcTab {
   return AMC_TABS.includes(value as AmcTab) ? (value as AmcTab) : "ongoing"
-}
-
-function parseAmcView(value: unknown): AmcView | undefined {
-  return AMC_VIEWS.includes(value as AmcView) ? (value as AmcView) : undefined
-}
-
-const AMC_VIEW_KEY = "pt_amc_view"
-
-function getStoredAmcView(): AmcView {
-  if (typeof window === "undefined") return "card"
-  return parseAmcView(localStorage.getItem(AMC_VIEW_KEY)) ?? "card"
-}
-
-function setStoredAmcView(view: AmcView) {
-  if (typeof window === "undefined") return
-  localStorage.setItem(AMC_VIEW_KEY, view)
 }
 
 const EMPTY_COPY: Record<AmcTab, string> = {
@@ -88,7 +72,7 @@ export const Route = createFileRoute("/_app/amc/")({
     const from = parseOptionalString(search.from)
     const to = parseOptionalString(search.to)
     const tab = search.tab === undefined ? undefined : parseAmcTab(search.tab)
-    const view = parseAmcView(search.view)
+    const view = parseListView(search.view)
     return {
       page,
       pageSize,
@@ -174,20 +158,18 @@ function AmcPage() {
 
   React.useLayoutEffect(() => {
     if (view === "table") {
-      setStoredAmcView("table")
+      setStoredView(AMC_VIEW_KEY, "table")
       return
     }
-    if (getStoredAmcView() !== "table") return
+    if (getStoredView(AMC_VIEW_KEY) !== "table") return
     void navigate({
       search: (prev) => ({ ...prev, view: "table" }),
       replace: true,
     })
-    // Restore once per visit; later toggles write storage themselves.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const setView = (next: AmcView) => {
-    setStoredAmcView(next)
+  const setView = (next: "card" | "table") => {
+    setStoredView(AMC_VIEW_KEY, next)
     void navigate({
       search: (prev) => ({
         ...prev,

@@ -10,18 +10,13 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@workspace/ui/components/select"
 import { Textarea } from "@workspace/ui/components/textarea"
+import { DatePicker } from "@/components/datetime-picker"
+import { ProjectCombobox } from "@/components/project-combobox"
 import { api, ApiError } from "@/lib/api"
 import type { Envelope, PaginatedEnvelope } from "@/lib/api"
 import { paisaNumber } from "@/lib/invoice-analytics"
-import { formatNpr, nprToPaisa, parseNprInput } from "@/lib/money"
+import { formatNpr, nprToPaisa, parseNprInput, paisaToNpr } from "@/lib/money"
 import { nptTodayIso } from "@/lib/standup-age"
 import type { Invoice, Project } from "@/lib/types"
 
@@ -40,7 +35,10 @@ export function InvoiceFormDialog({
   budgetPaisa,
   invoicedAmountPaisa = 0,
   presetProjectId,
+  invoice,
+  clientId,
   onCreated,
+  onUpdated,
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -48,10 +46,13 @@ export function InvoiceFormDialog({
   budgetPaisa?: string | number
   invoicedAmountPaisa?: number
   presetProjectId?: string
-  onCreated: (invoice: Invoice) => void
+  invoice?: Invoice | null
+  clientId?: string
+  onCreated?: (created: Invoice) => void
+  onUpdated?: (updated: Invoice) => void
 }) {
+  const editing = Boolean(invoice)
   const pickProject = !lockedProject
-  const [projects, setProjects] = React.useState<ProjectOption[]>([])
   const [projectId, setProjectId] = React.useState(presetProjectId ?? "")
   const [resolved, setResolved] = React.useState<{
     project: ProjectOption
@@ -67,30 +68,24 @@ export function InvoiceFormDialog({
 
   React.useEffect(() => {
     if (!open) return
+    setError(null)
+    setResolved(null)
+    if (invoice) {
+      setInvoiceNumber(invoice.invoiceNumber)
+      setInvoiceDate(String(invoice.invoiceDate).slice(0, 10))
+      setAmount(String(paisaToNpr(invoice.amountPaisa)))
+      setNotes(invoice.notes ?? "")
+      setProjectId(invoice.projectId)
+      return
+    }
     setInvoiceDate(nptTodayIso())
     setAmount("")
     setNotes("")
-    setError(null)
     setProjectId(lockedProject?.id ?? presetProjectId ?? "")
-    setResolved(null)
     void api<Envelope<{ nextNumber: string }>>("/invoices/next-number")
       .then((res) => setInvoiceNumber(res.data.nextNumber))
       .catch(() => setInvoiceNumber(""))
-  }, [open, lockedProject?.id, presetProjectId])
-
-  React.useEffect(() => {
-    if (!open || !pickProject) return
-    void (async () => {
-      try {
-        const res = await api<PaginatedEnvelope<ProjectOption[]>>("/projects")
-        setProjects([...res.data].sort((a, b) => a.name.localeCompare(b.name)))
-      } catch (err) {
-        setError(
-          err instanceof ApiError ? err.message : "Failed to load projects",
-        )
-      }
-    })()
-  }, [open, pickProject])
+  }, [open, invoice, lockedProject?.id, presetProjectId])
 
   React.useEffect(() => {
     if (!open) return
@@ -118,11 +113,12 @@ export function InvoiceFormDialog({
           ),
         ])
         const project = projectRes.data
+        const others = invoicesRes.data.filter((row) => row.id !== invoice?.id)
         setResolved({
           project,
           budgetPaisa: project.profitability?.revenuePaisa ?? project.budgetPaisa,
-          invoicedAmountPaisa: invoicesRes.data.reduce(
-            (sum, invoice) => sum + paisaNumber(invoice.amountPaisa),
+          invoicedAmountPaisa: others.reduce(
+            (sum, row) => sum + paisaNumber(row.amountPaisa),
             0,
           ),
         })
@@ -133,7 +129,15 @@ export function InvoiceFormDialog({
         )
       }
     })()
-  }, [open, lockedProject?.id, projectId, budgetPaisa, invoicedAmountPaisa, lockedProject])
+  }, [
+    open,
+    lockedProject,
+    lockedProject?.id,
+    projectId,
+    budgetPaisa,
+    invoicedAmountPaisa,
+    invoice?.id,
+  ])
 
   const project = resolved?.project
   const amountNpr = (() => {
@@ -155,17 +159,6 @@ export function InvoiceFormDialog({
   const pctOfBudget = budget > 0 ? (amountPaisa / budget) * 100 : 0
   const overBudget = budget > 0 && invoiced + amountPaisa > budget
 
-  const projectItems = React.useMemo(
-    () =>
-      Object.fromEntries(
-        projects.map((p) => [
-          p.id,
-          p.client?.name ? `${p.name} · ${p.client.name}` : p.name,
-        ]),
-      ),
-    [projects],
-  )
-
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
@@ -184,22 +177,41 @@ export function InvoiceFormDialog({
       setError("Amount must be greater than zero")
       return
     }
+    if (!invoiceDate) {
+      setError("Invoice date is required")
+      return
+    }
     setSaving(true)
+    const body = {
+      projectId: project.id,
+      invoiceNumber: invoiceNumber.trim(),
+      invoiceDate,
+      amountNpr: parsed,
+      notes: notes.trim() || undefined,
+    }
     try {
-      const res = await api<Envelope<Invoice>>("/invoices", {
-        method: "POST",
-        body: {
-          projectId: project.id,
-          invoiceNumber: invoiceNumber.trim(),
-          invoiceDate,
-          amountNpr: parsed,
-          notes: notes.trim() || undefined,
-        },
-      })
-      onCreated(res.data)
+      if (invoice) {
+        const res = await api<Envelope<Invoice>>(`/invoices/${invoice.id}`, {
+          method: "PATCH",
+          body,
+        })
+        onUpdated?.(res.data)
+      } else {
+        const res = await api<Envelope<Invoice>>("/invoices", {
+          method: "POST",
+          body,
+        })
+        onCreated?.(res.data)
+      }
       onOpenChange(false)
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create invoice")
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : editing
+            ? "Failed to update invoice"
+            : "Failed to create invoice",
+      )
     } finally {
       setSaving(false)
     }
@@ -209,31 +221,21 @@ export function InvoiceFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>New invoice</DialogTitle>
+          <DialogTitle>{editing ? "Edit invoice" : "New invoice"}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={(event) => void submit(event)} className="space-y-4">
+        <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
           {pickProject ? (
             <div className="flex flex-col gap-2">
-              <Label htmlFor="invoice-project">Project</Label>
-              <Select
-                value={projectId || null}
-                onValueChange={(value) => {
-                  setProjectId(value ?? "")
+              <Label>Project</Label>
+              <ProjectCombobox
+                value={projectId || undefined}
+                onValueChange={(id) => {
+                  setProjectId(id ?? "")
                   setError(null)
                 }}
-                items={projectItems}
-              >
-                <SelectTrigger id="invoice-project" className="w-full">
-                  <SelectValue placeholder="Select a project" />
-                </SelectTrigger>
-                <SelectContent>
-                  {projects.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.client?.name ? `${p.name} · ${p.client.name}` : p.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                clientId={clientId}
+                placeholder="Search projects…"
+              />
             </div>
           ) : null}
           <div className="flex flex-col gap-2">
@@ -247,14 +249,12 @@ export function InvoiceFormDialog({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label htmlFor="invoice-date">Invoice date</Label>
-            <Input
-              id="invoice-date"
-              type="date"
-              required
-              max={nptTodayIso()}
+            <Label>Invoice date</Label>
+            <DatePicker
               value={invoiceDate}
-              onChange={(e) => setInvoiceDate(e.target.value)}
+              onChange={(next) => setInvoiceDate(next ?? "")}
+              max={nptTodayIso()}
+              modal
             />
           </div>
           <div className="flex flex-col gap-2">
@@ -268,7 +268,7 @@ export function InvoiceFormDialog({
             />
           </div>
           {project ? (
-            <div className="space-y-1 rounded-lg bg-muted p-3 text-sm">
+            <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
                   VAT{project.isVatApplicable ? ` (${vatRate}%)` : ""}
@@ -284,7 +284,7 @@ export function InvoiceFormDialog({
             </div>
           ) : null}
           {project && budget > 0 ? (
-            <div className="space-y-1 rounded-lg border p-3 text-sm">
+            <div className="flex flex-col gap-1 rounded-lg border p-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">% of total budget</span>
                 <span className="font-medium">{pctOfBudget.toFixed(1)}%</span>
@@ -318,7 +318,13 @@ export function InvoiceFormDialog({
               Cancel
             </Button>
             <Button type="submit" disabled={saving || !project}>
-              {saving ? "Creating…" : "Create invoice"}
+              {saving
+                ? editing
+                  ? "Saving…"
+                  : "Creating…"
+                : editing
+                  ? "Save changes"
+                  : "Create invoice"}
             </Button>
           </DialogFooter>
         </form>

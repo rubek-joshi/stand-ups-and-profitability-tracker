@@ -4,6 +4,7 @@ import {
   IconAlertTriangle,
   IconCalendarOff,
   IconCircleCheck,
+  IconPencil,
   IconPlus,
   IconReceipt,
   IconTrash,
@@ -22,7 +23,10 @@ import {
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { InvoiceAnalytics } from "@/components/invoices/invoice-analytics"
 import { InvoiceFormDialog } from "@/components/invoices/invoice-form-dialog"
+import { InvoiceTable } from "@/components/invoices/invoice-table"
 import { MarkPaidDialog } from "@/components/invoices/mark-paid-dialog"
+import { ListViewToggle } from "@/components/list-view-toggle"
+import { PaginationBar } from "@/components/pagination-bar"
 import { StatusBadge } from "@/components/health-badge"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError } from "@/lib/api"
@@ -34,10 +38,16 @@ import {
   isInvoiceOverdue,
   paisaNumber,
 } from "@/lib/invoice-analytics"
-import { formatJoinedDate } from "@/lib/dates"
+import { toDateKey } from "@/lib/dates"
+import { clampPage, totalPagesFor } from "@/lib/list-query"
+import type { PageSize } from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
 import { nptTodayIso } from "@/lib/standup-age"
 import type { Invoice, Project } from "@/lib/types"
+import { getStoredView, setStoredView } from "@/lib/view-pref"
+import type { ListView } from "@/lib/view-pref"
+
+const INVOICES_VIEW_KEY = "pt_project_invoices_view"
 
 function SummaryCard({
   label,
@@ -81,16 +91,43 @@ function Row({
 export function ProjectInvoicesTab({
   project,
   canMutate,
+  page,
+  pageSize,
+  view,
+  onPageChange,
+  onPageSizeChange,
+  onViewChange,
 }: {
   project: Project
   canMutate: boolean
+  page: number
+  pageSize: PageSize
+  view: ListView
+  onPageChange: (page: number) => void
+  onPageSizeChange: (pageSize: PageSize) => void
+  onViewChange: (view: ListView) => void
 }) {
   const { confirm, dialog } = useConfirmDialog()
   const [invoices, setInvoices] = React.useState<Invoice[]>([])
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [formOpen, setFormOpen] = React.useState(false)
+  const [editing, setEditing] = React.useState<Invoice | null>(null)
   const [paying, setPaying] = React.useState<Invoice | null>(null)
+
+  React.useLayoutEffect(() => {
+    if (view === "table") {
+      setStoredView(INVOICES_VIEW_KEY, "table")
+      return
+    }
+    if (getStoredView(INVOICES_VIEW_KEY) !== "table") return
+    onViewChange("table")
+  }, [])
+
+  const setView = (next: ListView) => {
+    setStoredView(INVOICES_VIEW_KEY, next)
+    onViewChange(next)
+  }
 
   const load = React.useCallback(async () => {
     setLoading(true)
@@ -117,6 +154,16 @@ export function ProjectInvoicesTab({
   const budget = paisaNumber(budgetPaisa)
   const remainingToInvoice = budget - analytics.totalAmountPaisa
   const stale = isInvoiceListStale(invoices)
+  const sorted = React.useMemo(
+    () =>
+      [...invoices].sort((a, b) =>
+        String(b.invoiceDate).localeCompare(String(a.invoiceDate)),
+      ),
+    [invoices],
+  )
+  const totalPages = totalPagesFor(sorted.length, pageSize)
+  const safePage = clampPage(page, totalPages)
+  const paged = sorted.slice((safePage - 1) * pageSize, safePage * pageSize)
 
   async function markPaid(paymentDate: string) {
     if (!paying) return
@@ -218,13 +265,18 @@ export function ProjectInvoicesTab({
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <div className="mb-3 flex items-center justify-between">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h3 className="text-base font-medium">Invoice history</h3>
-            {analytics.lastInvoice ? (
-              <span className="text-xs text-muted-foreground">
-                Last invoice: {formatJoinedDate(analytics.lastInvoice.invoiceDate)}
-              </span>
-            ) : null}
+            <div className="flex flex-wrap items-center gap-3">
+              {analytics.lastInvoice ? (
+                <span className="text-xs text-muted-foreground">
+                  Last invoice: {toDateKey(analytics.lastInvoice.invoiceDate)}
+                </span>
+              ) : null}
+              {invoices.length > 0 ? (
+                <ListViewToggle view={view} onChange={setView} />
+              ) : null}
+            </div>
           </div>
           {invoices.length === 0 ? (
             <Empty className="min-h-64 border bg-card">
@@ -247,100 +299,125 @@ export function ProjectInvoicesTab({
               ) : null}
             </Empty>
           ) : (
-            <div className="space-y-2">
-              {[...invoices]
-                .sort((a, b) =>
-                  String(b.invoiceDate).localeCompare(String(a.invoiceDate)),
-                )
-                .map((invoice) => {
-                  const overdue = isInvoiceOverdue(invoice)
-                  return (
-                    <Card key={invoice.id}>
-                      <CardContent className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Link
-                              to="/invoices/$id"
-                              params={{ id: invoice.id }}
-                              className="font-medium hover:underline"
-                            >
-                              {invoice.invoiceNumber}
-                            </Link>
-                            <StatusBadge status={invoice.status} />
-                            {overdue ? (
-                              <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">
-                                Overdue
-                              </Badge>
-                            ) : null}
-                          </div>
-                          <div className="mt-1 text-sm text-muted-foreground">
-                            {formatJoinedDate(invoice.invoiceDate)}
-                            {invoice.status === "paid" && invoice.paymentDate ? (
-                              <span className="ml-2">
-                                · Paid {formatJoinedDate(invoice.paymentDate)}
-                                <span className="ml-1 text-xs">
-                                  (
-                                  {calendarDaysBetween(
-                                    invoice.invoiceDate,
-                                    invoice.paymentDate,
-                                  )}
-                                  d)
-                                </span>
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <div className="text-sm text-muted-foreground">
-                              {formatNpr(invoice.amountPaisa)}
-                              {paisaNumber(invoice.vatPaisa) > 0 ? (
-                                <span className="text-xs">
-                                  {" "}
-                                  +{formatNpr(invoice.vatPaisa)} VAT
+            <div className="flex flex-col gap-4">
+              {view === "table" ? (
+                <InvoiceTable
+                  invoices={paged}
+                  showProject={false}
+                  canMutate={canMutate}
+                  onEdit={setEditing}
+                />
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {paged.map((invoice) => {
+                    const overdue = isInvoiceOverdue(invoice)
+                    return (
+                      <Card key={invoice.id}>
+                        <CardContent className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link
+                                to="/invoices/$id"
+                                params={{ id: invoice.id }}
+                                className="font-medium hover:underline"
+                              >
+                                {invoice.invoiceNumber}
+                              </Link>
+                              <StatusBadge status={invoice.status} />
+                              {overdue ? (
+                                <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">
+                                  Overdue
+                                </Badge>
+                              ) : null}
+                            </div>
+                            <div className="mt-1 text-sm text-muted-foreground">
+                              {toDateKey(invoice.invoiceDate)}
+                              {invoice.status === "paid" && invoice.paymentDate ? (
+                                <span className="ml-2">
+                                  · Paid {toDateKey(invoice.paymentDate)}
+                                  <span className="ml-1 text-xs">
+                                    (
+                                    {calendarDaysBetween(
+                                      invoice.invoiceDate,
+                                      invoice.paymentDate,
+                                    )}
+                                    d)
+                                  </span>
                                 </span>
                               ) : null}
                             </div>
-                            <div className="font-semibold">
-                              {formatNpr(invoice.totalPaisa)}
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="text-right">
+                              <div className="text-sm text-muted-foreground">
+                                {formatNpr(invoice.amountPaisa)}
+                                {paisaNumber(invoice.vatPaisa) > 0 ? (
+                                  <span className="text-xs">
+                                    {" "}
+                                    +{formatNpr(invoice.vatPaisa)} VAT
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="font-semibold">
+                                {formatNpr(invoice.totalPaisa)}
+                              </div>
+                              {budget > 0 ? (
+                                <div className="text-xs text-muted-foreground">
+                                  {(
+                                    (paisaNumber(invoice.amountPaisa) / budget) *
+                                    100
+                                  ).toFixed(1)}
+                                  % of budget
+                                </div>
+                              ) : null}
                             </div>
-                            {budget > 0 ? (
-                              <div className="text-xs text-muted-foreground">
-                                {(
-                                  (paisaNumber(invoice.amountPaisa) / budget) *
-                                  100
-                                ).toFixed(1)}
-                                % of budget
+                            {canMutate ? (
+                              <div className="flex flex-col gap-1.5">
+                                {invoice.status === "pending" ? (
+                                  <>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setEditing(invoice)}
+                                    >
+                                      <IconPencil className="size-4" />
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setPaying(invoice)}
+                                    >
+                                      <IconCircleCheck className="size-4" />
+                                      Mark paid
+                                    </Button>
+                                  </>
+                                ) : null}
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="text-destructive hover:text-destructive"
+                                  onClick={() => void deleteInvoice(invoice)}
+                                >
+                                  <IconTrash className="size-4" />
+                                </Button>
                               </div>
                             ) : null}
                           </div>
-                          {canMutate ? (
-                            <div className="flex flex-col gap-1.5">
-                              {invoice.status === "pending" ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setPaying(invoice)}
-                                >
-                                  <IconCircleCheck className="size-4" />
-                                  Mark paid
-                                </Button>
-                              ) : null}
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                className="text-destructive hover:text-destructive"
-                                onClick={() => void deleteInvoice(invoice)}
-                              >
-                                <IconTrash className="size-4" />
-                              </Button>
-                            </div>
-                          ) : null}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+              <PaginationBar
+                page={safePage}
+                totalPages={totalPages}
+                total={sorted.length}
+                pageSize={pageSize}
+                onPageChange={onPageChange}
+                onPageSizeChange={onPageSizeChange}
+              />
             </div>
           )}
         </div>
@@ -383,7 +460,7 @@ export function ProjectInvoicesTab({
               </CardHeader>
               <CardContent className="text-sm text-muted-foreground">
                 {formatNpr(analytics.lastPaid.totalPaisa)} on{" "}
-                {formatJoinedDate(analytics.lastPaid.paymentDate)}
+                {toDateKey(analytics.lastPaid.paymentDate)}
               </CardContent>
             </Card>
           ) : null}
@@ -404,6 +481,17 @@ export function ProjectInvoicesTab({
         budgetPaisa={budgetPaisa}
         invoicedAmountPaisa={analytics.totalAmountPaisa}
         onCreated={() => void load()}
+      />
+      <InvoiceFormDialog
+        open={Boolean(editing)}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null)
+        }}
+        project={project}
+        budgetPaisa={budgetPaisa}
+        invoicedAmountPaisa={analytics.totalAmountPaisa}
+        invoice={editing}
+        onUpdated={() => void load()}
       />
       <MarkPaidDialog
         invoice={paying}

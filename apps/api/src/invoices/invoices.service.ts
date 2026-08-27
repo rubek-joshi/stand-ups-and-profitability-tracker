@@ -15,7 +15,11 @@ import {
 import { serializeMoneyFields } from '../_shared/utils/serialize-money.util';
 import { nptTodayIso } from '../_shared/utils/standup-age.util';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateInvoiceDto, MarkInvoicePaidDto } from './dto/invoice.dto';
+import {
+  CreateInvoiceDto,
+  MarkInvoicePaidDto,
+  UpdateInvoiceDto,
+} from './dto/invoice.dto';
 
 const INVOICE_MONEY_FIELDS = ['amountPaisa', 'vatPaisa', 'totalPaisa'] as const;
 
@@ -51,6 +55,7 @@ export class InvoicesService {
       q?: string;
       status?: string;
       projectId?: string;
+      clientId?: string;
       from?: string;
       to?: string;
       page?: string;
@@ -59,6 +64,7 @@ export class InvoicesService {
   ) {
     const q = filters.q?.trim();
     const projectId = filters.projectId?.trim();
+    const clientId = filters.clientId?.trim();
     const pagination = resolvePagination({
       page: filters.page,
       pageSize: filters.pageSize,
@@ -76,6 +82,7 @@ export class InvoicesService {
     const where: Prisma.InvoiceWhereInput = {
       ...(status ? { status } : {}),
       ...(projectId ? { projectId } : {}),
+      ...(clientId ? { project: { clientId } } : {}),
       ...(from || to
         ? {
             invoiceDate: {
@@ -156,9 +163,11 @@ export class InvoicesService {
       throw new BadRequestException('Amount must be greater than zero');
     }
 
-    const vatRateApplied = project.isVatApplicable ? project.vatRateApplied : 0;
-    const vatPaisa = roundVatPaisa(amountPaisa, vatRateApplied);
-    const totalPaisa = amountPaisa + vatPaisa;
+    this.assertInvoiceDateNotFuture(invoiceDate);
+    const { vatRateApplied, vatPaisa, totalPaisa } = this.vatFor(
+      amountPaisa,
+      project,
+    );
     const notes = dto.notes?.trim() || null;
 
     const duplicate = await this.prismaService.invoice.findUnique({
@@ -199,6 +208,89 @@ export class InvoicesService {
       },
     });
     return this.serialize(created);
+  }
+
+  async update(id: string, dto: UpdateInvoiceDto, actorId: string) {
+    const invoice = await this.prismaService.invoice.findUnique({
+      where: { id },
+    });
+    if (!invoice) throw new NotFoundException('Invoice not found');
+    if (invoice.status === InvoiceStatus.paid) {
+      throw new BadRequestException('Paid invoices cannot be edited');
+    }
+
+    const project = await this.prismaService.project.findUnique({
+      where: { id: dto.projectId },
+      select: {
+        id: true,
+        isVatApplicable: true,
+        vatRateApplied: true,
+      },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+
+    const invoiceNumber = dto.invoiceNumber.trim();
+    if (!invoiceNumber) {
+      throw new BadRequestException('Invoice number is required');
+    }
+
+    const invoiceDate = requireIsoDate(dto.invoiceDate, 'Invoice date');
+    this.assertInvoiceDateNotFuture(invoiceDate);
+
+    let amountPaisa: bigint;
+    try {
+      amountPaisa = nprToPaisa(dto.amountNpr);
+    } catch {
+      throw new BadRequestException('Invalid amount');
+    }
+    if (amountPaisa <= 0n) {
+      throw new BadRequestException('Amount must be greater than zero');
+    }
+
+    const duplicate = await this.prismaService.invoice.findFirst({
+      where: { invoiceNumber, NOT: { id } },
+      select: { id: true },
+    });
+    if (duplicate) {
+      throw new ConflictException(
+        `Invoice number "${invoiceNumber}" is already in use`,
+      );
+    }
+
+    const { vatRateApplied, vatPaisa, totalPaisa } = this.vatFor(
+      amountPaisa,
+      project,
+    );
+    const notes = dto.notes?.trim() || null;
+
+    const updated = await this.prismaService.invoice.update({
+      where: { id },
+      data: {
+        projectId: project.id,
+        invoiceNumber,
+        invoiceDate,
+        amountPaisa,
+        vatPaisa,
+        totalPaisa,
+        vatRateApplied,
+        notes,
+      },
+      include: { project: { include: projectInclude } },
+    });
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.INVOICE_UPDATED,
+      targetType: 'Invoice',
+      targetId: updated.id,
+      metadata: {
+        projectId: project.id,
+        invoiceNumber,
+        amountPaisa: amountPaisa.toString(),
+        vatPaisa: vatPaisa.toString(),
+        totalPaisa: totalPaisa.toString(),
+      },
+    });
+    return this.serialize(updated);
   }
 
   async markPaid(id: string, dto: MarkInvoicePaidDto, actorId: string) {
@@ -260,6 +352,21 @@ export class InvoicesService {
       },
     });
     return { id };
+  }
+
+  private assertInvoiceDateNotFuture(invoiceDate: Date) {
+    if (toIsoDate(invoiceDate) > nptTodayIso()) {
+      throw new BadRequestException('Invoice date cannot be in the future');
+    }
+  }
+
+  private vatFor(
+    amountPaisa: bigint,
+    project: { isVatApplicable: boolean; vatRateApplied: number },
+  ) {
+    const vatRateApplied = project.isVatApplicable ? project.vatRateApplied : 0;
+    const vatPaisa = roundVatPaisa(amountPaisa, vatRateApplied);
+    return { vatRateApplied, vatPaisa, totalPaisa: amountPaisa + vatPaisa };
   }
 
   private parseStatus(value?: string): InvoiceStatus | undefined {

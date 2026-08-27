@@ -1,8 +1,6 @@
 import type { ReactNode } from "react"
-import {
-  PageBreadcrumbs,
-  type BreadcrumbEntry,
-} from "@/components/page-breadcrumbs"
+import { PageBreadcrumbs } from "@/components/page-breadcrumbs"
+import type { BreadcrumbEntry } from "@/components/page-breadcrumbs"
 import { useDocumentTitle } from "@/hooks/use-document-title"
 
 export function PageHeader({
@@ -13,7 +11,7 @@ export function PageHeader({
   breadcrumbs,
 }: {
   title: string
-  description?: string
+  description?: ReactNode
   /** Shown directly under the title (e.g. status / health badges). */
   status?: ReactNode
   actions?: ReactNode
@@ -33,11 +31,11 @@ export function PageHeader({
             <div className="mt-2 flex flex-wrap items-center gap-2">{status}</div>
           ) : null}
           {description ? (
-            <p
+            <div
               className={`text-sm text-muted-foreground ${status ? "mt-1.5" : "mt-1"}`}
             >
               {description}
-            </p>
+            </div>
           ) : null}
         </div>
         {actions ? (

@@ -108,6 +108,7 @@ import { toIsoDateInput } from "@/lib/dashboard-metrics"
 import {
   DEFAULT_LIST_SEARCH,
   clampPage,
+  parseListSearch,
   totalPagesFor,
   type PageSize,
 } from "@/lib/list-query"
@@ -121,6 +122,7 @@ import type {
   ProjectAssignment,
   ProjectLink,
 } from "@/lib/types"
+import { parseListView } from "@/lib/view-pref"
 
 const PROJECT_TABS = ["team", "standups", "extensions", "invoices", "amc", "labor"] as const
 
@@ -185,12 +187,17 @@ export const Route = createFileRoute("/_app/projects/$id")({
     const defaults = defaultStandupHistoryRange()
     const from = parseIsoSearchDate(search.from)
     const to = parseIsoSearchDate(search.to)
+    const { page, pageSize } = parseListSearch(search)
+    const view = parseListView(search.view)
     return {
       tab: parseProjectTab(search.tab),
       q: typeof search.q === "string" ? search.q : "",
       employeeIds: parseEmployeeIdsSearch(search).join(","),
       from: from && to ? from : defaults.from,
       to: from && to ? to : defaults.to,
+      page,
+      pageSize,
+      ...(view && view !== "card" ? { view } : {}),
     }
   },
   component: ProjectDetailPage,
@@ -199,7 +206,8 @@ export const Route = createFileRoute("/_app/projects/$id")({
 function ProjectDetailPage() {
   const { id } = Route.useParams()
   const navigate = Route.useNavigate()
-  const { tab, q, employeeIds, from, to } = Route.useSearch()
+  const { tab, q, employeeIds, from, to, page, pageSize, view = "card" } =
+    Route.useSearch()
   const employeeIdList = React.useMemo(
     () =>
       employeeIds
@@ -1784,6 +1792,29 @@ function ProjectDetailPage() {
               <ProjectInvoicesTab
                 project={project}
                 canMutate={canManageLinks}
+                page={page}
+                pageSize={pageSize}
+                view={view}
+                onPageChange={(nextPage) => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, page: nextPage }),
+                  })
+                }}
+                onPageSizeChange={(size) => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, pageSize: size, page: 1 }),
+                  })
+                }}
+                onViewChange={(next) => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      view: next === "card" ? undefined : next,
+                    }),
+                    replace: true,
+                    resetScroll: false,
+                  })
+                }}
               />
             </TabsContent>
 

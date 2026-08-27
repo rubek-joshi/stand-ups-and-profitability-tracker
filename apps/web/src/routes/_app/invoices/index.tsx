@@ -1,7 +1,6 @@
 import * as React from "react"
-import { Link, createFileRoute } from "@tanstack/react-router"
-import { IconEye, IconSearch } from "@tabler/icons-react"
-import { Badge } from "@workspace/ui/components/badge"
+import { createFileRoute } from "@tanstack/react-router"
+import { IconSearch } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import {
@@ -11,30 +10,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@workspace/ui/components/table"
+import { DatePicker } from "@/components/datetime-picker"
 import { InvoiceFormDialog } from "@/components/invoices/invoice-form-dialog"
+import { InvoiceTable } from "@/components/invoices/invoice-table"
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
-import { StatusBadge } from "@/components/health-badge"
+import { ProjectCombobox } from "@/components/project-combobox"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import { AUDIT_ROLES } from "@/lib/access"
-import {
-  NavigableTableRow,
-  TableActionLink,
-  TableActionsCell,
-  TableActionsHead,
-} from "@/components/table-row-actions"
 import { api, ApiError } from "@/lib/api"
 import type { PaginatedEnvelope } from "@/lib/api"
-import { formatJoinedDate } from "@/lib/dates"
-import { isInvoiceOverdue } from "@/lib/invoice-analytics"
 import {
   buildListQuery,
   parseListSearch,
@@ -42,9 +27,7 @@ import {
   totalPagesFor,
 } from "@/lib/list-query"
 import { useAuth } from "@/lib/auth"
-import { formatNpr } from "@/lib/money"
-import { ClientLink, ProjectLink } from "@/components/resource-link"
-import type { Invoice, Project } from "@/lib/types"
+import type { Invoice } from "@/lib/types"
 
 const INVOICE_STATUSES = ["paid", "unpaid"] as const
 
@@ -82,11 +65,11 @@ function InvoicesPage() {
     user?.role && (AUDIT_ROLES as string[]).includes(user.role),
   )
   const [invoices, setInvoices] = React.useState<Invoice[]>([])
-  const [projects, setProjects] = React.useState<Project[]>([])
   const [total, setTotal] = React.useState(0)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [formOpen, setFormOpen] = React.useState(false)
+  const [editing, setEditing] = React.useState<Invoice | null>(null)
   const [searchInput, setSearchInput] = React.useState(q ?? "")
 
   React.useEffect(() => {
@@ -132,23 +115,8 @@ function InvoicesPage() {
     void load()
   }, [load])
 
-  React.useEffect(() => {
-    void (async () => {
-      try {
-        const res = await api<PaginatedEnvelope<Project[]>>("/projects")
-        setProjects([...res.data].sort((a, b) => a.name.localeCompare(b.name)))
-      } catch {
-        // Project filter stays empty if load fails
-      }
-    })()
-  }, [])
-
   const totalPages = totalPagesFor(total, pageSize)
   const hasFilters = Boolean(q || status || projectId || from || to)
-  const projectItems = React.useMemo(
-    () => Object.fromEntries(projects.map((p) => [p.id, p.name])),
-    [projects],
-  )
 
   return (
     <div>
@@ -203,44 +171,35 @@ function InvoicesPage() {
             <span className="text-xs font-medium text-muted-foreground">
               Project
             </span>
-            <Select
-              value={projectId || null}
-              onValueChange={(v) => {
+            <ProjectCombobox
+              className="w-64"
+              value={projectId}
+              allowClear
+              placeholder="All projects"
+              onValueChange={(id) => {
                 void navigate({
                   search: (prev) => ({
                     ...prev,
-                    projectId: v || undefined,
+                    projectId: id,
                     page: 1,
                   }),
                 })
               }}
-              items={projectItems}
-            >
-              <SelectTrigger className="w-52">
-                <SelectValue placeholder="All projects" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            />
           </div>
           <div className="grid gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">
               From
             </span>
-            <Input
-              type="date"
-              className="w-40"
-              value={from ?? ""}
-              onChange={(e) => {
+            <DatePicker
+              className="w-44"
+              value={from}
+              clearable
+              onChange={(next) => {
                 void navigate({
                   search: (prev) => ({
                     ...prev,
-                    from: e.target.value || undefined,
+                    from: next,
                     page: 1,
                   }),
                 })
@@ -251,15 +210,15 @@ function InvoicesPage() {
             <span className="text-xs font-medium text-muted-foreground">
               To
             </span>
-            <Input
-              type="date"
-              className="w-40"
-              value={to ?? ""}
-              onChange={(e) => {
+            <DatePicker
+              className="w-44"
+              value={to}
+              clearable
+              onChange={(next) => {
                 void navigate({
                   search: (prev) => ({
                     ...prev,
-                    to: e.target.value || undefined,
+                    to: next,
                     page: 1,
                   }),
                 })
@@ -298,100 +257,11 @@ function InvoicesPage() {
       ) : null}
       {invoices.length > 0 ? (
         <div className="space-y-4">
-          <div className="overflow-x-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Number</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Amount / total</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Payment date</TableHead>
-                  <TableActionsHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {invoices.map((invoice) => {
-                  const overdue = isInvoiceOverdue(invoice)
-                  return (
-                    <NavigableTableRow
-                      key={invoice.id}
-                      to="/invoices/$id"
-                      params={{ id: invoice.id }}
-                    >
-                      <TableCell>
-                        <Link
-                          to="/invoices/$id"
-                          params={{ id: invoice.id }}
-                          className="font-medium hover:underline"
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          {invoice.invoiceNumber}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        {invoice.project?.id ? (
-                          <div className="min-w-0">
-                            <ProjectLink id={invoice.project.id}>
-                              {invoice.project.name}
-                            </ProjectLink>
-                            {invoice.project.client?.id ? (
-                              <div className="text-xs text-muted-foreground">
-                                <ClientLink id={invoice.project.client.id}>
-                                  {invoice.project.client.name}
-                                </ClientLink>
-                              </div>
-                            ) : null}
-                          </div>
-                        ) : (
-                          "—"
-                        )}
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {formatJoinedDate(invoice.invoiceDate)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="tabular-nums font-medium">
-                          {formatNpr(invoice.totalPaisa)}
-                        </div>
-                        <div className="text-xs text-muted-foreground tabular-nums">
-                          {formatNpr(invoice.amountPaisa)}
-                          {Number(invoice.vatPaisa) > 0
-                            ? ` + ${formatNpr(invoice.vatPaisa)} VAT`
-                            : ""}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <StatusBadge status={invoice.status} />
-                          {overdue ? (
-                            <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">
-                              Overdue
-                            </Badge>
-                          ) : null}
-                        </div>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
-                        {invoice.paymentDate
-                          ? formatJoinedDate(invoice.paymentDate)
-                          : "—"}
-                      </TableCell>
-                      <TableActionsCell>
-                        <TableActionLink
-                          label="View"
-                          to="/invoices/$id"
-                          params={{ id: invoice.id }}
-                        >
-                          <IconEye className="size-3.5" />
-                        </TableActionLink>
-                      </TableActionsCell>
-                    </NavigableTableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </div>
+          <InvoiceTable
+            invoices={invoices}
+            canMutate={canMutate}
+            onEdit={setEditing}
+          />
           <PaginationBar
             page={page}
             totalPages={totalPages}
@@ -416,6 +286,14 @@ function InvoicesPage() {
         onOpenChange={setFormOpen}
         presetProjectId={projectId}
         onCreated={() => void load()}
+      />
+      <InvoiceFormDialog
+        open={Boolean(editing)}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null)
+        }}
+        invoice={editing}
+        onUpdated={() => void load()}
       />
     </div>
   )

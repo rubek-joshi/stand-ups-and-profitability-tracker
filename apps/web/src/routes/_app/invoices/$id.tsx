@@ -1,30 +1,49 @@
 import * as React from "react"
 import { createFileRoute, useNavigate } from "@tanstack/react-router"
-import { IconCircleCheck, IconTrash } from "@tabler/icons-react"
+import {
+  IconAlertTriangle,
+  IconCircleCheck,
+  IconPencil,
+  IconTrash,
+} from "@tabler/icons-react"
+import {
+  Alert,
+  AlertDescription,
+} from "@workspace/ui/components/alert"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import { Separator } from "@workspace/ui/components/separator"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { StatusBadge } from "@/components/health-badge"
+import { InvoiceFormDialog } from "@/components/invoices/invoice-form-dialog"
 import { MarkPaidDialog } from "@/components/invoices/mark-paid-dialog"
 import { PageHeader } from "@/components/page-header"
 import { ClientLink, ProjectLink } from "@/components/resource-link"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { AUDIT_ROLES } from "@/lib/access"
 import { api, ApiError } from "@/lib/api"
-import type { Envelope } from "@/lib/api"
+import type { Envelope, PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
-import { formatJoinedDate } from "@/lib/dates"
-import { isInvoiceOverdue, paisaNumber } from "@/lib/invoice-analytics"
+import { toDateKey } from "@/lib/dates"
+import {
+  OVERDUE_AFTER_DAYS,
+  calendarDaysBetween,
+  computeInvoiceAnalytics,
+  daysSinceInvoice,
+  invoiceDateKey,
+  isInvoiceOverdue,
+  paisaNumber,
+} from "@/lib/invoice-analytics"
 import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
-import type { Invoice } from "@/lib/types"
+import type { Invoice, Project } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/invoices/$id")({
   component: InvoiceDetailPage,
 })
 
-function Row({
+function DetailRow({
   label,
   value,
   bold,
@@ -34,9 +53,30 @@ function Row({
   bold?: boolean
 }) {
   return (
-    <div className="flex justify-between gap-4 py-1.5 text-sm">
-      <span className={bold ? "font-medium" : "text-muted-foreground"}>{label}</span>
-      <span className={bold ? "font-semibold text-right" : "text-right"}>{value}</span>
+    <div className="flex justify-between gap-4 text-sm">
+      <span className={bold ? "font-medium" : "text-muted-foreground"}>
+        {label}
+      </span>
+      <span className={bold ? "text-right font-semibold" : "text-right"}>
+        {value}
+      </span>
+    </div>
+  )
+}
+
+function StatRow({
+  label,
+  value,
+  accent,
+}: {
+  label: string
+  value: string
+  accent?: string
+}) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-muted-foreground">{label}</span>
+      <span className={accent ?? "font-medium"}>{value}</span>
     </div>
   )
 }
@@ -51,16 +91,30 @@ function InvoiceDetailPage() {
   )
 
   const [invoice, setInvoice] = React.useState<Invoice | null>(null)
+  const [siblings, setSiblings] = React.useState<Invoice[]>([])
+  const [project, setProject] = React.useState<Project | null>(null)
   const [loading, setLoading] = React.useState(true)
   const [error, setError] = React.useState<string | null>(null)
   const [paying, setPaying] = React.useState(false)
+  const [editing, setEditing] = React.useState(false)
 
   const load = React.useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
-      const res = await api<Envelope<Invoice>>(`/invoices/${id}`)
-      setInvoice(res.data)
+      const invoiceRes = await api<Envelope<Invoice>>(`/invoices/${id}`)
+      const current = invoiceRes.data
+      setInvoice(current)
+      const [invoicesRes, projectRes] = await Promise.all([
+        api<PaginatedEnvelope<Invoice[]>>(
+          `/invoices?projectId=${encodeURIComponent(current.projectId)}`,
+        ),
+        api<Envelope<Project>>(`/projects/${current.projectId}`).catch(
+          () => null,
+        ),
+      ])
+      setSiblings(invoicesRes.data)
+      setProject(projectRes?.data ?? null)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load invoice")
     } finally {
@@ -78,7 +132,41 @@ function InvoiceDetailPage() {
 
   const current = invoice
   const overdue = isInvoiceOverdue(current)
-  const client = current.project?.client
+  const client = current.project?.client ?? project?.client
+  const daysIssued = daysSinceInvoice(current.invoiceDate)
+
+  const sorted = [...siblings].sort((a, b) =>
+    invoiceDateKey(a.invoiceDate).localeCompare(invoiceDateKey(b.invoiceDate)),
+  )
+  const idx = sorted.findIndex((row) => row.id === current.id)
+  const upTo = idx >= 0 ? sorted.slice(0, idx + 1) : [current]
+  const thisAmount = paisaNumber(current.amountPaisa)
+  const cumulative = upTo.reduce(
+    (sum, row) => sum + paisaNumber(row.amountPaisa),
+    0,
+  )
+  const totalAmount = sorted.reduce(
+    (sum, row) => sum + paisaNumber(row.amountPaisa),
+    0,
+  )
+  const budgetPaisa =
+    project?.profitability?.revenuePaisa ??
+    project?.budgetPaisa ??
+    current.project?.budgetPaisa ??
+    "0"
+  const budget = paisaNumber(budgetPaisa)
+  const pctOfBudget = budget > 0 ? (thisAmount / budget) * 100 : 0
+  const pctOfInvoiced = totalAmount > 0 ? (thisAmount / totalAmount) * 100 : 0
+  const remainingAfter = budget - cumulative
+  const analytics = computeInvoiceAnalytics(sorted)
+  const daysToPayment =
+    current.status === "paid" && current.paymentDate
+      ? calendarDaysBetween(current.invoiceDate, current.paymentDate)
+      : null
+  const daysSincePrev =
+    idx > 0
+      ? calendarDaysBetween(sorted[idx - 1].invoiceDate, current.invoiceDate)
+      : null
 
   async function markPaid(paymentDate: string) {
     try {
@@ -118,6 +206,21 @@ function InvoiceDetailPage() {
           { label: "Invoices", to: "/invoices", search: DEFAULT_LIST_SEARCH },
           { label: invoice.invoiceNumber },
         ]}
+        description={
+          invoice.project?.id ? (
+            <>
+              <ProjectLink id={invoice.project.id}>
+                {invoice.project.name}
+              </ProjectLink>
+              {client?.id ? (
+                <>
+                  {" · "}
+                  <ClientLink id={client.id}>{client.name}</ClientLink>
+                </>
+              ) : null}
+            </>
+          ) : undefined
+        }
         status={
           <>
             <StatusBadge status={invoice.status} />
@@ -132,10 +235,16 @@ function InvoiceDetailPage() {
           canMutate ? (
             <>
               {invoice.status === "pending" ? (
-                <Button variant="outline" onClick={() => setPaying(true)}>
-                  <IconCircleCheck className="size-4" />
-                  Mark paid
-                </Button>
+                <>
+                  <Button variant="outline" onClick={() => setEditing(true)}>
+                    <IconPencil className="size-4" />
+                    Edit
+                  </Button>
+                  <Button variant="outline" onClick={() => setPaying(true)}>
+                    <IconCircleCheck className="size-4" />
+                    Mark paid
+                  </Button>
+                </>
               ) : null}
               <Button
                 variant="ghost"
@@ -150,85 +259,162 @@ function InvoiceDetailPage() {
         }
       />
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Amounts</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Row label="Amount (ex-VAT)" value={formatNpr(invoice.amountPaisa)} />
-            <Row
-              label={
-                invoice.vatRateApplied > 0
-                  ? `VAT (${invoice.vatRateApplied}%)`
-                  : "VAT"
-              }
-              value={
-                paisaNumber(invoice.vatPaisa) > 0
-                  ? formatNpr(invoice.vatPaisa)
-                  : "Not applicable"
-              }
-            />
-            <div className="border-t mt-1 pt-1">
-              <Row label="Total" value={formatNpr(invoice.totalPaisa)} bold />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Row
-              label="Project"
-              value={
-                invoice.project?.id ? (
-                  <ProjectLink id={invoice.project.id}>
-                    {invoice.project.name}
-                  </ProjectLink>
-                ) : (
-                  "—"
-                )
-              }
-            />
-            <Row
-              label="Client"
-              value={
-                client?.id ? (
-                  <ClientLink id={client.id}>{client.name}</ClientLink>
-                ) : (
-                  "—"
-                )
-              }
-            />
-            <Row
-              label="Invoice date"
-              value={formatJoinedDate(invoice.invoiceDate)}
-            />
-            <Row
-              label="Payment date"
-              value={
-                invoice.paymentDate
-                  ? formatJoinedDate(invoice.paymentDate)
-                  : "—"
-              }
-            />
-          </CardContent>
-        </Card>
-      </div>
-
-      {invoice.notes ? (
-        <Card className="mt-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium">Notes</CardTitle>
-          </CardHeader>
-          <CardContent className="whitespace-pre-wrap text-sm">
-            {invoice.notes}
-          </CardContent>
-        </Card>
+      {overdue ? (
+        <Alert className="mb-6 border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+          <IconAlertTriangle />
+          <AlertDescription className="text-amber-900 dark:text-amber-200">
+            This invoice has been unpaid for {daysIssued} days (over the{" "}
+            {OVERDUE_AFTER_DAYS}-day limit).
+          </AlertDescription>
+        </Alert>
       ) : null}
 
+      <div className="grid gap-6 md:grid-cols-3">
+        <div className="md:col-span-2">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Invoice Details
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3">
+                <DetailRow
+                  label="Invoice Number"
+                  value={invoice.invoiceNumber}
+                />
+                <DetailRow
+                  label="Invoice Date"
+                  value={toDateKey(invoice.invoiceDate)}
+                />
+                <DetailRow
+                  label="Status"
+                  value={invoice.status === "paid" ? "Paid" : "Pending"}
+                />
+                {invoice.paymentDate ? (
+                  <DetailRow
+                    label="Payment Date"
+                    value={toDateKey(invoice.paymentDate)}
+                  />
+                ) : null}
+                {invoice.notes ? (
+                  <DetailRow
+                    label="Notes"
+                    value={
+                      <span className="whitespace-pre-wrap">{invoice.notes}</span>
+                    }
+                  />
+                ) : null}
+              </div>
+              <Separator />
+              <div className="flex flex-col gap-2">
+                <DetailRow
+                  label="Amount"
+                  value={formatNpr(invoice.amountPaisa)}
+                />
+                <DetailRow
+                  label={
+                    invoice.vatRateApplied > 0
+                      ? `VAT (${invoice.vatRateApplied}%)`
+                      : "VAT"
+                  }
+                  value={
+                    paisaNumber(invoice.vatPaisa) > 0
+                      ? formatNpr(invoice.vatPaisa)
+                      : "Not applicable"
+                  }
+                />
+              </div>
+              <Separator />
+              <div className="flex justify-between text-lg font-semibold">
+                <span>Total</span>
+                <span>{formatNpr(invoice.totalPaisa)}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Stats</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 text-sm">
+              <StatRow
+                label="% of total budget"
+                value={`${pctOfBudget.toFixed(1)}%`}
+              />
+              <StatRow
+                label="% of total invoiced"
+                value={`${pctOfInvoiced.toFixed(1)}%`}
+              />
+              <StatRow
+                label="Cumulative invoiced"
+                value={formatNpr(cumulative)}
+              />
+              <StatRow
+                label="Remaining budget after"
+                value={formatNpr(remainingAfter)}
+                accent={remainingAfter < 0 ? "font-medium text-amber-600" : undefined}
+              />
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">Timing</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 text-sm">
+              <StatRow
+                label="Days since issued"
+                value={`${daysIssued} days`}
+              />
+              <StatRow
+                label="Days to payment"
+                value={
+                  daysToPayment !== null ? `${daysToPayment} days` : "—"
+                }
+              />
+              {daysSincePrev !== null ? (
+                <StatRow
+                  label="Days since previous invoice"
+                  value={`${daysSincePrev} days`}
+                />
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium">
+                Project Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3 text-sm">
+              <StatRow label="Total budget" value={formatNpr(budgetPaisa)} />
+              <StatRow
+                label="Total invoiced"
+                value={formatNpr(analytics.totalInvoicedPaisa)}
+              />
+              <StatRow
+                label="Total paid"
+                value={formatNpr(analytics.totalPaidPaisa)}
+              />
+              <StatRow
+                label="Outstanding"
+                value={formatNpr(analytics.outstandingPaisa)}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <InvoiceFormDialog
+        open={editing}
+        onOpenChange={setEditing}
+        invoice={invoice}
+        onUpdated={() => void load()}
+      />
       <MarkPaidDialog
         invoice={paying ? invoice : null}
         onClose={() => setPaying(false)}

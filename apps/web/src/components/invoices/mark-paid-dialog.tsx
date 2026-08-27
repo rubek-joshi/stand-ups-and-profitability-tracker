@@ -9,8 +9,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog"
-import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { DatePicker } from "@/components/datetime-picker"
 import { formatNpr } from "@/lib/money"
 import { nptTodayIso } from "@/lib/standup-age"
 import type { Invoice } from "@/lib/types"
@@ -52,15 +52,15 @@ export function MarkPaidDialog({
         </AlertDialogHeader>
         <div className="flex flex-col gap-2 py-2">
           <Label htmlFor="payment-date">Payment date</Label>
-          <Input
-            id="payment-date"
-            type="date"
-            required
-            min={invoiceDay}
-            max={nptTodayIso()}
+          <DatePicker
             value={date}
-            onChange={(e) => setDate(e.target.value)}
+            min={invoiceDay || undefined}
+            max={nptTodayIso()}
             disabled={busy}
+            modal
+            onChange={(next) => {
+              if (next) setDate(next)
+            }}
           />
         </div>
         <AlertDialogFooter>
