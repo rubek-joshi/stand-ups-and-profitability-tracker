@@ -63,6 +63,7 @@ import { StandupTableView } from "@/components/standup/table-view"
 import { advanceStandupFocus } from "@/components/standup/standup-focus-nav"
 import { toggleMiscellaneousNotes } from "@/components/standup/miscellaneous-notes-toggle"
 import { StandupGuidelinesControl } from "@/components/standup/standup-guidelines-dialog"
+import { formatTaskForCopy } from "@/components/standup/task-indent"
 import {
   rebalance,
   type DraftAlloc,
@@ -1046,7 +1047,7 @@ function StandupDetailPage() {
           const tasks = a.tasks.filter((t) => t.text.trim().length > 0)
           if (tasks.length === 0) return null
           return `### ${name}\n${tasks
-            .map((t) => `- ${t.text.trim()}${t.blocker ? " [blocker]" : ""}`)
+            .map((t) => formatTaskForCopy(t.text, t.blocker))
             .join("\n")}`
         })
         .filter(Boolean)

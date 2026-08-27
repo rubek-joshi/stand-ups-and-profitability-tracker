@@ -241,7 +241,7 @@ function TaskMini({
                 />
                 <span
                   className={cn(
-                    "text-sm leading-snug",
+                    "whitespace-pre-wrap text-sm leading-snug",
                     task.state === "done" &&
                       "text-muted-foreground line-through",
                   )}

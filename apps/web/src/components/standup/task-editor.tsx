@@ -11,6 +11,7 @@ import {
 import { cn } from "@workspace/ui/lib/utils"
 import { primaryModifierPressed } from "@/lib/keyboard"
 import type { StandupTask, StandupTaskState } from "@/lib/types"
+import { applyTaskIndentKey } from "./task-indent"
 
 export type TaskDraft = {
   id: string
@@ -63,11 +64,18 @@ function AutoTextarea({
   "data-blocker"?: boolean
 }) {
   const ref = React.useRef<HTMLTextAreaElement>(null)
-  React.useEffect(() => {
+  const pendingCursor = React.useRef<number | null>(null)
+
+  React.useLayoutEffect(() => {
     const el = ref.current
     if (!el) return
     el.style.height = "0px"
     el.style.height = `${el.scrollHeight}px`
+    if (pendingCursor.current !== null) {
+      const pos = Math.min(pendingCursor.current, el.value.length)
+      pendingCursor.current = null
+      el.setSelectionRange(pos, pos)
+    }
   }, [value])
 
   React.useEffect(() => {
@@ -92,9 +100,30 @@ function AutoTextarea({
       data-task-id={dataTaskId}
       data-blocker={dataBlocker ? "" : undefined}
       onChange={(e) => onChange(e.target.value)}
-      onKeyDown={onKeyDown}
+      onKeyDown={(e) => {
+        if (!disabled) {
+          const result = applyTaskIndentKey({
+            text: value,
+            selectionStart: e.currentTarget.selectionStart ?? 0,
+            selectionEnd: e.currentTarget.selectionEnd ?? 0,
+            key: e.key,
+            shiftKey: e.shiftKey,
+            altKey: e.altKey,
+            metaOrCtrl: primaryModifierPressed(e),
+          })
+          if (result) {
+            e.preventDefault()
+            if (result.text !== value) {
+              pendingCursor.current = result.cursor
+              onChange(result.text)
+            }
+            return
+          }
+        }
+        onKeyDown?.(e)
+      }}
       className={cn(
-        "w-full resize-none overflow-hidden bg-transparent outline-none placeholder:text-muted-foreground/60 disabled:cursor-not-allowed",
+        "w-full resize-none overflow-hidden whitespace-pre-wrap bg-transparent outline-none placeholder:text-muted-foreground/60 disabled:cursor-not-allowed",
         className,
       )}
     />
@@ -237,7 +266,7 @@ export function TaskEditor({
   }
 
   const commitBlocker = (task: TaskDraft, value: string) => {
-    const blocker = value.trim() ? value.trim() : null
+    const blocker = value.trim() ? value.replace(/\s+$/, "") : null
     patch(task.id, { blocker })
     setEditingBlocker(null)
     setDraft("")
@@ -409,7 +438,7 @@ export function TaskEditor({
                   ) {
                     e.preventDefault()
                     ignoreBlockerBlur.current = true
-                    const blocker = draft.trim() ? draft.trim() : null
+                    const blocker = draft.trim() ? draft.replace(/\s+$/, "") : null
                     const next = [...list]
                     next[i] = { ...t, blocker }
                     next.splice(i + 1, 0, emptyTask())
@@ -444,7 +473,9 @@ export function TaskEditor({
             t.blocker && (
               <div className="group/blocker relative ml-6 flex items-start gap-2 rounded-md border-l-2 border-task-blocker/50 bg-task-blocker/5 px-2 py-1 pr-14">
                 <IconCornerDownRight className="mt-0.5 size-3.5 shrink-0 text-task-blocker/70" />
-                <p className="text-[0.8rem] leading-5 text-task-blocker">{t.blocker}</p>
+                <p className="whitespace-pre-wrap text-[0.8rem] leading-5 text-task-blocker">
+                  {t.blocker}
+                </p>
                 <div className="pointer-events-none absolute right-1 top-0.5 flex items-center gap-0.5 rounded-md border border-border bg-card p-0.5 opacity-0 shadow-sm transition-opacity group-hover/blocker:pointer-events-auto group-hover/blocker:opacity-100">
                   <button
                     type="button"

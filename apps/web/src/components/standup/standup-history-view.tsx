@@ -351,7 +351,7 @@ function HistoryDayCard({
                           <li
                             key={task.id}
                             className={cn(
-                              "text-sm",
+                              "whitespace-pre-wrap text-sm",
                               TASK_STATE_CLASS[task.state],
                             )}
                           >
@@ -360,7 +360,7 @@ function HistoryDayCard({
                               query={highlightQuery}
                             />
                             {task.blocker ? (
-                              <span className="mt-0.5 block text-xs text-task-blocker">
+                              <span className="mt-0.5 block whitespace-pre-wrap text-xs text-task-blocker">
                                 Blocked:{" "}
                                 <HighlightText
                                   text={task.blocker}

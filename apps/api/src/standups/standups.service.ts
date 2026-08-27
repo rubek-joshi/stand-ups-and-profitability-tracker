@@ -702,7 +702,9 @@ export class StandupsService {
                 .map((task, taskIndex) => ({
                   text: task.text ?? "",
                   state: task.state ?? StandupTaskState.open,
-                  blocker: task.blocker?.trim() ? task.blocker.trim() : null,
+                  blocker: task.blocker != null && task.blocker.trim().length > 0
+                    ? task.blocker.replace(/\s+$/, "")
+                    : null,
                   sortOrder: task.sortOrder ?? taskIndex,
                 }))
                 .filter(
