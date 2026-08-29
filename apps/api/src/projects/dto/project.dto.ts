@@ -12,6 +12,7 @@ import {
   IsUrl,
   MaxLength,
   Min,
+  ValidateIf,
 } from "class-validator";
 
 /** Default project accent — matches app --primary teal as hex. */
@@ -52,9 +53,10 @@ export class CreateProjectDto {
   @IsDateString()
   startDate!: string;
 
-  @ApiProperty({ example: "2026-06-30" })
+  @ApiPropertyOptional({ example: "2026-06-30" })
+  @IsOptional()
   @IsDateString()
-  endDate!: string;
+  endDate?: string;
 
   @ApiPropertyOptional({ default: true })
   @IsOptional()
@@ -95,10 +97,11 @@ export class UpdateProjectDto {
   @IsDateString()
   startDate?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ example: "2026-06-30", nullable: true })
   @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined && value !== "")
   @IsDateString()
-  endDate?: string;
+  endDate?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

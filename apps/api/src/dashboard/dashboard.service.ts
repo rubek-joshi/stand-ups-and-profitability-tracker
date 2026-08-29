@@ -144,6 +144,8 @@ export class DashboardService {
     let totalLoss = 0n;
     let revenueSum = 0n;
     let profitLossSum = 0n;
+    let contractedRevenueSum = 0n;
+    let contractedProfitLossSum = 0n;
     const ranked = projects.map((project) => {
       const pl = byId.get(project.id)!;
       if (pl.profitLossPaisa > 0n) {
@@ -153,6 +155,8 @@ export class DashboardService {
       }
       revenueSum += pl.revenuePaisa;
       profitLossSum += pl.profitLossPaisa;
+      contractedRevenueSum += pl.contractedRevenuePaisa;
+      contractedProfitLossSum += pl.contractedProfitLossPaisa;
       const categoryNames = project.projectCategories.map(
         (row) => row.category.name,
       );
@@ -165,6 +169,8 @@ export class DashboardService {
         status: project.status,
         profitLossPaisa: String(pl.profitLossPaisa),
         marginPercent: pl.marginPercent,
+        contractedProfitLossPaisa: String(pl.contractedProfitLossPaisa),
+        contractedMarginPercent: pl.contractedMarginPercent,
         isTrendingOverBudget: pl.isTrendingOverBudget,
       };
     });
@@ -220,6 +226,14 @@ export class DashboardService {
       ? computedMargin
       : 0;
 
+    const computedContractedMargin =
+      contractedRevenueSum === 0n
+        ? 0
+        : Number((contractedProfitLossSum * 10000n) / contractedRevenueSum) / 100;
+    const overallContractedMarginPercent = Number.isFinite(computedContractedMargin)
+      ? computedContractedMargin
+      : 0;
+
     const clientsWithActiveProjects = new Set(
       projects
         .filter(
@@ -268,6 +282,9 @@ export class DashboardService {
       netProfitLossPaisa: String(profitLossSum),
       totalRevenuePaisa: String(revenueSum),
       overallMarginPercent,
+      contractedRevenuePaisa: String(contractedRevenueSum),
+      contractedNetProfitLossPaisa: String(contractedProfitLossSum),
+      overallContractedMarginPercent,
       activeClients,
       clientsWithActiveProjects,
       activeCount: projects.filter(

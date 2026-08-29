@@ -39,6 +39,7 @@ function ProjectEditPage() {
     budgetNpr: "",
     startDate: "",
     endDate: "",
+    isIndefinite: false,
     isVatApplicable: true,
   })
 
@@ -59,7 +60,8 @@ function ProjectEditPage() {
         themeColor: p.data.themeColor || DEFAULT_PROJECT_THEME_COLOR,
         budgetNpr: String(paisaToNpr(p.data.budgetPaisa)),
         startDate: String(p.data.startDate).slice(0, 10),
-        endDate: String(p.data.endDate).slice(0, 10),
+        endDate: p.data.endDate ? String(p.data.endDate).slice(0, 10) : "",
+        isIndefinite: !p.data.endDate,
         isVatApplicable: p.data.isVatApplicable,
       })
     } catch (e) {
@@ -119,7 +121,7 @@ function ProjectEditPage() {
                       : DEFAULT_PROJECT_THEME_COLOR,
                     budgetNpr: parseNprInput(edit.budgetNpr),
                     startDate: edit.startDate,
-                    endDate: edit.endDate,
+                    endDate: edit.isIndefinite ? null : edit.endDate.trim() || null,
                     isVatApplicable: edit.isVatApplicable,
                   },
                 })
@@ -182,28 +184,41 @@ function ProjectEditPage() {
                 }
               />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label>Start</Label>
-                <Input
-                  type="date"
-                  required
-                  value={edit.startDate}
-                  onChange={(e) =>
-                    setEdit((f) => ({ ...f, startDate: e.target.value }))
+            <div className="space-y-3">
+              <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                <Checkbox
+                  checked={edit.isIndefinite}
+                  onCheckedChange={(checked) =>
+                    setEdit((f) => ({ ...f, isIndefinite: Boolean(checked) }))
                   }
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>End</Label>
-                <Input
-                  type="date"
-                  required
-                  value={edit.endDate}
-                  onChange={(e) =>
-                    setEdit((f) => ({ ...f, endDate: e.target.value }))
-                  }
-                />
+                Indefinite / Ongoing (no set end date)
+              </label>
+              <div className={`grid ${edit.isIndefinite ? "grid-cols-1" : "grid-cols-2"} gap-3`}>
+                <div className="space-y-2">
+                  <Label>Start</Label>
+                  <Input
+                    type="date"
+                    required
+                    value={edit.startDate}
+                    onChange={(e) =>
+                      setEdit((f) => ({ ...f, startDate: e.target.value }))
+                    }
+                  />
+                </div>
+                {!edit.isIndefinite ? (
+                  <div className="space-y-2">
+                    <Label>End</Label>
+                    <Input
+                      type="date"
+                      required
+                      value={edit.endDate}
+                      onChange={(e) =>
+                        setEdit((f) => ({ ...f, endDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                ) : null}
               </div>
             </div>
             <div className="flex items-center justify-between rounded-md border px-3 py-2">

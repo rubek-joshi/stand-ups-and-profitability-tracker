@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { AuditAction, InvoiceStatus, Prisma } from '@workspace/database';
 import { AuditService } from '../audit/audit.service';
+import { ProfitabilityService } from '../profitability/profitability.service';
 import { parseIsoDate, toIsoDate } from '../_shared/utils/date.util';
 import { nprToPaisa } from '../_shared/utils/money.util';
 import {
@@ -48,6 +49,7 @@ export class InvoicesService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly auditService: AuditService,
+    private readonly profitabilityService: ProfitabilityService,
   ) {}
 
   async findAll(
@@ -194,6 +196,7 @@ export class InvoicesService {
       },
       include: { project: { include: projectInclude } },
     });
+    this.profitabilityService.clearCache(project.id);
     await this.auditService.write({
       actorId,
       action: AuditAction.INVOICE_CREATED,
@@ -277,6 +280,10 @@ export class InvoicesService {
       },
       include: { project: { include: projectInclude } },
     });
+    this.profitabilityService.clearCache(project.id);
+    if (invoice.projectId !== project.id) {
+      this.profitabilityService.clearCache(invoice.projectId);
+    }
     await this.auditService.write({
       actorId,
       action: AuditAction.INVOICE_UPDATED,
@@ -320,6 +327,7 @@ export class InvoicesService {
       data: { status: InvoiceStatus.paid, paymentDate },
       include: { project: { include: projectInclude } },
     });
+    this.profitabilityService.clearCache(invoice.projectId);
     await this.auditService.write({
       actorId,
       action: AuditAction.INVOICE_MARKED_PAID,
@@ -340,6 +348,7 @@ export class InvoicesService {
     if (!invoice) throw new NotFoundException('Invoice not found');
 
     await this.prismaService.invoice.delete({ where: { id } });
+    this.profitabilityService.clearCache(invoice.projectId);
     await this.auditService.write({
       actorId,
       action: AuditAction.INVOICE_DELETED,

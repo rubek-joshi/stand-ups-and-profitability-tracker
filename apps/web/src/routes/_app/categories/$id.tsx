@@ -250,7 +250,9 @@ function ProjectRow({ project }: { project: Project }) {
       <TableCell>{formatNpr(project.budgetPaisa)}</TableCell>
       <TableCell className="text-muted-foreground">
         {String(project.startDate).slice(0, 10)} →{" "}
-        {String(project.endDate).slice(0, 10)}
+        {project.endDate
+          ? String(project.endDate).slice(0, 10)
+          : "Ongoing"}
       </TableCell>
       <TableActionsCell>
         <TableActionLink

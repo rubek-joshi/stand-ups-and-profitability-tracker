@@ -294,7 +294,7 @@ model Project {
   themeColor      String        @default("#168A6F")
   budgetPaisa     BigInt
   startDate       DateTime      @db.Date
-  endDate         DateTime      @db.Date
+  endDate         DateTime?     @db.Date
   status          ProjectStatus @default(active)
   isVatApplicable Boolean       @default(true)
   vatRateApplied  Int           @default(13)

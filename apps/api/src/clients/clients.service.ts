@@ -19,11 +19,14 @@ const AMC_MONEY_FIELDS = ["amcAmountPaisa"] as const;
 const PROFIT_MONEY_FIELDS = [
   "budgetPaisa",
   "extensionsPaisa",
+  "contractedRevenuePaisa",
+  "realizedRevenuePaisa",
   "revenuePaisa",
   "employeeCostPaisa",
   "coreMemberCostPaisa",
   "totalCostPaisa",
   "profitLossPaisa",
+  "contractedProfitLossPaisa",
 ] as const;
 
 @Injectable()
@@ -139,9 +142,11 @@ export class ClientsService {
                 ? null
                 : String(profitability.forecastProfitLossPaisa),
             marginPercent: profitability.marginPercent,
+            contractedMarginPercent: profitability.contractedMarginPercent,
             isTrendingOverBudget: profitability.isTrendingOverBudget,
           },
           _profitLossPaisa: profitability.profitLossPaisa,
+          _contractedProfitLossPaisa: profitability.contractedProfitLossPaisa,
         };
       }),
     );
@@ -150,11 +155,19 @@ export class ClientsService {
       (sum, project) => sum + project._profitLossPaisa,
       0n,
     );
+    const totalContractedProfitLossPaisa = projects.reduce(
+      (sum, project) => sum + project._contractedProfitLossPaisa,
+      0n,
+    );
     const serializedProjects = projects.map(
-      ({ _profitLossPaisa: _, ...project }) => project,
+      ({ _profitLossPaisa: _pl, _contractedProfitLossPaisa: _cpl, ...project }) => project,
     );
     const projectIds = client.projects.map((project) => project.id);
-    const stats = await this.buildClientStats(projectIds, totalProfitLossPaisa);
+    const stats = await this.buildClientStats(
+      projectIds,
+      totalProfitLossPaisa,
+      totalContractedProfitLossPaisa,
+    );
 
     return {
       ...client,
@@ -166,10 +179,12 @@ export class ClientsService {
   private async buildClientStats(
     projectIds: string[],
     totalProfitLossPaisa: bigint,
+    totalContractedProfitLossPaisa: bigint = 0n,
   ) {
     if (projectIds.length === 0) {
       return {
         profitLossPaisa: "0",
+        contractedProfitLossPaisa: "0",
         employeesInvolved: [] as Array<{ id: string; name: string }>,
         coreMembersInvolved: [] as Array<{ id: string; name: string }>,
         standupsMentioned: 0,
@@ -215,6 +230,7 @@ export class ClientsService {
 
     return {
       profitLossPaisa: String(totalProfitLossPaisa),
+      contractedProfitLossPaisa: String(totalContractedProfitLossPaisa),
       employeesInvolved: [...employeesById.values()].sort((a, b) =>
         a.name.localeCompare(b.name),
       ),

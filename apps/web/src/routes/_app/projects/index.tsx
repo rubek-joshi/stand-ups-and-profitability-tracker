@@ -316,7 +316,10 @@ function ProjectsPage() {
                     </TableCell>
                     <TableCell className="tabular-nums">{formatNpr(p.budgetPaisa)}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">
-                      {String(p.startDate).slice(0, 10)} → {String(p.endDate).slice(0, 10)}
+                      {String(p.startDate).slice(0, 10)} →{" "}
+                      {p.endDate
+                        ? String(p.endDate).slice(0, 10)
+                        : "Ongoing"}
                     </TableCell>
                     <TableActionsCell>
                       <TableActionLink

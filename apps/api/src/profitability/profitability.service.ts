@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { AttendanceStatus } from "@workspace/database";
+import { AttendanceStatus, InvoiceStatus } from "@workspace/database";
 import { dayBefore, daysInMonth, toIsoDate } from "../_shared/utils/date.util";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -7,12 +7,16 @@ export type ProjectProfitability = {
   projectId: string;
   budgetPaisa: bigint;
   extensionsPaisa: bigint;
+  contractedRevenuePaisa: bigint;
+  realizedRevenuePaisa: bigint;
   revenuePaisa: bigint;
   employeeCostPaisa: bigint;
   coreMemberCostPaisa: bigint;
   totalCostPaisa: bigint;
   profitLossPaisa: bigint;
   marginPercent: number;
+  contractedProfitLossPaisa: bigint;
+  contractedMarginPercent: number;
   forecastProfitLossPaisa: bigint | null;
   isTrendingOverBudget: boolean;
 };
@@ -63,6 +67,9 @@ export class ProfitabilityService {
         where: { id: projectId },
         include: {
           extensions: true,
+          invoices: {
+            where: { status: InvoiceStatus.paid },
+          },
           employeeAssignments: {
             include: {
               employee: { include: { salaryEntries: true } },
@@ -93,6 +100,24 @@ export class ProfitabilityService {
       (sum, extension) => sum + extension.amountPaisa,
       0n,
     );
+
+    const paidInvoices = project.invoices.filter((inv) => {
+      const invDate = inv.paymentDate ?? inv.invoiceDate;
+      if (options?.from && invDate < options.from) {
+        return false;
+      }
+      if (options?.to && invDate > options.to) {
+        return false;
+      }
+      return true;
+    });
+
+    const realizedRevenuePaisa = paidInvoices.reduce(
+      (sum, inv) => sum + inv.amountPaisa,
+      0n,
+    );
+
+    const contractedRevenuePaisa = project.budgetPaisa + extensionsPaisa;
 
     const cutoverDate = orgSettings?.standupTrackingStartDate ?? null;
     let employeeCostPaisa = 0n;
@@ -142,25 +167,35 @@ export class ProfitabilityService {
       options?.from,
       options?.to,
     );
-    const revenuePaisa = project.budgetPaisa + extensionsPaisa;
+    const revenuePaisa = realizedRevenuePaisa;
     const totalCostPaisa = employeeCostPaisa + coreMemberCostPaisa;
-    const profitLossPaisa = revenuePaisa - totalCostPaisa;
+    const profitLossPaisa = realizedRevenuePaisa - totalCostPaisa;
     const marginPercent =
-      revenuePaisa === 0n
+      realizedRevenuePaisa === 0n
         ? 0
-        : Number((profitLossPaisa * 10000n) / revenuePaisa) / 100;
+        : Number((profitLossPaisa * 10000n) / realizedRevenuePaisa) / 100;
+    const contractedProfitLossPaisa = contractedRevenuePaisa - totalCostPaisa;
+    const contractedMarginPercent =
+      contractedRevenuePaisa === 0n
+        ? 0
+        : Number((contractedProfitLossPaisa * 10000n) / contractedRevenuePaisa) / 100;
+
     const result: ProjectProfitability = {
       projectId,
       budgetPaisa: project.budgetPaisa,
       extensionsPaisa,
+      contractedRevenuePaisa,
+      realizedRevenuePaisa,
       revenuePaisa,
       employeeCostPaisa,
       coreMemberCostPaisa,
       totalCostPaisa,
       profitLossPaisa,
       marginPercent,
+      contractedProfitLossPaisa,
+      contractedMarginPercent,
       forecastProfitLossPaisa: null,
-      isTrendingOverBudget: false,
+      isTrendingOverBudget: totalCostPaisa > contractedRevenuePaisa,
     };
     if (useCache) {
       this.cache.set(projectId, result);

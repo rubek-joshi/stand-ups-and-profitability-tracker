@@ -102,7 +102,7 @@ export class ProjectsService {
         themeColor: dto.themeColor ?? DEFAULT_PROJECT_THEME_COLOR,
         budgetPaisa: nprToPaisa(dto.budgetNpr),
         startDate: parseIsoDate(dto.startDate),
-        endDate: parseIsoDate(dto.endDate),
+        endDate: dto.endDate ? parseIsoDate(dto.endDate) : null,
         isVatApplicable,
         vatRateApplied: isVatApplicable ? settings.vatRatePercent : 0,
         projectCategories: {
@@ -186,11 +186,14 @@ export class ProjectsService {
         ...profitability,
         budgetPaisa: String(profitability.budgetPaisa),
         extensionsPaisa: String(profitability.extensionsPaisa),
+        contractedRevenuePaisa: String(profitability.contractedRevenuePaisa),
+        realizedRevenuePaisa: String(profitability.realizedRevenuePaisa),
         revenuePaisa: String(profitability.revenuePaisa),
         employeeCostPaisa: String(profitability.employeeCostPaisa),
         coreMemberCostPaisa: String(profitability.coreMemberCostPaisa),
         totalCostPaisa: String(profitability.totalCostPaisa),
         profitLossPaisa: String(profitability.profitLossPaisa),
+        contractedProfitLossPaisa: String(profitability.contractedProfitLossPaisa),
         forecastProfitLossPaisa:
           profitability.forecastProfitLossPaisa === null
             ? null
@@ -223,7 +226,12 @@ export class ProjectsService {
           budgetPaisa:
             dto.budgetNpr === undefined ? undefined : nprToPaisa(dto.budgetNpr),
           startDate: dto.startDate ? parseIsoDate(dto.startDate) : undefined,
-          endDate: dto.endDate ? parseIsoDate(dto.endDate) : undefined,
+          endDate:
+            dto.endDate !== undefined
+              ? dto.endDate
+                ? parseIsoDate(dto.endDate)
+                : null
+              : undefined,
           isVatApplicable: dto.isVatApplicable,
         },
         include: this.projectInclude,
@@ -297,15 +305,16 @@ export class ProjectsService {
     const hasManualExtension = before.extensions.some(
       (extension) => !extension.isAuto,
     );
-    const endDay = toIsoDate(before.endDate);
-    if (hasManualExtension && closeDateIso < endDay) {
+    const endDay = before.endDate ? toIsoDate(before.endDate) : null;
+    if (hasManualExtension && endDay && closeDateIso < endDay) {
       throw new BadRequestException(
         `This project has a manual extension until ${endDay}. Close date cannot be before that date.`,
       );
     }
 
     const removeAutoExtension = before.autoExtended;
-    const shortenEndDate = closeDateIso < endDay;
+    const shouldSetEndDate =
+      before.endDate === null || (endDay !== null && closeDateIso < endDay);
 
     const project = await this.prismaService.$transaction(async (tx) => {
       await tx.projectAssignment.updateMany({
@@ -326,7 +335,7 @@ export class ProjectsService {
         data: {
           status: ProjectStatus.closed,
           ...(removeAutoExtension ? { autoExtended: false } : {}),
-          ...(shortenEndDate ? { endDate: closedAt } : {}),
+          ...(shouldSetEndDate ? { endDate: closedAt } : {}),
         },
         include: this.projectInclude,
       });
@@ -881,12 +890,22 @@ export class ProjectsService {
       throw new BadRequestException("Cannot extend a closed project");
     }
     const endDate = parseIsoDate(dto.endDate);
-    const currentEnd = new Date(project.endDate);
-    currentEnd.setUTCHours(0, 0, 0, 0);
-    if (endDate <= currentEnd) {
-      throw new BadRequestException(
-        "Extension end date must be after the project's current end date",
-      );
+    if (project.endDate) {
+      const currentEnd = new Date(project.endDate);
+      currentEnd.setUTCHours(0, 0, 0, 0);
+      if (endDate <= currentEnd) {
+        throw new BadRequestException(
+          "Extension end date must be after the project's current end date",
+        );
+      }
+    } else {
+      const currentStart = new Date(project.startDate);
+      currentStart.setUTCHours(0, 0, 0, 0);
+      if (endDate < currentStart) {
+        throw new BadRequestException(
+          "Extension end date must be on or after the project's start date",
+        );
+      }
     }
     const amountPaisa = nprToPaisa(dto.amountNpr ?? 0);
     const extension = await this.prismaService.$transaction(async (tx) => {

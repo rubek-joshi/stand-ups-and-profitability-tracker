@@ -51,7 +51,7 @@ export class JobsService {
     const due = await this.prismaService.project.findMany({
       where: {
         status: ProjectStatus.active,
-        endDate: { lt: today },
+        endDate: { not: null, lt: today },
         autoExtended: false,
       },
     });

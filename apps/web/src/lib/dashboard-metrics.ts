@@ -14,6 +14,8 @@ export type DashboardProjectRow = {
   client: string
   profitLossPaisa: string
   marginPercent: number
+  contractedProfitLossPaisa?: string
+  contractedMarginPercent?: number
 }
 
 export type DashboardAmcRow = {
@@ -31,6 +33,9 @@ export type DashboardData = {
   netProfitPaisa: string
   totalRevenuePaisa: string
   marginPct: number
+  contractedNetProfitPaisa?: string
+  contractedRevenuePaisa?: string
+  contractedMarginPct?: number
   activeClients: number
   clientsWithActiveProjects: number
   activeProjects: number
@@ -139,6 +144,11 @@ export function buildDashboard(
     client: row.clientName,
     profitLossPaisa: row.profitLossPaisa,
     marginPercent: finiteNumber(row.marginPercent),
+    contractedProfitLossPaisa: row.contractedProfitLossPaisa,
+    contractedMarginPercent:
+      row.contractedMarginPercent !== undefined
+        ? finiteNumber(row.contractedMarginPercent)
+        : undefined,
   })
 
   const mapAmc = (
@@ -158,6 +168,12 @@ export function buildDashboard(
     netProfitPaisa: summary.netProfitLossPaisa,
     totalRevenuePaisa: summary.totalRevenuePaisa,
     marginPct: finiteNumber(summary.overallMarginPercent),
+    contractedNetProfitPaisa: summary.contractedNetProfitLossPaisa,
+    contractedRevenuePaisa: summary.contractedRevenuePaisa,
+    contractedMarginPct:
+      summary.overallContractedMarginPercent !== undefined
+        ? finiteNumber(summary.overallContractedMarginPercent)
+        : undefined,
     activeClients: summary.activeClients,
     clientsWithActiveProjects: summary.clientsWithActiveProjects ?? 0,
     activeProjects: summary.activeCount,
@@ -178,6 +194,11 @@ export function buildDashboard(
       client: row.clientName,
       profitLossPaisa: "0",
       marginPercent: finiteNumber(row.marginPercent),
+      contractedProfitLossPaisa: row.contractedProfitLossPaisa,
+      contractedMarginPercent:
+        row.contractedMarginPercent !== undefined
+          ? finiteNumber(row.contractedMarginPercent)
+          : undefined,
     })),
     amcFollowUps: (summary.amcReminders ?? []).map(mapAmc),
     amcList: (summary.amcContracts ?? []).map(mapAmc),

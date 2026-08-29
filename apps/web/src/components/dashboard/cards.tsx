@@ -181,10 +181,14 @@ const allCardDefs: CardDef[] = [
     render: (d) => (
       <Stat
         icon={<IconWallet className="size-4" />}
-        label="Net P&L"
+        label="Net Realized P&L"
         value={formatNpr(d.netProfitPaisa, { signed: true })}
         tone={paisaToNpr(d.netProfitPaisa) >= 0 ? "positive" : "negative"}
-        delta={`${formatNpr(d.totalRevenuePaisa)} revenue in range`}
+        delta={`${formatNpr(d.totalRevenuePaisa)} realized${
+          d.contractedNetProfitPaisa
+            ? ` · Contracted: ${formatNpr(d.contractedNetProfitPaisa, { signed: true })}`
+            : " revenue in range"
+        }`}
       />
     ),
   },
@@ -196,8 +200,13 @@ const allCardDefs: CardDef[] = [
       <div className="flex h-full flex-col justify-between gap-4">
         <Stat
           icon={<IconPercentage className="size-4" />}
-          label="Margin"
+          label="Realized Margin"
           value={`${d.marginPct.toFixed(1)}%`}
+          delta={
+            d.contractedMarginPct !== undefined
+              ? `Contracted: ${d.contractedMarginPct.toFixed(1)}%`
+              : undefined
+          }
           tone={
             d.marginPct >= (d.settings?.healthHealthyMinPercent ?? 20)
               ? "positive"
@@ -365,7 +374,11 @@ const allCardDefs: CardDef[] = [
               to="/projects/$id"
               params={{ id: p.id }}
               primary={p.name}
-              secondary={`${p.client} · ${p.marginPercent.toFixed(0)}% margin`}
+              secondary={`${p.client} · ${p.marginPercent.toFixed(0)}% realized${
+                p.contractedProfitLossPaisa
+                  ? ` (Contracted: ${formatNpr(p.contractedProfitLossPaisa, { signed: true })})`
+                  : ""
+              }`}
               value={formatNpr(p.profitLossPaisa, { signed: true })}
               valueTone="positive"
               meta={<IconArrowUpRight className="size-4 text-emerald-600 dark:text-emerald-400" />}
@@ -390,7 +403,11 @@ const allCardDefs: CardDef[] = [
               to="/projects/$id"
               params={{ id: p.id }}
               primary={p.name}
-              secondary={`${p.client} · ${p.marginPercent.toFixed(0)}% margin`}
+              secondary={`${p.client} · ${p.marginPercent.toFixed(0)}% realized${
+                p.contractedProfitLossPaisa
+                  ? ` (Contracted: ${formatNpr(p.contractedProfitLossPaisa, { signed: true })})`
+                  : ""
+              }`}
               value={formatNpr(p.profitLossPaisa, { signed: true })}
               valueTone={paisaToNpr(p.profitLossPaisa) < 0 ? "negative" : "warning"}
               meta={<IconArrowDownRight className="size-4 text-destructive" />}

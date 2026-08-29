@@ -32,6 +32,7 @@ type CreateProjectForm = {
   budgetNpr: string
   startDate: string
   endDate: string
+  isIndefinite: boolean
   isVatApplicable: boolean
 }
 
@@ -44,6 +45,7 @@ function emptyForm(clientId = ""): CreateProjectForm {
     budgetNpr: "",
     startDate: new Date().toISOString().slice(0, 10),
     endDate: "",
+    isIndefinite: false,
     isVatApplicable: true,
   }
 }
@@ -141,7 +143,7 @@ export function CreateProjectDialog({
                   categoryIds: form.categoryIds,
                   budgetNpr: parseNprInput(form.budgetNpr),
                   startDate: form.startDate,
-                  endDate: form.endDate,
+                  endDate: form.isIndefinite ? undefined : form.endDate.trim() || undefined,
                   isVatApplicable: form.isVatApplicable,
                   themeColor: /^#[0-9A-Fa-f]{6}$/i.test(form.themeColor)
                     ? form.themeColor.toUpperCase()
@@ -241,26 +243,40 @@ export function CreateProjectDialog({
               onChange={(e) => setForm((f) => ({ ...f, budgetNpr: e.target.value }))}
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label>Start</Label>
-              <Input
-                type="date"
-                required
+          <div className="space-y-3">
+            <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+              <Checkbox
+                checked={form.isIndefinite}
                 disabled={loadingOptions || saving}
-                value={form.startDate}
-                onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                onCheckedChange={(checked) =>
+                  setForm((f) => ({ ...f, isIndefinite: Boolean(checked) }))
+                }
               />
-            </div>
-            <div className="space-y-2">
-              <Label>End</Label>
-              <Input
-                type="date"
-                required
-                disabled={loadingOptions || saving}
-                value={form.endDate}
-                onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
-              />
+              Indefinite / Ongoing (no set end date)
+            </label>
+            <div className={`grid ${form.isIndefinite ? "grid-cols-1" : "grid-cols-2"} gap-3`}>
+              <div className="space-y-2">
+                <Label>Start</Label>
+                <Input
+                  type="date"
+                  required
+                  disabled={loadingOptions || saving}
+                  value={form.startDate}
+                  onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                />
+              </div>
+              {!form.isIndefinite ? (
+                <div className="space-y-2">
+                  <Label>End</Label>
+                  <Input
+                    type="date"
+                    required
+                    disabled={loadingOptions || saving}
+                    value={form.endDate}
+                    onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
+                  />
+                </div>
+              ) : null}
             </div>
           </div>
           <div className="flex items-center justify-between rounded-md border px-3 py-2">

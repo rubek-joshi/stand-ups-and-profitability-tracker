@@ -1,5 +1,6 @@
 export type ClientStats = {
   profitLossPaisa: string
+  contractedProfitLossPaisa?: string
   employeesInvolved: Array<{ id: string; name: string }>
   coreMembersInvolved: Array<{ id: string; name: string }>
   standupsMentioned: number
@@ -41,7 +42,7 @@ export type Project = {
   categoryIds?: string[]
   budgetPaisa: string
   startDate: string
-  endDate: string
+  endDate?: string | null
   status: ProjectStatus
   isVatApplicable: boolean
   vatRateApplied?: number
@@ -122,12 +123,16 @@ export type ProjectProfitability = {
   projectId: string
   budgetPaisa: string
   extensionsPaisa: string
+  contractedRevenuePaisa?: string
+  realizedRevenuePaisa?: string
   revenuePaisa: string
   employeeCostPaisa: string
   coreMemberCostPaisa: string
   totalCostPaisa: string
   profitLossPaisa: string
   marginPercent: number
+  contractedProfitLossPaisa?: string
+  contractedMarginPercent?: number
   forecastProfitLossPaisa: string | null
   isTrendingOverBudget: boolean
 }
@@ -456,6 +461,9 @@ export type DashboardSummary = {
   netProfitLossPaisa: string
   totalRevenuePaisa: string
   overallMarginPercent: number
+  contractedRevenuePaisa?: string
+  contractedNetProfitLossPaisa?: string
+  overallContractedMarginPercent?: number
   activeClients: number
   clientsWithActiveProjects: number
   activeCount: number
@@ -473,6 +481,8 @@ export type DashboardSummary = {
     clientName: string
     profitLossPaisa: string
     marginPercent: number
+    contractedProfitLossPaisa?: string
+    contractedMarginPercent?: number
   }>
   top5LossMaking: Array<{
     id: string
@@ -480,12 +490,16 @@ export type DashboardSummary = {
     clientName: string
     profitLossPaisa: string
     marginPercent: number
+    contractedProfitLossPaisa?: string
+    contractedMarginPercent?: number
   }>
   trendingOverBudget: Array<{
     id: string
     name: string
     clientName: string
     marginPercent: number
+    contractedProfitLossPaisa?: string
+    contractedMarginPercent?: number
   }>
   accumulatedVat: { unpaidPaisa: string }
   amcReminders: Array<{

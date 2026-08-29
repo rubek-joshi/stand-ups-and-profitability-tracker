@@ -432,7 +432,7 @@ function ProjectDetailPage() {
   )
   const wasAutoExtended = Boolean(project.autoExtended)
   const projectStartDay = String(project.startDate).slice(0, 10)
-  const projectEndDay = String(project.endDate).slice(0, 10)
+  const projectEndDay = project.endDate ? String(project.endDate).slice(0, 10) : null
   const latestAssignmentEnd = maxIsoDate(
     ...assignments.employees.map((assignment) => assignment.unassignedAt),
     ...assignments.coreMembers.map((assignment) => assignment.unassignedAt)
@@ -446,19 +446,19 @@ function ProjectDetailPage() {
       projectStartDay,
       latestAssignmentEnd,
       latestOpenAssignedFrom,
-      hasManualExtension ? projectEndDay : undefined
+      hasManualExtension && projectEndDay ? projectEndDay : undefined
     ) ?? projectStartDay
   const closeDateTooEarly = Boolean(closeDate && closeDate < minCloseDate)
   const closeDateInFuture = Boolean(closeDate && closeDate > todayIso)
   const cannotCloseYet = minCloseDate > todayIso
   const closeBlockedReason = cannotCloseYet
-    ? hasManualExtension
+    ? hasManualExtension && projectEndDay
       ? `This project has a manual extension until ${projectEndDay}. It cannot be closed before that date.`
       : latestAssignmentEnd && latestAssignmentEnd > todayIso
         ? `Close date cannot be before ${latestAssignmentEnd}, the latest assignment end date.`
         : `Close date cannot be before ${minCloseDate}.`
     : closeDateTooEarly
-      ? hasManualExtension && closeDate < projectEndDay
+      ? hasManualExtension && projectEndDay && closeDate < projectEndDay
         ? `This project has a manual extension until ${projectEndDay}. Close date cannot be before that date.`
         : latestAssignmentEnd && closeDate < latestAssignmentEnd
           ? `Close date cannot be before ${latestAssignmentEnd}, the latest assignment end date.`
@@ -689,16 +689,16 @@ function ProjectDetailPage() {
         <div className="min-w-0 space-y-6">
           <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <ProjectMetricCard
-              label="Total budget"
+              label="Realized revenue"
               value={
                 profit
-                  ? formatNpr(profit.revenuePaisa)
-                  : formatNpr(project.budgetPaisa)
+                  ? formatNpr(profit.realizedRevenuePaisa ?? profit.revenuePaisa)
+                  : formatNpr("0")
               }
               hint={
                 profit
-                  ? `Base ${formatNpr(profit.budgetPaisa)} + ${formatNpr(profit.extensionsPaisa)} extensions`
-                  : "Project base budget"
+                  ? `Contracted: ${formatNpr(profit.contractedRevenuePaisa ?? profit.budgetPaisa)} (Base ${formatNpr(profit.budgetPaisa)} + ${formatNpr(profit.extensionsPaisa)} ext)`
+                  : "Paid invoice revenue"
               }
             />
             <ProjectMetricCard
@@ -715,8 +715,8 @@ function ProjectDetailPage() {
             <ProjectMetricCard
               label={
                 profit && Number(profit.profitLossPaisa) < 0
-                  ? "Projected loss"
-                  : "Projected profit"
+                  ? "Realized loss"
+                  : "Realized profit"
               }
               value={
                 profit
@@ -725,7 +725,7 @@ function ProjectDetailPage() {
               }
               hint={
                 profit
-                  ? `${profit.marginPercent.toFixed(1)}% margin`
+                  ? `${profit.marginPercent.toFixed(1)}% realized margin · Contracted: ${formatNpr(profit.contractedProfitLossPaisa ?? "0", { signed: true })} (${(profit.contractedMarginPercent ?? 0).toFixed(1)}%)`
                   : "Profitability unavailable"
               }
               valueClassName={
@@ -1807,18 +1807,25 @@ function ProjectDetailPage() {
                       <Input
                         type="date"
                         required
-                        min={(() => {
-                          const current = new Date(
-                            String(project.endDate).slice(0, 10)
-                          )
-                          current.setUTCDate(current.getUTCDate() + 1)
-                          return current.toISOString().slice(0, 10)
-                        })()}
+                        min={
+                          project.endDate
+                            ? (() => {
+                                const current = new Date(
+                                  String(project.endDate).slice(0, 10)
+                                )
+                                current.setUTCDate(current.getUTCDate() + 1)
+                                return current.toISOString().slice(0, 10)
+                              })()
+                            : String(project.startDate).slice(0, 10)
+                        }
                         value={extEndDate}
                         onChange={(e) => setExtEndDate(e.target.value)}
                       />
                       <p className="text-xs text-muted-foreground">
-                        Current end date: {String(project.endDate).slice(0, 10)}
+                        Current end date:{" "}
+                        {project.endDate
+                          ? String(project.endDate).slice(0, 10)
+                          : "Ongoing / Indefinite"}
                       </p>
                     </div>
                     <DialogFooter>
@@ -2015,9 +2022,15 @@ function ProjectDetailPage() {
                   <ProjectLaborCostChart
                     series={laborSeries}
                     startDate={String(project.startDate).slice(0, 10)}
-                    endDate={String(project.endDate).slice(0, 10)}
+                    endDate={
+                      project.endDate
+                        ? String(project.endDate).slice(0, 10)
+                        : null
+                    }
                     totalBudgetPaisa={
-                      profit?.revenuePaisa ?? project.budgetPaisa
+                      profit?.contractedRevenuePaisa ??
+                      profit?.revenuePaisa ??
+                      project.budgetPaisa
                     }
                     spentLaborPaisa={summary?.laborCostPaisa ?? "0"}
                   />
@@ -2116,7 +2129,11 @@ function ProjectDetailPage() {
               />
               <Detail
                 label="End date"
-                value={String(project.endDate).slice(0, 10)}
+                value={
+                  project.endDate
+                    ? String(project.endDate).slice(0, 10)
+                    : "Ongoing / Indefinite"
+                }
               />
               <Detail
                 label="Core members"
@@ -2318,8 +2335,9 @@ function ProjectDetailPage() {
           <DialogHeader>
             <DialogTitle>Close project?</DialogTitle>
             <DialogDescription>
-              Closing ends all active employee and core member assignments on
-              the close date (inclusive) and keeps assignment history.
+              {project.endDate
+                ? "Closing ends all active employee and core member assignments on the close date (inclusive) and keeps assignment history."
+                : "This is an ongoing project with no set end date. Closing will set the project's end date to the selected close date, and end all active assignments on this date."}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -2456,12 +2474,15 @@ function ProjectLaborCostChart({
     employeeCount: number
   }>
   startDate: string
-  endDate: string
+  endDate?: string | null
   totalBudgetPaisa: string
   spentLaborPaisa: string
 }) {
+  const effectiveEndDate = endDate
+    ? String(endDate).slice(0, 10)
+    : new Date().toISOString().slice(0, 10)
   const [grain, setGrain] = React.useState<LaborGrain>("monthly")
-  const durationMonths = inclusiveMonthCount(startDate, endDate)
+  const durationMonths = inclusiveMonthCount(startDate, effectiveEndDate)
   const periodBudgetPaisa = periodBudgetForGrain(
     Number(totalBudgetPaisa) || 0,
     durationMonths,
@@ -2487,11 +2508,11 @@ function ProjectLaborCostChart({
       buildLaborChartData({
         series,
         startDate,
-        endDate,
+        endDate: effectiveEndDate,
         grain,
         periodBudgetPaisa,
       }),
-    [series, startDate, endDate, grain, periodBudgetPaisa]
+    [series, startDate, effectiveEndDate, grain, periodBudgetPaisa]
   )
 
   return (

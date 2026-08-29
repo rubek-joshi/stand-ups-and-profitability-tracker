@@ -376,6 +376,11 @@ function ClientDetailPage() {
             <StatCard
               title="Project profit / loss"
               value={formatNpr(stats?.profitLossPaisa ?? "0", { signed: true })}
+              subtitle={
+                stats?.contractedProfitLossPaisa
+                  ? `Contracted: ${formatNpr(stats.contractedProfitLossPaisa, { signed: true })}`
+                  : undefined
+              }
               valueClassName={
                 totalPl > 0
                   ? "text-emerald-600 dark:text-emerald-400"
@@ -533,9 +538,26 @@ function ClientDetailPage() {
                               {formatNpr(project.budgetPaisa)}
                             </TableCell>
                             <TableCell className="tabular-nums">
-                              {profit
-                                ? formatNpr(profit.profitLossPaisa, { signed: true })
-                                : "—"}
+                              {profit ? (
+                                <div>
+                                  <div className="font-medium">
+                                    {formatNpr(profit.profitLossPaisa, {
+                                      signed: true,
+                                    })}
+                                  </div>
+                                  {profit.contractedProfitLossPaisa ? (
+                                    <div className="text-xs text-muted-foreground">
+                                      Contracted:{" "}
+                                      {formatNpr(
+                                        profit.contractedProfitLossPaisa,
+                                        { signed: true }
+                                      )}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : (
+                                "—"
+                              )}
                             </TableCell>
                             <TableActionsCell>
                               <TableActionLink
@@ -862,7 +884,9 @@ function ProjectCard({
           <div className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
             <Meta label="Timeline">
               {String(project.startDate).slice(0, 10)} →{" "}
-              {String(project.endDate).slice(0, 10)}
+              {project.endDate
+                ? String(project.endDate).slice(0, 10)
+                : "Ongoing"}
             </Meta>
             {duration ? <Meta label="Duration so far">{duration}</Meta> : null}
             <Meta label="Extensions">{String(project.extensionCount ?? 0)}</Meta>
@@ -870,22 +894,37 @@ function ProjectCard({
           </div>
 
           {profit ? (
-            <div className="flex items-baseline justify-between gap-2 border-t pt-3">
-              <span className="text-xs text-muted-foreground">Profit / Loss</span>
-              <span
-                className={`tabular-nums text-sm font-semibold ${
-                  pl > 0
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : pl < 0
-                      ? "text-red-600 dark:text-red-400"
-                      : "text-muted-foreground"
-                }`}
-              >
-                {formatNpr(profit.profitLossPaisa, { signed: true })}
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  ({profit.marginPercent.toFixed(1)}%)
+            <div className="space-y-1 border-t pt-3">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-xs text-muted-foreground">Realized P&L</span>
+                <span
+                  className={`tabular-nums text-sm font-semibold ${
+                    pl > 0
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : pl < 0
+                        ? "text-red-600 dark:text-red-400"
+                        : "text-muted-foreground"
+                  }`}
+                >
+                  {formatNpr(profit.profitLossPaisa, { signed: true })}
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    ({profit.marginPercent.toFixed(1)}%)
+                  </span>
                 </span>
-              </span>
+              </div>
+              {profit.contractedProfitLossPaisa ? (
+                <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground">
+                  <span>Contracted</span>
+                  <span className="tabular-nums">
+                    {formatNpr(profit.contractedProfitLossPaisa, {
+                      signed: true,
+                    })}
+                    {profit.contractedMarginPercent !== undefined
+                      ? ` (${profit.contractedMarginPercent.toFixed(1)}%)`
+                      : ""}
+                  </span>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </CardContent>
@@ -897,12 +936,14 @@ function ProjectCard({
 function StatCard({
   title,
   value,
+  subtitle,
   valueClassName,
   interactive,
   onClick,
 }: {
   title: string
   value: string
+  subtitle?: string
   valueClassName?: string
   interactive?: boolean
   onClick?: () => void
@@ -932,6 +973,9 @@ function StatCard({
         <p className={`text-xl font-semibold tabular-nums ${valueClassName ?? ""}`}>
           {value}
         </p>
+        {subtitle ? (
+          <p className="mt-1 text-xs text-muted-foreground">{subtitle}</p>
+        ) : null}
         {interactive ? (
           <p className="mt-1 text-xs text-muted-foreground">Click to view</p>
         ) : null}
@@ -949,11 +993,16 @@ function Meta({ label, children }: { label: string; children: React.ReactNode })
   )
 }
 
-function projectDurationSoFar(startDate: string, endDate: string): string | null {
+function projectDurationSoFar(
+  startDate: string,
+  endDate?: string | null
+): string | null {
   const start = startOfDay(parseISO(String(startDate).slice(0, 10)))
-  const end = startOfDay(parseISO(String(endDate).slice(0, 10)))
   const today = startOfDay(new Date())
   if (isBefore(today, start)) return null
+  const end = endDate
+    ? startOfDay(parseISO(String(endDate).slice(0, 10)))
+    : today
   const until = isBefore(today, end) ? today : end
   return formatDistanceStrict(start, until)
 }
