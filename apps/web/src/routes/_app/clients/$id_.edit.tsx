@@ -62,15 +62,6 @@ function ClientEditPage() {
           { label: client.name, to: "/clients/$id", params: { id } },
           { label: "Edit" },
         ]}
-        actions={
-          <Link
-            to="/clients/$id"
-            params={{ id }}
-            className={buttonVariants({ variant: "outline" })}
-          >
-            Cancel
-          </Link>
-        }
       />
 
       <Card className="max-w-xl">
@@ -131,9 +122,18 @@ function ClientEditPage() {
                 onChange={(e) => setAdditionalInfo(e.target.value)}
               />
             </div>
-            <Button type="submit" disabled={saving}>
-              {saving ? "Saving…" : "Save changes"}
-            </Button>
+            <div className="flex gap-2 pt-1">
+              <Link
+                to="/clients/$id"
+                params={{ id }}
+                className={buttonVariants({ variant: "secondary" })}
+              >
+                Cancel
+              </Link>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving…" : "Save changes"}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

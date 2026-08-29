@@ -52,8 +52,9 @@ import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { toIsoDateInput } from "@/lib/dashboard-metrics"
 import { buildListQuery, parsePage, parsePageSize, totalPagesFor } from "@/lib/list-query"
+import { STANDUP_EDITABLE_DAYS, isStandupEditable } from "@/lib/standup-age"
 import type { EmployeeGroup, Standup } from "@/lib/types"
-import { format, parseISO } from "date-fns"
+import { format, parseISO, subDays } from "date-fns"
 
 function defaultHistoryRange() {
   const range = rangeFromDays(DEFAULT_PRESET_DAYS)
@@ -171,8 +172,23 @@ function StandupsPage() {
     if (view === "list") void load()
   }, [load, view])
 
+  const maxDate = utcIsoDate()
+  const minDate = format(
+    subDays(parseISO(maxDate), STANDUP_EDITABLE_DAYS),
+    "yyyy-MM-dd",
+  )
+
   const openCreate = async (initialDate?: string) => {
-    setDate(initialDate ?? utcIsoDate())
+    if (
+      initialDate &&
+      (initialDate > maxDate ||
+        initialDate < minDate ||
+        !isStandupEditable(initialDate))
+    ) {
+      alert("Stand-ups can only be created for dates within the last 7 days.")
+      return
+    }
+    setDate(initialDate ?? maxDate)
     setRemember(false)
     if (preference === "group" && user?.standupPreferredGroupId) {
       setScope("group")
@@ -194,8 +210,6 @@ function StandupsPage() {
     }
     setOpen(true)
   }
-
-  const maxDate = utcIsoDate()
   const totalPages = totalPagesFor(total, pageSize)
   const groupItems = Object.fromEntries(groups.map((g) => [g.id, g.name]))
 
@@ -373,8 +387,12 @@ function StandupsPage() {
             className="space-y-3"
             onSubmit={async (e) => {
               e.preventDefault()
-              if (date > utcIsoDate()) {
+              if (date > maxDate) {
                 alert("Stand-ups cannot be created for a future date.")
+                return
+              }
+              if (date < minDate || !isStandupEditable(date)) {
+                alert("Stand-ups cannot be created for dates older than 7 days.")
                 return
               }
               const effectiveScope =
@@ -430,12 +448,13 @@ function StandupsPage() {
                 id="standup-date"
                 type="date"
                 required
+                min={minDate}
                 max={maxDate}
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
               />
               <p className="text-xs text-muted-foreground">
-                Today or a past date. One stand-up per day.
+                Within the last 7 days. One stand-up per day.
               </p>
             </div>
 

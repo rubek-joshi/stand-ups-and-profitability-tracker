@@ -70,6 +70,11 @@ export class StandupsService {
         "Cannot create a stand-up for a future date",
       );
     }
+    if (!isStandupEditable(date)) {
+      throw new BadRequestException(
+        "Cannot create a stand-up older than 7 days",
+      );
+    }
 
     const existing = await this.prismaService.standup.findFirst({
       where: { date },

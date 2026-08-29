@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/componen
 import { Calendar } from "@workspace/ui/components/calendar"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { isStandupEditable } from "@/lib/standup-age"
 import type { StandupCalendarDay } from "@/lib/types"
 
 function localIsoDate(date: Date) {
@@ -133,7 +134,11 @@ export function StandupCalendar({
                 })
                 return
               }
-              if (!isAfter(startOfDay(day), today) && onMissingDayClick) {
+              if (
+                !isAfter(startOfDay(day), today) &&
+                isStandupEditable(key) &&
+                onMissingDayClick
+              ) {
                 onMissingDayClick(key)
               }
             }}
@@ -141,7 +146,7 @@ export function StandupCalendar({
           />
         ) : null}
         <p className="mt-3 text-center text-xs text-muted-foreground">
-          Click an entered day to open it, or a missing day to create one.
+          Click an entered day to open it, or a missing day within the last 7 days to create one.
         </p>
       </CardContent>
     </Card>

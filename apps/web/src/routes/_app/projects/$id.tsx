@@ -2,11 +2,11 @@ import * as React from "react"
 import { Link, createFileRoute } from "@tanstack/react-router"
 import {
   IconDotsVertical,
+  IconExternalLink,
   IconEye,
   IconLock,
   IconLockOpen,
   IconPencil,
-  IconPlus,
   IconShieldCheck,
   IconTrash,
   IconUserMinus,
@@ -121,7 +121,6 @@ import type {
   Employee,
   Project,
   ProjectAssignment,
-  ProjectLink,
 } from "@/lib/types"
 import { parseListView } from "@/lib/view-pref"
 
@@ -140,15 +139,6 @@ function defaultStandupHistoryRange() {
 function parseIsoSearchDate(value: unknown): string {
   if (typeof value !== "string") return ""
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : ""
-}
-
-function isHttpUrl(value: string): boolean {
-  try {
-    const parsed = new URL(value)
-    return parsed.protocol === "http:" || parsed.protocol === "https:"
-  } catch {
-    return false
-  }
 }
 
 function maxIsoDate(
@@ -240,7 +230,7 @@ function ProjectDetailPage() {
   const { confirm, dialog } = useConfirmDialog()
   const canDeleteAmc = user?.role === "super_admin"
   const canDeleteAssignmentLogs = user?.role === "super_admin"
-  const canManageLinks = Boolean(
+  const canManage = Boolean(
     user?.role && (AUDIT_ROLES as string[]).includes(user.role)
   )
   const [project, setProject] = React.useState<Project | null>(null)
@@ -288,10 +278,6 @@ function ProjectDetailPage() {
     toIsoDateInput(new Date())
   )
   const [releasing, setReleasing] = React.useState(false)
-  const [linkOpen, setLinkOpen] = React.useState(false)
-  const [editingLink, setEditingLink] = React.useState<ProjectLink | null>(null)
-  const [linkForm, setLinkForm] = React.useState({ label: "", url: "" })
-  const [savingLink, setSavingLink] = React.useState(false)
   const [closeOpen, setCloseOpen] = React.useState(false)
   const [closeDate, setCloseDate] = React.useState("")
   const [closing, setClosing] = React.useState(false)
@@ -495,21 +481,9 @@ function ProjectDetailPage() {
     setReleaseDate(toIsoDateInput(new Date()))
   }
 
-  const openCreateLink = () => {
-    setEditingLink(null)
-    setLinkForm({ label: "", url: "" })
-    setLinkOpen(true)
-  }
-
   const openCloseProject = () => {
     setCloseDate(toIsoDateInput(new Date()))
     setCloseOpen(true)
-  }
-
-  const openEditLink = (link: ProjectLink) => {
-    setEditingLink(link)
-    setLinkForm({ label: link.label, url: link.url })
-    setLinkOpen(true)
   }
 
   const toggleEmployee = (employeeId: string, checked: boolean) => {
@@ -1848,7 +1822,7 @@ function ProjectDetailPage() {
             <TabsContent value="invoices" className="mt-4 space-y-4">
               <ProjectInvoicesTab
                 project={project}
-                canMutate={canManageLinks}
+                canMutate={canManage}
                 page={page}
                 pageSize={pageSize}
                 view={view}
@@ -2146,73 +2120,37 @@ function ProjectDetailPage() {
                 value={`${summary?.extensionCount ?? project.extensions?.length ?? 0} total`}
               />
               <div className="min-w-0">
-                <div className="flex items-center justify-between gap-2">
-                  <dt className="text-xs tracking-wide text-muted-foreground uppercase">
-                    Project links
-                  </dt>
-                  {canManageLinks ? (
-                    <Button
-                      type="button"
-                      size="icon-sm"
-                      variant="ghost"
-                      aria-label="Add project link"
-                      onClick={openCreateLink}
-                    >
-                      <IconPlus className="size-3.5" />
-                    </Button>
-                  ) : null}
-                </div>
+                <dt className="text-xs tracking-wide text-muted-foreground uppercase">
+                  Project links
+                </dt>
                 {(project.links ?? []).length === 0 ? (
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <dd className="mt-1 text-sm text-muted-foreground">
                     No project links
-                  </p>
+                  </dd>
                 ) : (
-                  <ul className="mt-2 space-y-2">
-                    {(project.links ?? []).map((link) => (
-                      <li
-                        key={link.id}
-                        className="flex items-start justify-between gap-2 rounded-md border p-2"
-                      >
+                  <dd className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
+                    {(project.links ?? []).map((link, index) => (
+                      <React.Fragment key={link.id}>
+                        {index > 0 ? (
+                          <span
+                            className="text-muted-foreground select-none"
+                            aria-hidden="true"
+                          >
+                            •
+                          </span>
+                        ) : null}
                         <a
                           href={link.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="min-w-0 truncate font-medium text-primary underline-offset-4 hover:underline"
+                          className="inline-flex items-center gap-1 text-primary underline-offset-4 hover:underline"
                         >
-                          {link.label}
+                          <span>{link.label}</span>
+                          <IconExternalLink className="size-3.5 shrink-0" />
                         </a>
-                        {canManageLinks ? (
-                          <div className="flex shrink-0 items-center gap-0.5">
-                            <TableActionButton
-                              label="Edit project link"
-                              onClick={() => openEditLink(link)}
-                            >
-                              <IconPencil className="size-3.5" />
-                            </TableActionButton>
-                            <TableActionButton
-                              label="Delete project link"
-                              variant="destructive"
-                              onClick={async () => {
-                                const ok = await confirm({
-                                  title: "Delete project link?",
-                                  description: `${link.label} will be removed from this project.`,
-                                  confirmLabel: "Delete",
-                                  destructive: true,
-                                })
-                                if (!ok) return
-                                await api(`/projects/${id}/links/${link.id}`, {
-                                  method: "DELETE",
-                                })
-                                await load()
-                              }}
-                            >
-                              <IconTrash className="size-3.5" />
-                            </TableActionButton>
-                          </div>
-                        ) : null}
-                      </li>
+                      </React.Fragment>
                     ))}
-                  </ul>
+                  </dd>
                 )}
               </div>
             </CardContent>
@@ -2220,116 +2158,6 @@ function ProjectDetailPage() {
         </aside>
       </div>
       {dialog}
-      <Dialog
-        open={linkOpen}
-        onOpenChange={(open) => {
-          setLinkOpen(open)
-          if (!open) setEditingLink(null)
-        }}
-      >
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingLink ? "Edit project link" : "Add project link"}
-            </DialogTitle>
-          </DialogHeader>
-          <form
-            className="space-y-3"
-            onSubmit={async (event) => {
-              event.preventDefault()
-              const label = linkForm.label.trim()
-              const url = linkForm.url.trim()
-              if (!label) {
-                alert("Label is required")
-                return
-              }
-              if (!isHttpUrl(url)) {
-                alert("URL must start with http:// or https://")
-                return
-              }
-              setSavingLink(true)
-              try {
-                const body = { label, url }
-                if (editingLink) {
-                  await api(`/projects/${id}/links/${editingLink.id}`, {
-                    method: "PATCH",
-                    body,
-                  })
-                } else {
-                  await api(`/projects/${id}/links`, {
-                    method: "POST",
-                    body,
-                  })
-                }
-                setLinkOpen(false)
-                setEditingLink(null)
-                await load()
-              } catch (caughtError) {
-                alert(
-                  caughtError instanceof ApiError
-                    ? caughtError.message
-                    : "Failed to save project link"
-                )
-              } finally {
-                setSavingLink(false)
-              }
-            }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="project-link-label">Label</Label>
-              <Input
-                id="project-link-label"
-                required
-                maxLength={200}
-                value={linkForm.label}
-                onChange={(event) =>
-                  setLinkForm((form) => ({
-                    ...form,
-                    label: event.target.value,
-                  }))
-                }
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="project-link-url">URL</Label>
-              <Input
-                id="project-link-url"
-                type="url"
-                required
-                maxLength={2048}
-                placeholder="https://"
-                value={linkForm.url}
-                onChange={(event) =>
-                  setLinkForm((form) => ({
-                    ...form,
-                    url: event.target.value,
-                  }))
-                }
-              />
-              <p className="text-xs text-muted-foreground">
-                Must be an http or https URL. Opens in a new tab.
-              </p>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={savingLink}
-                onClick={() => setLinkOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={savingLink}>
-                {savingLink
-                  ? "Saving…"
-                  : editingLink
-                    ? "Save link"
-                    : "Add link"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
       <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
