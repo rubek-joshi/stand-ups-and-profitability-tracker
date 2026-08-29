@@ -4,6 +4,7 @@ import {
   IconDotsVertical,
   IconEye,
   IconLock,
+  IconLockOpen,
   IconPencil,
   IconPlus,
   IconShieldCheck,
@@ -562,21 +563,46 @@ function ProjectDetailPage() {
           </>
         }
         actions={
-          canManageAssignments ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    size="icon-sm"
-                    variant="ghost"
-                    aria-label="Project actions"
-                  />
-                }
-              >
-                <IconDotsVertical />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="min-w-40">
-                <DropdownMenuGroup>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={
+                <Button
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Project actions"
+                />
+              }
+            >
+              <IconDotsVertical />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-40">
+              <DropdownMenuGroup>
+                {project.status === "closed" ? (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "Re-open project?",
+                        description:
+                          "The project status will be restored so you can assign team members and record stand-up entries.",
+                        confirmLabel: "Re-open",
+                      })
+                      if (!ok) return
+                      try {
+                        await api(`/projects/${id}/reopen`, { method: "POST" })
+                        await load()
+                      } catch (e) {
+                        alert(
+                          e instanceof ApiError
+                            ? e.message
+                            : "Failed to re-open project",
+                        )
+                      }
+                    }}
+                  >
+                    <IconLockOpen />
+                    Re-open
+                  </DropdownMenuItem>
+                ) : project.status !== "under_amc" ? (
                   <DropdownMenuItem
                     variant="destructive"
                     onClick={openCloseProject}
@@ -584,54 +610,56 @@ function ProjectDetailPage() {
                     <IconLock />
                     Close
                   </DropdownMenuItem>
-                  {canDeleteProject ? (
-                    <DropdownMenuItem
-                      variant="destructive"
-                      onClick={async () => {
-                        const ok = await confirm({
-                          title: "Delete project?",
-                          description:
-                            "This permanently deletes the project, its assignments, and extensions.",
-                          confirmLabel: "Delete",
-                          destructive: true,
+                ) : null}
+                {canDeleteProject ? (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={async () => {
+                      const ok = await confirm({
+                        title: "Delete project?",
+                        description:
+                          "This permanently deletes the project, its assignments, and extensions.",
+                        confirmLabel: "Delete",
+                        destructive: true,
+                      })
+                      if (!ok) return
+                      try {
+                        await api(`/projects/${id}`, { method: "DELETE" })
+                        void navigate({
+                          to: "/projects",
+                          search: DEFAULT_LIST_SEARCH,
                         })
-                        if (!ok) return
-                        try {
-                          await api(`/projects/${id}`, { method: "DELETE" })
-                          void navigate({
-                            to: "/projects",
-                            search: DEFAULT_LIST_SEARCH,
-                          })
-                        } catch (e) {
-                          alert(
-                            e instanceof ApiError ? e.message : "Delete failed"
-                          )
-                        }
-                      }}
+                      } catch (e) {
+                        alert(
+                          e instanceof ApiError ? e.message : "Delete failed",
+                        )
+                      }
+                    }}
+                  >
+                    <IconTrash />
+                    Delete
+                  </DropdownMenuItem>
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={<div className="w-full cursor-not-allowed" />}
                     >
-                      <IconTrash />
-                      Delete
-                    </DropdownMenuItem>
-                  ) : (
-                    <Tooltip>
-                      <TooltipTrigger
-                        render={<div className="w-full cursor-not-allowed" />}
-                      >
-                        <DropdownMenuItem disabled variant="destructive">
-                          <IconTrash />
-                          Delete
-                        </DropdownMenuItem>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        Cannot delete: stand-ups have been recorded for this
-                        project
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : null
+                      <DropdownMenuItem disabled variant="destructive">
+                        <IconTrash />
+                        Delete
+                      </DropdownMenuItem>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      {project.status === "closed" ||
+                      project.status === "under_amc"
+                        ? "Cannot delete a closed project"
+                        : "Cannot delete: stand-ups have been recorded for this project"}
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 

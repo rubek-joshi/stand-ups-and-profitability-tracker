@@ -137,6 +137,16 @@ export class ProjectsController {
     return this.projectsService.close(id, dto ?? {}, user.id);
   }
 
+  @Post(":id/reopen")
+  @RequirePermission("projects", "*")
+  @ApiOperation({ summary: "Re-open a closed project" })
+  async reopen(
+    @Param("id") id: string,
+    @CurrentUser() user: AuthUser,
+  ) {
+    return this.projectsService.reopen(id, user.id);
+  }
+
   @Delete(":id")
   @RequirePermission("projects", "*")
   @ApiOperation({

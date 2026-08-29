@@ -360,6 +360,55 @@ export class ProjectsService {
     return this.serializeProject(project);
   }
 
+  async reopen(id: string, actorId: string) {
+    const before = await this.getProjectOrThrow(id);
+    if (before.status === ProjectStatus.under_amc) {
+      throw new BadRequestException(
+        "Project is under AMC and cannot be re-opened directly. Cancel or remove AMC first.",
+      );
+    }
+    if (before.status !== ProjectStatus.closed) {
+      throw new BadRequestException("Project is already open");
+    }
+
+    const hasManualExtension = before.extensions.some(
+      (extension) => !extension.isAuto,
+    );
+    const nextStatus = hasManualExtension
+      ? ProjectStatus.extended
+      : ProjectStatus.active;
+
+    const project = await this.prismaService.project.update({
+      where: { id },
+      data: {
+        status: nextStatus,
+      },
+      include: this.projectInclude,
+    });
+
+    const coreMemberIds = [
+      ...new Set(
+        before.coreMemberAssignments.map((assignment) => assignment.coreMemberId),
+      ),
+    ];
+    await this.clearCacheForCoreMembers(coreMemberIds);
+    this.profitabilityService.clearCache(id);
+
+    await this.auditService.write({
+      actorId,
+      action: AuditAction.PROJECT_UPDATED,
+      targetType: "Project",
+      targetId: project.id,
+      metadata: {
+        reopen: true,
+        before: this.serializeProject(before),
+        after: this.serializeProject(project),
+      },
+    });
+
+    return this.serializeProject(project);
+  }
+
   async remove(id: string, actorId: string) {
     const before = await this.getProjectOrThrow(id);
     if (
