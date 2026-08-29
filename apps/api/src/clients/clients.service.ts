@@ -72,7 +72,7 @@ export class ClientsService {
     const [data, total] = await Promise.all([
       this.prismaService.client.findMany({
         where,
-        orderBy: { createdAt: "desc" },
+        orderBy: { name: "asc" },
         include: { _count: { select: { projects: true } } },
         ...(pagination
           ? { skip: pagination.skip, take: pagination.take }

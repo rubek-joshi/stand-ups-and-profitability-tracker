@@ -49,7 +49,12 @@ import { formatNpr } from "@/lib/money"
 import type { Project } from "@/lib/types"
 
 const PROJECT_STATUSES = ["active", "extended", "closed", "under_amc"] as const
-const PROJECT_SORT_FIELDS = ["budget", "startDate"] as const
+const PROJECT_SORT_FIELDS = [
+  "name",
+  "client",
+  "budget",
+  "startDate",
+] as const
 
 type ProjectSortBy = (typeof PROJECT_SORT_FIELDS)[number]
 
@@ -59,8 +64,8 @@ function parseProjectSortBy(value: unknown): ProjectSortBy | undefined {
     : undefined
 }
 
-function defaultSortDir(): SortDir {
-  return "desc"
+function defaultSortDir(column: ProjectSortBy): SortDir {
+  return column === "name" || column === "client" ? "asc" : "desc"
 }
 
 export const Route = createFileRoute("/_app/projects/")({
@@ -76,7 +81,7 @@ export const Route = createFileRoute("/_app/projects/")({
           ? status
           : undefined,
       sortBy,
-      sortDir: sortBy ? (sortDir ?? defaultSortDir()) : undefined,
+      sortDir: sortBy ? (sortDir ?? defaultSortDir(sortBy)) : undefined,
     }
   },
   component: ProjectsPage,
@@ -143,7 +148,7 @@ function ProjectsPage() {
           return {
             ...prev,
             sortBy: column,
-            sortDir: defaultSortDir(),
+            sortDir: defaultSortDir(column),
             page: 1,
           }
         }
@@ -234,8 +239,20 @@ function ProjectsPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Client</TableHead>
+                  <SortableTableHead
+                    label="Name"
+                    column="name"
+                    active={sortBy === "name"}
+                    dir={sortDir}
+                    onSort={toggleSort}
+                  />
+                  <SortableTableHead
+                    label="Client"
+                    column="client"
+                    active={sortBy === "client"}
+                    dir={sortDir}
+                    onSort={toggleSort}
+                  />
                   <TableHead>Status</TableHead>
                   <SortableTableHead
                     label="Budget"

@@ -125,7 +125,7 @@
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.552 0.016 285.938);
     --task-tomorrow: oklch(0.72 0.12 250);
-    --task-progress: oklch(0.72 0.14 145);
+    --task-progress: oklch(0.72 0.16 56);
     --task-blocker: oklch(0.72 0.16 25);
 }
 

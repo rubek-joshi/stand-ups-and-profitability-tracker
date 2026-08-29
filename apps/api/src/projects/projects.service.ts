@@ -65,11 +65,17 @@ function resolveProjectOrder(
   sortBy?: string,
   sortDir?: string,
 ): Prisma.ProjectOrderByWithRelationInput[] {
+  const dir: SortDir = sortDir === "asc" ? "asc" : "desc";
+  if (sortBy === "client") {
+    return [{ client: { name: dir } }, { createdAt: "desc" }];
+  }
+  if (sortBy === "name") {
+    return [{ name: dir }, { createdAt: "desc" }];
+  }
   const field = PROJECT_SORT_FIELDS[sortBy as ProjectSortBy];
   if (!field) {
     return [{ createdAt: "desc" }];
   }
-  const dir: SortDir = sortDir === "asc" ? "asc" : "desc";
   return [{ [field]: dir }, { createdAt: "desc" }];
 }
 
