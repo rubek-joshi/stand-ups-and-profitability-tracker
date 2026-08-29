@@ -425,6 +425,27 @@ function serializeCollabEntry(draft: EntryDraft): string {
   })
 }
 
+function syncDraftsToYjs(
+  map: Y.Map<string> | null,
+  drafts: Record<string, EntryDraft>,
+) {
+  if (!map) return
+  const apply = () => {
+    for (const [entryId, draft] of Object.entries(drafts)) {
+      const serialized = serializeCollabEntry(draft)
+      if (map.get(entryId) !== serialized) {
+        map.set(entryId, serialized)
+      }
+    }
+  }
+  const doc = map.doc
+  if (doc) {
+    doc.transact(apply, "hydrate-from-server")
+  } else {
+    apply()
+  }
+}
+
 function parseCollabEntry(raw: string, fallback: EntryDraft): EntryDraft {
   try {
     const parsed = JSON.parse(raw) as Partial<EntryDraft>
@@ -447,20 +468,6 @@ function parseCollabEntry(raw: string, fallback: EntryDraft): EntryDraft {
   } catch {
     return fallback
   }
-}
-
-function tasksSignature(draft: EntryDraft): string {
-  return JSON.stringify(
-    draft.allocations.map((a) => ({
-      projectId: a.projectId,
-      tasks: a.tasks.map((t) => ({
-        id: t.id,
-        text: t.text,
-        state: t.state,
-        blocker: t.blocker,
-      })),
-    })),
-  )
 }
 
 function StandupDetailPage() {
@@ -501,6 +508,23 @@ function StandupDetailPage() {
   const entriesMapRef = React.useRef<Y.Map<string> | null>(null)
   const draftsRef = React.useRef(drafts)
   draftsRef.current = drafts
+  const draftsReadyRef = React.useRef(false)
+  const collabStateAppliedRef = React.useRef(false)
+  const yjsHydratedFromServerRef = React.useRef(false)
+  const hydrateYjsFromDraftsRef = React.useRef(
+    (_drafts?: Record<string, EntryDraft>) => {},
+  )
+  hydrateYjsFromDraftsRef.current = (incoming) => {
+    const map = entriesMapRef.current
+    const draftsToWrite = incoming ?? draftsRef.current
+    if (!map || !collabStateAppliedRef.current || !draftsReadyRef.current) {
+      return
+    }
+    if (yjsHydratedFromServerRef.current) return
+    if (Object.keys(draftsToWrite).length === 0) return
+    syncDraftsToYjs(map, draftsToWrite)
+    yjsHydratedFromServerRef.current = true
+  }
   const visibleEntriesRef = React.useRef<Array<{ id: string }>>([])
 
   const readonly = Boolean(standup && !isStandupEditable(String(standup.date)))
@@ -524,6 +548,8 @@ function StandupDetailPage() {
   const load = React.useCallback(async () => {
     setLoading(true)
     setError(null)
+    draftsReadyRef.current = false
+    yjsHydratedFromServerRef.current = false
     try {
       const [s, p] = await Promise.all([
         api<Envelope<Standup>>(`/standups/${id}`),
@@ -533,8 +559,11 @@ function StandupDetailPage() {
       setProjects(p.data)
       const fromServer = draftsFromStandup(s.data.entries)
       const next = applyAssignedProjectDefaults(fromServer, s.data, p.data)
+      draftsRef.current = next
+      draftsReadyRef.current = true
       setDrafts(next)
       setBaseline(serializeDrafts(fromServer))
+      hydrateYjsFromDraftsRef.current(next)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load stand-up")
     } finally {
@@ -587,13 +616,19 @@ function StandupDetailPage() {
   }, [])
 
   React.useEffect(() => {
+    collabStateAppliedRef.current = false
+    yjsHydratedFromServerRef.current = false
     const session = connectStandupCollab(id, (nextPeers) => {
+      collabStateAppliedRef.current = true
       setPeers(nextPeers)
       setCollabConnected(true)
+      hydrateYjsFromDraftsRef.current()
     })
     const entriesMap = session.doc.getMap<string>("entries")
     entriesMapRef.current = entriesMap
     const observer = () => {
+      // Wait until saved stand-up data has replaced the persisted Yjs snapshot.
+      if (!yjsHydratedFromServerRef.current) return
       setDrafts((prev) => {
         const next = { ...prev }
         let changed = false
@@ -613,6 +648,8 @@ function StandupDetailPage() {
     return () => {
       entriesMap.unobserve(observer)
       entriesMapRef.current = null
+      collabStateAppliedRef.current = false
+      yjsHydratedFromServerRef.current = false
       session.disconnect()
       setCollabConnected(false)
       setPeers([])
@@ -679,8 +716,10 @@ function StandupDetailPage() {
       })
       setStandup(res.data)
       const nextDrafts = draftsFromStandup(res.data.entries)
+      draftsRef.current = nextDrafts
       setDrafts(nextDrafts)
       setBaseline(serializeDrafts(nextDrafts))
+      syncDraftsToYjs(entriesMapRef.current, nextDrafts)
       setMissingAssignments([])
       setResolutionChoices({})
       setMissingAssignmentOpen(false)
@@ -725,13 +764,13 @@ function StandupDetailPage() {
 
   const handleDraftChange = React.useCallback(
     (entryId: string, next: EntryDraft) => {
-      const prev = draftsRef.current[entryId]
-      setDrafts((current) => ({ ...current, [entryId]: next }))
-      if (!prev) return
-      const miscChanged = prev.miscellaneousNotes !== next.miscellaneousNotes
-      const tasksChanged = tasksSignature(prev) !== tasksSignature(next)
-      if (miscChanged || tasksChanged) {
-        entriesMapRef.current?.set(entryId, serializeCollabEntry(next))
+      draftsRef.current = { ...draftsRef.current, [entryId]: next }
+      setDrafts(draftsRef.current)
+      const map = entriesMapRef.current
+      if (!map) return
+      const serialized = serializeCollabEntry(next)
+      if (map.get(entryId) !== serialized) {
+        map.set(entryId, serialized)
       }
     },
     [],
