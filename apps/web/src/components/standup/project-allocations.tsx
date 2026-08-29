@@ -25,6 +25,8 @@ import type { Project } from "@/lib/types"
 import { useAuth } from "@/lib/auth"
 import {
   DEFAULT_PROJECT_THEME_COLOR,
+  formatStandupProjectName,
+  isProjectSelectableForStandup,
   resolveProjectAccent,
 } from "./entry-draft"
 
@@ -222,12 +224,16 @@ export function ProjectAllocations({
   )
   const filteredProjects = React.useMemo(() => {
     const q = query.trim().toLowerCase()
-    if (!q) return projects
     return projects.filter((project) => {
-      const hay = `${project.name} ${project.status}`.toLowerCase()
+      if (!isProjectSelectableForStandup(project) && !selectedIds.has(project.id)) {
+        return false
+      }
+      if (!q) return true
+      const formatted = formatStandupProjectName(project).toLowerCase()
+      const hay = `${formatted} ${project.name} ${project.status}`.toLowerCase()
       return hay.includes(q)
     })
-  }, [projects, query])
+  }, [projects, query, selectedIds])
 
   const toggleProject = (projectId: string) => {
     if (selectedIds.has(projectId)) {
@@ -355,7 +361,9 @@ export function ProjectAllocations({
                     >
                       {active ? <IconCheck className="size-3" /> : null}
                     </span>
-                    <span className="truncate">{project.name}</span>
+                    <span className="truncate">
+                      {formatStandupProjectName(project)}
+                    </span>
                   </button>
                 )
               })
@@ -403,7 +411,7 @@ export function ProjectAllocations({
                       }}
                     />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                      {project?.name ?? a.projectId}
+                      {project ? formatStandupProjectName(project) : a.projectId}
                     </span>
                     <Button
                       type="button"

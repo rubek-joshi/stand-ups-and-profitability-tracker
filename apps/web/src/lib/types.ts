@@ -52,6 +52,7 @@ export type Project = {
   extensionCount?: number
   extensions?: ProjectExtension[]
   amcRecord?: AmcRecord | null
+  amcRecords?: AmcRecord[]
   employeeAssignments?: ProjectAssignment[]
   coreMemberAssignments?: CoreMemberAssignment[]
   links?: ProjectLink[]

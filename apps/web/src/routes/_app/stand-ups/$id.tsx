@@ -54,6 +54,7 @@ import {
   buildEntriesPayload,
   draftsFromStandup,
   isEntryComplete,
+  isProjectSelectableForStandup,
   isWorking,
   serializeDrafts,
   type EntryDraft,
@@ -283,10 +284,12 @@ function assignedProjectIdsOnDate(
   standupDate: string,
   projects: Project[],
 ): string[] {
+  const selectableProjects = projects.filter(isProjectSelectableForStandup)
+  const selectableProjectIds = new Set(selectableProjects.map((p) => p.id))
   const names = new Map<string, string>()
   for (const assignment of entry.employee.assignments ?? []) {
     const projectId = assignment.project?.id ?? assignment.projectId
-    if (!projectId) continue
+    if (!projectId || !selectableProjectIds.has(projectId)) continue
     if (
       !assignmentCoversDate(
         assignment.assignedAt,
@@ -298,10 +301,10 @@ function assignedProjectIdsOnDate(
     }
     names.set(projectId, assignment.project?.name ?? projectId)
   }
-  for (const project of projects) {
+  for (const project of selectableProjects) {
     if (
       hasProjectRosterAssignment(
-        projects,
+        selectableProjects,
         entry.employee.id,
         project.id,
         standupDate,

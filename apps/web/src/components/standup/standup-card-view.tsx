@@ -3,6 +3,7 @@ import type { AttendanceStatus, Project, StandupEntry } from "@/lib/types"
 import { useAuth } from "@/lib/auth"
 import {
   ATTENDANCE_META,
+  formatStandupProjectName,
   isWorking,
   projectColor,
   withPreservedTasks,
@@ -108,7 +109,7 @@ export function StandupCardView({
                           aria-hidden
                         />
                         <h3 className="text-sm font-semibold text-foreground">
-                          {project?.name ?? a.projectId}
+                          {project ? formatStandupProjectName(project) : a.projectId}
                         </h3>
                         <span className="font-mono text-xs text-muted-foreground">
                           {a.percentage}%

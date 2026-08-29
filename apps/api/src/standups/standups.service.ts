@@ -1199,9 +1199,8 @@ export class StandupsService {
       }
       const currentAmc = project.amcRecords[0] ?? null;
       const blocked =
-        (project.status === ProjectStatus.closed ||
-          project.status === ProjectStatus.under_amc) &&
-        currentAmc === null;
+        project.status === ProjectStatus.closed ||
+        (project.status === ProjectStatus.under_amc && currentAmc === null);
       if (blocked) {
         throw new BadRequestException(
           `Project ${project.name} is closed or cancelled and cannot be allocated`,

@@ -56,6 +56,7 @@ const EXTENSION_MONEY_FIELDS = ["amountPaisa"] as const;
 const PROJECT_SORT_FIELDS = {
   budget: "budgetPaisa",
   startDate: "startDate",
+  status: "status",
 } as const;
 
 type ProjectSortBy = keyof typeof PROJECT_SORT_FIELDS;

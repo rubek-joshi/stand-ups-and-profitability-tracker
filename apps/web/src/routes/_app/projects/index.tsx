@@ -52,6 +52,7 @@ const PROJECT_STATUSES = ["active", "extended", "closed", "under_amc"] as const
 const PROJECT_SORT_FIELDS = [
   "name",
   "client",
+  "status",
   "budget",
   "startDate",
 ] as const
@@ -65,7 +66,9 @@ function parseProjectSortBy(value: unknown): ProjectSortBy | undefined {
 }
 
 function defaultSortDir(column: ProjectSortBy): SortDir {
-  return column === "name" || column === "client" ? "asc" : "desc"
+  return column === "name" || column === "client" || column === "status"
+    ? "asc"
+    : "desc"
 }
 
 export const Route = createFileRoute("/_app/projects/")({
@@ -253,7 +256,13 @@ function ProjectsPage() {
                     dir={sortDir}
                     onSort={toggleSort}
                   />
-                  <TableHead>Status</TableHead>
+                  <SortableTableHead
+                    label="Status"
+                    column="status"
+                    active={sortBy === "status"}
+                    dir={sortDir}
+                    onSort={toggleSort}
+                  />
                   <SortableTableHead
                     label="Budget"
                     column="budget"

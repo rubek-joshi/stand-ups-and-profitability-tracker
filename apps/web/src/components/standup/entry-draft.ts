@@ -192,3 +192,31 @@ export function projectColor(
   const project = projects.find((p) => p.id === projectId)
   return resolveProjectAccent(project?.themeColor, preference, "dot")
 }
+
+/**
+ * Returns true if a project is eligible to be selected in a stand-up.
+ * Closed projects do not show up as an option.
+ */
+export function isProjectSelectableForStandup(project: Project): boolean {
+  return project.status !== "closed"
+}
+
+/**
+ * Formats a project's display name for stand-ups based on its status:
+ * - under_amc: "Project Name (AMC)"
+ * - extended (auto): "Project Name (Auto-Extended)"
+ * - extended (manual): "Project Name (Extended)"
+ * - active: "Project Name"
+ */
+export function formatStandupProjectName(project: Project): string {
+  if (project.status === "under_amc") {
+    return `${project.name} (AMC)`
+  }
+  if (project.status === "extended") {
+    return project.autoExtended
+      ? `${project.name} (Auto-Extended)`
+      : `${project.name} (Extended)`
+  }
+  return project.name
+}
+
