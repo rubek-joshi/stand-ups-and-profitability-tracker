@@ -21,6 +21,7 @@ export type InvolvementEntry = {
   projectId: string
   projectName: string
   percentage: number
+  themeColor?: string | null
 }
 
 const CHART_COLORS = [
@@ -31,8 +32,22 @@ const CHART_COLORS = [
   "var(--chart-5)",
 ] as const
 
-function colorFor(_projectId: string, index: number) {
+export function resolveProjectColor(
+  themeColor?: string | null,
+  index = 0,
+) {
+  if (themeColor?.trim()) {
+    return themeColor.trim()
+  }
   return CHART_COLORS[index % CHART_COLORS.length] ?? CHART_COLORS[0]
+}
+
+export function projectColor(
+  _projectId?: string,
+  index = 0,
+  themeColor?: string | null,
+) {
+  return resolveProjectColor(themeColor, index)
 }
 
 function EmptyChart({ message }: { message: string }) {
@@ -45,13 +60,22 @@ function EmptyChart({ message }: { message: string }) {
 
 export function ProjectAllocationChart({ entries }: { entries: InvolvementEntry[] }) {
   const data = React.useMemo(() => {
-    const totals = new Map<string, { project: string; projectId: string; percentage: number }>()
+    const totals = new Map<
+      string,
+      {
+        project: string
+        projectId: string
+        percentage: number
+        themeColor?: string | null
+      }
+    >()
     for (const e of entries) {
       const prev = totals.get(e.projectId)
       totals.set(e.projectId, {
         projectId: e.projectId,
         project: e.projectName,
         percentage: (prev?.percentage ?? 0) + e.percentage,
+        themeColor: e.themeColor ?? prev?.themeColor,
       })
     }
     return [...totals.values()]
@@ -64,7 +88,7 @@ export function ProjectAllocationChart({ entries }: { entries: InvolvementEntry[
     for (const [i, row] of data.entries()) {
       next[row.projectId] = {
         label: row.project,
-        color: colorFor(row.projectId, i),
+        color: resolveProjectColor(row.themeColor, i),
       }
     }
     return next
@@ -103,7 +127,7 @@ export function ProjectAllocationChart({ entries }: { entries: InvolvementEntry[
         />
         <Bar dataKey="percentage" radius={[0, 6, 6, 0]} barSize={22}>
           {data.map((d, i) => (
-            <Cell key={d.projectId} fill={colorFor(d.projectId, i)} />
+            <Cell key={d.projectId} fill={resolveProjectColor(d.themeColor, i)} />
           ))}
         </Bar>
       </BarChart>
@@ -118,9 +142,9 @@ export function ProjectTimelineChart({
   entries: InvolvementEntry[]
   bucket: "day" | "week" | "month"
 }) {
-  const { data, keys, config } = React.useMemo(() => {
+  const { data, keys, config, keyColors } = React.useMemo(() => {
     const byBucket = new Map<string, Record<string, number | string>>()
-    const used = new Map<string, string>()
+    const used = new Map<string, { name: string; themeColor?: string | null }>()
     for (const e of entries) {
       const d = new Date(`${e.date.slice(0, 10)}T00:00:00Z`)
       let label = e.date.slice(5, 10)
@@ -138,20 +162,27 @@ export function ProjectTimelineChart({
       const row = byBucket.get(label) ?? { label }
       row[e.projectId] = Number(row[e.projectId] ?? 0) + e.percentage
       byBucket.set(label, row)
-      used.set(e.projectId, e.projectName)
+      if (!used.has(e.projectId) || (!used.get(e.projectId)?.themeColor && e.themeColor)) {
+        used.set(e.projectId, { name: e.projectName, themeColor: e.themeColor })
+      }
     }
-    const orderedKeys = [...used.entries()].map(([id]) => id)
+    const orderedKeys = [...used.keys()]
     const chartConfig: ChartConfig = {}
+    const colorMap = new Map<string, string>()
     orderedKeys.forEach((id, i) => {
+      const meta = used.get(id)
+      const color = resolveProjectColor(meta?.themeColor, i)
+      colorMap.set(id, color)
       chartConfig[id] = {
-        label: used.get(id) ?? id,
-        color: colorFor(id, i),
+        label: meta?.name ?? id,
+        color,
       }
     })
     return {
       data: [...byBucket.values()],
       keys: orderedKeys,
       config: chartConfig,
+      keyColors: colorMap,
     }
   }, [entries, bucket])
 
@@ -183,15 +214,11 @@ export function ProjectTimelineChart({
             key={key}
             dataKey={key}
             stackId="pct"
-            fill={colorFor(key, i)}
+            fill={keyColors.get(key)}
             radius={i === keys.length - 1 ? [4, 4, 0, 0] : 0}
           />
         ))}
       </BarChart>
     </ChartContainer>
   )
-}
-
-export function projectColor(projectId: string, index: number) {
-  return colorFor(projectId, index)
 }

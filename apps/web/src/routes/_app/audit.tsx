@@ -398,7 +398,7 @@ function AuditPage() {
                       <TableCell className="max-w-md truncate text-sm text-muted-foreground">
                         {log.summary || "—"}
                       </TableCell>
-                      <TableActionsCell />
+                      <TableActionsCell>{null}</TableActionsCell>
                     </TableRow>
                   )
                 })}

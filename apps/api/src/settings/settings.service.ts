@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { AuditAction, type OrgSettings, type Prisma } from "@workspace/database";
+import { parseIsoDate } from "../_shared/utils/date.util";
 import { AuditService } from "../audit/audit.service";
 import { MailService } from "../mail/mail.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { ProfitabilityService } from "../profitability/profitability.service";
 import { UpdateSettingsDto } from "./dto/update-settings.dto";
 
 export type OrgSettingsResponse = Omit<OrgSettings, "smtpPass"> & {
@@ -15,6 +17,7 @@ export class SettingsService {
     private readonly prismaService: PrismaService,
     private readonly auditService: AuditService,
     private readonly mailService: MailService,
+    private readonly profitabilityService: ProfitabilityService,
   ) {}
 
   async get() {
@@ -30,8 +33,13 @@ export class SettingsService {
     if (!current) {
       throw new NotFoundException("Org settings not found");
     }
-    const { smtpPass, ...rest } = dto;
+    const { smtpPass, standupTrackingStartDate, ...rest } = dto;
     const data: Prisma.OrgSettingsUpdateInput = { ...rest };
+    if (standupTrackingStartDate !== undefined) {
+      data.standupTrackingStartDate = standupTrackingStartDate
+        ? parseIsoDate(standupTrackingStartDate)
+        : null;
+    }
     if (smtpPass !== undefined) {
       data.smtpPass = smtpPass.trim() === "" ? null : smtpPass;
     }
@@ -48,6 +56,7 @@ export class SettingsService {
       where: { id: current.id },
       data,
     });
+    this.profitabilityService.clearCache();
     await this.auditService.write({
       actorId,
       action: AuditAction.SETTINGS_UPDATED,

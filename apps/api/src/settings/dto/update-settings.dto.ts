@@ -1,6 +1,7 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import {
   IsBoolean,
+  IsDateString,
   IsEmail,
   IsInt,
   IsOptional,
@@ -34,12 +35,20 @@ export class UpdateSettingsDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
+  @Min(0)
   healthHealthyMinPercent?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
+  @Min(0)
   healthAtRiskMinPercent?: number;
+
+  @ApiPropertyOptional({ nullable: true, example: "2026-08-01" })
+  @IsOptional()
+  @ValidateIf((_, value) => value !== null && value !== undefined && value !== "")
+  @IsDateString()
+  standupTrackingStartDate?: string | null;
 
   @ApiPropertyOptional()
   @IsOptional()

@@ -241,20 +241,21 @@ model CasbinRule {
 }
 
 model OrgSettings {
-  id                      String   @id @default(cuid())
-  vatRatePercent          Int      @default(13)
-  paidLeaveDaysPerMonth   Int      @default(4)
-  amcReminderLeadDays     Int      @default(7)
-  healthHealthyMinPercent Int      @default(20)
-  healthAtRiskMinPercent  Int      @default(0)
+  id                      String    @id @default(cuid())
+  vatRatePercent          Int       @default(13)
+  paidLeaveDaysPerMonth   Int       @default(4)
+  amcReminderLeadDays     Int       @default(7)
+  healthHealthyMinPercent Int       @default(20)
+  healthAtRiskMinPercent  Int       @default(0)
+  standupTrackingStartDate DateTime? @db.Date
   smtpHost                String?
-  smtpPort                Int      @default(587)
-  smtpSecure              Boolean  @default(false)
+  smtpPort                Int       @default(587)
+  smtpSecure              Boolean   @default(false)
   smtpUser                String?
   smtpPass                String?
   smtpFrom                String?
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   @@map("org_settings")
 }

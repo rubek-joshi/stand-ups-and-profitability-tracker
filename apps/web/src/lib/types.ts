@@ -214,7 +214,7 @@ export type Employee = {
     id: string
     assignedAt: string
     unassignedAt: string | null
-    project: { id: string; name: string; status: string }
+    project: { id: string; name: string; status: string; themeColor?: string | null }
   }>
   attendanceRecords?: Array<{
     id: string
@@ -231,7 +231,7 @@ export type Employee = {
       projectId: string
       percentage: number
       isNonBillable?: boolean
-      project?: { id: string; name: string; status: string }
+      project?: { id: string; name: string; status: string; themeColor?: string | null }
       tasks?: StandupTask[]
     }>
   }>
@@ -388,6 +388,7 @@ export type OrgSettings = {
   amcReminderLeadDays: number
   healthHealthyMinPercent: number
   healthAtRiskMinPercent: number
+  standupTrackingStartDate?: string | null
   smtpHost?: string | null
   smtpPort?: number
   smtpSecure?: boolean

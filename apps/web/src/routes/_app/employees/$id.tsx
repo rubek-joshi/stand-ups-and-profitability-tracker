@@ -292,6 +292,7 @@ function EmployeeDetailPage() {
           projectId: allocation.projectId,
           projectName: allocation.project?.name ?? allocation.projectId,
           percentage: allocation.percentage,
+          themeColor: allocation.project?.themeColor,
         })
       }
     }
@@ -313,10 +314,15 @@ function EmployeeDetailPage() {
     [employee, inRange],
   )
 
-  const projectMeta = React.useMemo(
-    () => [...new Map(involvementEntries.map((e) => [e.projectId, e.projectName])).entries()],
-    [involvementEntries],
-  )
+  const projectMeta = React.useMemo(() => {
+    const map = new Map<string, { name: string; themeColor?: string | null }>()
+    for (const e of involvementEntries) {
+      if (!map.has(e.projectId) || (!map.get(e.projectId)?.themeColor && e.themeColor)) {
+        map.set(e.projectId, { name: e.projectName, themeColor: e.themeColor })
+      }
+    }
+    return [...map.entries()]
+  }, [involvementEntries])
 
   const projectIndex = React.useMemo(
     () =>
@@ -541,16 +547,22 @@ function EmployeeDetailPage() {
 
               {projectMeta.length > 0 ? (
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {projectMeta.map(([projectId, name], i) => (
+                  {projectMeta.map(([projectId, meta], i) => (
                     <span
                       key={projectId}
                       className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs"
                     >
                       <span
                         className="size-2 rounded-full"
-                        style={{ background: projectColor(projectId, i) }}
+                        style={{
+                          background: projectColor(
+                            projectId,
+                            i,
+                            meta.themeColor,
+                          ),
+                        }}
                       />
-                      {name}
+                      {meta.name}
                     </span>
                   ))}
                 </div>
@@ -724,6 +736,7 @@ function EmployeeDetailPage() {
                                       background: projectColor(
                                         a.projectId,
                                         projectIndex.get(a.projectId) ?? 0,
+                                        a.project?.themeColor,
                                       ),
                                     }}
                                   />

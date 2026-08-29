@@ -15,7 +15,7 @@ import {
   IconShieldCheck,
 } from "@tabler/icons-react"
 import type { ComponentType } from "react"
-import { AUDIT_ROLES, STAFF_ROLES } from "@/lib/access"
+import { AUDIT_ROLES, SETTINGS_ROLES, STAFF_ROLES } from "@/lib/access"
 import type { UserRole } from "@/lib/types"
 
 export type NavItem = {
@@ -71,7 +71,7 @@ export const NAV_ITEMS: NavItem[] = [
     roles: STAFF_ROLES,
   },
   { title: "Audit", to: "/audit", icon: IconScanTraces, keywords: ["logs"], roles: AUDIT_ROLES },
-  { title: "Settings", to: "/settings", icon: IconSettings, roles: STAFF_ROLES },
+  { title: "Settings", to: "/settings", icon: IconSettings, roles: SETTINGS_ROLES },
 ]
 
 const byTo = Object.fromEntries(NAV_ITEMS.map((item) => [item.to, item])) as Record<

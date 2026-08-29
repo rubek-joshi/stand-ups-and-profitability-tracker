@@ -42,6 +42,7 @@ import { useConfirmDialog } from "@/components/confirm-dialog"
 import { NumberField } from "@/components/settings/number-field"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
+import { useAuth } from "@/lib/auth"
 import type { OrgSettings } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/settings")({
@@ -63,6 +64,7 @@ type OrgForm = {
   amcReminderLeadDays: number
   healthHealthyMinPercent: number
   healthAtRiskMinPercent: number
+  standupTrackingStartDate: string
 }
 
 type SnapshotMeta = {
@@ -91,6 +93,7 @@ function formatSnapshotSize(sizeBytes: string) {
 }
 
 function SettingsPage() {
+  const { user } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
   const [settings, setSettings] = React.useState<OrgSettings | null>(null)
   const [form, setForm] = React.useState<OrgForm>({
@@ -99,6 +102,7 @@ function SettingsPage() {
     amcReminderLeadDays: 0,
     healthHealthyMinPercent: 20,
     healthAtRiskMinPercent: 0,
+    standupTrackingStartDate: "",
   })
   const [smtpForm, setSmtpForm] = React.useState(emptySmtpForm)
   const [testTo, setTestTo] = React.useState("")
@@ -131,8 +135,14 @@ function SettingsPage() {
   }, [])
 
   React.useEffect(() => {
-    void load()
-  }, [load])
+    if (user?.role === "super_admin") {
+      void load()
+    }
+  }, [load, user?.role])
+
+  if (user && user.role !== "super_admin") {
+    return null
+  }
 
   function applySettings(data: OrgSettings) {
     setSettings(data)
@@ -142,6 +152,9 @@ function SettingsPage() {
       amcReminderLeadDays: data.amcReminderLeadDays,
       healthHealthyMinPercent: data.healthHealthyMinPercent,
       healthAtRiskMinPercent: data.healthAtRiskMinPercent,
+      standupTrackingStartDate: data.standupTrackingStartDate
+        ? String(data.standupTrackingStartDate).slice(0, 10)
+        : "",
     })
     setSmtpForm({
       smtpHost: data.smtpHost ?? "",
@@ -227,6 +240,8 @@ function SettingsPage() {
                       amcReminderLeadDays: form.amcReminderLeadDays,
                       healthHealthyMinPercent: form.healthHealthyMinPercent,
                       healthAtRiskMinPercent: form.healthAtRiskMinPercent,
+                      standupTrackingStartDate:
+                        form.standupTrackingStartDate.trim() || null,
                     },
                   })
                   applySettings(res.data)
@@ -266,7 +281,25 @@ function SettingsPage() {
               }
               hint="How early renewal reminders are triggered."
             />
-            <div className="hidden sm:block" />
+            <Field className="gap-1.5">
+              <FieldLabel htmlFor="standup-tracking-start">
+                Stand-up tracking start date
+              </FieldLabel>
+              <Input
+                id="standup-tracking-start"
+                type="date"
+                value={form.standupTrackingStartDate}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    standupTrackingStartDate: e.target.value,
+                  }))
+                }
+              />
+              <FieldDescription>
+                Dates prior to this calculate labor cost from employee assignments.
+              </FieldDescription>
+            </Field>
             <NumberField
               id="healthy"
               label="Healthy margin ≥"

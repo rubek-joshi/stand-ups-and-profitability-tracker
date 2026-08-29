@@ -131,7 +131,11 @@ export class EmployeesService {
       include: {
         salaryEntries: { orderBy: { effectiveDate: "desc" } },
         assignments: {
-          include: { project: { select: { id: true, name: true, status: true } } },
+          include: {
+            project: {
+              select: { id: true, name: true, status: true, themeColor: true },
+            },
+          },
           orderBy: { assignedAt: "desc" },
         },
         attendanceRecords: { orderBy: { date: "desc" } },
@@ -140,7 +144,9 @@ export class EmployeesService {
             standup: { select: { id: true, date: true } },
             allocations: {
               include: {
-                project: { select: { id: true, name: true, status: true } },
+                project: {
+                  select: { id: true, name: true, status: true, themeColor: true },
+                },
                 tasks: { orderBy: { sortOrder: "asc" } },
               },
             },

@@ -8,6 +8,7 @@ import {
   IconSun,
   IconX,
 } from "@tabler/icons-react"
+import { toast } from "@workspace/ui/components/toast"
 import { cn } from "@workspace/ui/lib/utils"
 import { primaryModifierPressed } from "@/lib/keyboard"
 import type { StandupTask, StandupTaskState } from "@/lib/types"
@@ -233,6 +234,16 @@ export function TaskEditor({
       }
 
       if (event.altKey && !mod && !event.shiftKey && code === "Enter") {
+        if (task.blocker) {
+          event.preventDefault()
+          event.stopPropagation()
+          toast.add({
+            title: "Task is blocked",
+            description: "Remove the blocker before marking this task complete.",
+            type: "warning",
+          })
+          return
+        }
         applyState("done")
       }
     }
@@ -257,8 +268,17 @@ export function TaskEditor({
     onChange(next)
   }
 
-  const toggleState = (t: TaskDraft, state: StandupTaskState) =>
+  const toggleState = (t: TaskDraft, state: StandupTaskState) => {
+    if (state === "done" && t.blocker) {
+      toast.add({
+        title: "Task is blocked",
+        description: "Remove the blocker before marking this task complete.",
+        type: "warning",
+      })
+      return
+    }
     patch(t.id, { state: t.state === state ? "open" : state })
+  }
 
   const openBlocker = (task: TaskDraft, nextDraft: string) => {
     setDraft(nextDraft)
@@ -267,7 +287,11 @@ export function TaskEditor({
 
   const commitBlocker = (task: TaskDraft, value: string) => {
     const blocker = value.trim() ? value.replace(/\s+$/, "") : null
-    patch(task.id, { blocker })
+    const nextState =
+      blocker && (task.state === "done" || task.state === "open")
+        ? "tomorrow"
+        : task.state
+    patch(task.id, { blocker, state: nextState })
     setEditingBlocker(null)
     setDraft("")
   }
@@ -388,21 +412,34 @@ export function TaskEditor({
                   "group-hover/task:pointer-events-auto group-hover/task:translate-y-0 group-hover/task:opacity-100 group-focus-within/task:pointer-events-auto group-focus-within/task:opacity-100",
               )}
             >
-              {ACTIONS.map(({ state, label, icon: Icon }) => (
-                <button
-                  key={state}
-                  type="button"
-                  title={label}
-                  aria-label={label}
-                  onClick={() => toggleState(t, state)}
-                  className={cn(
-                    "rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-                    t.state === state && "bg-accent text-foreground",
-                  )}
-                >
-                  <Icon className="size-3.5" />
-                </button>
-              ))}
+              {ACTIONS.map(({ state, label, icon: Icon }) => {
+                const isCompleteAction = state === "done"
+                const isBlocked = Boolean(t.blocker)
+                const isActionDisabled = disabled || (isCompleteAction && isBlocked)
+
+                return (
+                  <button
+                    key={state}
+                    type="button"
+                    disabled={isActionDisabled}
+                    title={
+                      isCompleteAction && isBlocked
+                        ? "Cannot complete a task with an active blocker"
+                        : label
+                    }
+                    aria-label={label}
+                    onClick={() => toggleState(t, state)}
+                    className={cn(
+                      "rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                      t.state === state && "bg-accent text-foreground",
+                      isActionDisabled &&
+                        "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground",
+                    )}
+                  >
+                    <Icon className="size-3.5" />
+                  </button>
+                )
+              })}
               <span className="mx-0.5 h-4 w-px bg-border" />
               <button
                 type="button"
@@ -439,8 +476,12 @@ export function TaskEditor({
                     e.preventDefault()
                     ignoreBlockerBlur.current = true
                     const blocker = draft.trim() ? draft.replace(/\s+$/, "") : null
+                    const nextState =
+                      blocker && (t.state === "done" || t.state === "open")
+                        ? "tomorrow"
+                        : t.state
                     const next = [...list]
-                    next[i] = { ...t, blocker }
+                    next[i] = { ...t, blocker, state: nextState }
                     next.splice(i + 1, 0, emptyTask())
                     focusNext.current = i + 1
                     setEditingBlocker(null)

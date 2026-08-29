@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { AttendanceStatus } from "@workspace/database";
-import { daysInMonth, toIsoDate } from "../_shared/utils/date.util";
+import { dayBefore, daysInMonth, toIsoDate } from "../_shared/utils/date.util";
 import { PrismaService } from "../prisma/prisma.service";
 
 export type ProjectProfitability = {
@@ -58,36 +58,84 @@ export class ProfitabilityService {
         return cached;
       }
     }
-    const project = await this.prismaService.project.findUnique({
-      where: { id: projectId },
-      include: {
-        extensions: true,
-        allocations: {
-          include: {
-            standupEntry: {
-              include: { standup: true, employee: { include: { salaryEntries: true } } },
+    const [project, orgSettings] = await Promise.all([
+      this.prismaService.project.findUnique({
+        where: { id: projectId },
+        include: {
+          extensions: true,
+          employeeAssignments: {
+            include: {
+              employee: { include: { salaryEntries: true } },
+            },
+          },
+          allocations: {
+            include: {
+              standupEntry: {
+                include: { standup: true, employee: { include: { salaryEntries: true } } },
+              },
+            },
+          },
+          coreMemberAssignments: {
+            include: {
+              coreMember: { include: { salaryEntries: true } },
             },
           },
         },
-        coreMemberAssignments: {
-          include: {
-            coreMember: { include: { salaryEntries: true } },
-          },
-        },
-      },
-    });
+      }),
+      this.prismaService.orgSettings.findFirst(),
+    ]);
+
     if (!project) {
       throw new NotFoundException(`Project ${projectId} not found`);
     }
+
     const extensionsPaisa = project.extensions.reduce(
       (sum, extension) => sum + extension.amountPaisa,
       0n,
     );
-    const employeeCostPaisa = await this.calculateEmployeeCost(
-      project.allocations,
-      options?.from,
-      options?.to,
-    );
+
+    const cutoverDate = orgSettings?.standupTrackingStartDate ?? null;
+    let employeeCostPaisa = 0n;
+
+    if (cutoverDate) {
+      const assignmentCost = (
+        await this.calculateEmployeeCostFromAssignments(
+          project.employeeAssignments,
+          project.startDate,
+          options?.from,
+          this.minDate(options?.to ?? new Date(), dayBefore(cutoverDate)),
+        )
+      ).totalCostPaisa;
+
+      const standupFrom = options?.from
+        ? this.maxDate(options.from, cutoverDate)
+        : cutoverDate;
+      const standupCost = await this.calculateEmployeeCost(
+        project.allocations,
+        standupFrom,
+        options?.to,
+      );
+
+      employeeCostPaisa = assignmentCost + standupCost;
+    } else {
+      if (project.allocations.length === 0) {
+        employeeCostPaisa = (
+          await this.calculateEmployeeCostFromAssignments(
+            project.employeeAssignments,
+            project.startDate,
+            options?.from,
+            options?.to,
+          )
+        ).totalCostPaisa;
+      } else {
+        employeeCostPaisa = await this.calculateEmployeeCost(
+          project.allocations,
+          options?.from,
+          options?.to,
+        );
+      }
+    }
+
     const coreMemberCostPaisa = await this.calculateCoreMemberCost(
       project.coreMemberAssignments,
       project.startDate,
@@ -135,18 +183,35 @@ export class ProfitabilityService {
     projectId: string,
     options?: { from?: Date; to?: Date },
   ): Promise<ProjectLaborSummary> {
-    const allocations = await this.prismaService.projectAllocation.findMany({
-      where: { projectId },
-      include: {
-        standupEntry: {
-          include: {
-            standup: true,
-            employee: { include: { salaryEntries: true } },
+    const [project, orgSettings] = await Promise.all([
+      this.prismaService.project.findUnique({
+        where: { id: projectId },
+        include: {
+          employeeAssignments: {
+            include: {
+              employee: { include: { salaryEntries: true } },
+            },
+          },
+          allocations: {
+            include: {
+              standupEntry: {
+                include: {
+                  standup: true,
+                  employee: { include: { salaryEntries: true } },
+                },
+              },
+            },
           },
         },
-      },
-    });
+      }),
+      this.prismaService.orgSettings.findFirst(),
+    ]);
 
+    if (!project) {
+      throw new NotFoundException(`Project ${projectId} not found`);
+    }
+
+    const cutoverDate = orgSettings?.standupTrackingStartDate ?? null;
     const byDate = new Map<
       string,
       {
@@ -156,52 +221,92 @@ export class ProfitabilityService {
         employeeIds: Set<string>;
       }
     >();
-    const standupIds = new Set<string>();
-    const employeeIds = new Set<string>();
+
+    const shouldIncludeStandups =
+      cutoverDate !== null || project.allocations.length > 0;
+
+    if (shouldIncludeStandups) {
+      for (const allocation of project.allocations) {
+        const standup = allocation.standupEntry.standup;
+        if (cutoverDate && standup.date < cutoverDate) {
+          continue;
+        }
+        if (options?.from && standup.date < options.from) {
+          continue;
+        }
+        if (options?.to && standup.date > options.to) {
+          continue;
+        }
+        if (allocation.standupEntry.attendanceStatus === AttendanceStatus.absent) {
+          continue;
+        }
+
+        const salary = this.resolveSalary(
+          allocation.standupEntry.employee.salaryEntries,
+          standup.date,
+        );
+        if (salary === null) {
+          continue;
+        }
+
+        const laborCostPaisa =
+          (salary / BigInt(daysInMonth(standup.date)) * BigInt(allocation.percentage)) /
+          100n;
+        const date = toIsoDate(standup.date);
+        const bucket = byDate.get(date) ?? {
+          laborCostPaisa: 0n,
+          allocationPercentTotal: 0,
+          standupIds: new Set<string>(),
+          employeeIds: new Set<string>(),
+        };
+
+        bucket.laborCostPaisa += laborCostPaisa;
+        bucket.allocationPercentTotal += allocation.percentage;
+        bucket.standupIds.add(standup.id);
+        bucket.employeeIds.add(allocation.standupEntry.employeeId);
+        byDate.set(date, bucket);
+      }
+    }
+
+    const shouldIncludeAssignments =
+      cutoverDate !== null || project.allocations.length === 0;
+
+    if (shouldIncludeAssignments) {
+      const assignmentRangeEnd = cutoverDate
+        ? this.minDate(options?.to ?? new Date(), dayBefore(cutoverDate))
+        : options?.to ?? new Date();
+
+      const assignmentResult = await this.calculateEmployeeCostFromAssignments(
+        project.employeeAssignments,
+        project.startDate,
+        options?.from,
+        assignmentRangeEnd,
+      );
+
+      for (const [date, data] of assignmentResult.byDate.entries()) {
+        const bucket = byDate.get(date) ?? {
+          laborCostPaisa: 0n,
+          allocationPercentTotal: 0,
+          standupIds: new Set<string>(),
+          employeeIds: new Set<string>(),
+        };
+        bucket.laborCostPaisa += data.laborCostPaisa;
+        bucket.allocationPercentTotal += data.employeeIds.size > 0 ? 100 : 0;
+        data.employeeIds.forEach((id) => bucket.employeeIds.add(id));
+        byDate.set(date, bucket);
+      }
+    }
+
     let totalLaborCostPaisa = 0n;
     let allocationPercentTotal = 0;
+    const allStandupIds = new Set<string>();
+    const allEmployeeIds = new Set<string>();
 
-    for (const allocation of allocations) {
-      const standup = allocation.standupEntry.standup;
-      if (options?.from && standup.date < options.from) {
-        continue;
-      }
-      if (options?.to && standup.date > options.to) {
-        continue;
-      }
-      if (allocation.standupEntry.attendanceStatus === AttendanceStatus.absent) {
-        continue;
-      }
-
-      const salary = this.resolveSalary(
-        allocation.standupEntry.employee.salaryEntries,
-        standup.date,
-      );
-      if (salary === null) {
-        continue;
-      }
-
-      const laborCostPaisa =
-        (salary / BigInt(daysInMonth(standup.date)) * BigInt(allocation.percentage)) /
-        100n;
-      const date = toIsoDate(standup.date);
-      const bucket = byDate.get(date) ?? {
-        laborCostPaisa: 0n,
-        allocationPercentTotal: 0,
-        standupIds: new Set<string>(),
-        employeeIds: new Set<string>(),
-      };
-
-      bucket.laborCostPaisa += laborCostPaisa;
-      bucket.allocationPercentTotal += allocation.percentage;
-      bucket.standupIds.add(standup.id);
-      bucket.employeeIds.add(allocation.standupEntry.employeeId);
-      byDate.set(date, bucket);
-
-      totalLaborCostPaisa += laborCostPaisa;
-      allocationPercentTotal += allocation.percentage;
-      standupIds.add(standup.id);
-      employeeIds.add(allocation.standupEntry.employeeId);
+    for (const bucket of byDate.values()) {
+      totalLaborCostPaisa += bucket.laborCostPaisa;
+      allocationPercentTotal += bucket.allocationPercentTotal;
+      bucket.standupIds.forEach((id) => allStandupIds.add(id));
+      bucket.employeeIds.forEach((id) => allEmployeeIds.add(id));
     }
 
     const daily = [...byDate.entries()]
@@ -216,11 +321,93 @@ export class ProfitabilityService {
 
     return {
       totalLaborCostPaisa,
-      completedStandupCount: standupIds.size,
-      employeeCount: employeeIds.size,
+      completedStandupCount: allStandupIds.size,
+      employeeCount: allEmployeeIds.size,
       allocationPercentTotal,
       daily,
     };
+  }
+
+  private async calculateEmployeeCostFromAssignments(
+    assignments: Array<{
+      projectId: string;
+      assignedAt: Date;
+      unassignedAt: Date | null;
+      employee: {
+        id: string;
+        salaryEntries: Array<{ effectiveDate: Date; salaryPaisa: bigint }>;
+      };
+    }>,
+    projectStart: Date,
+    from?: Date,
+    to?: Date,
+  ): Promise<{
+    totalCostPaisa: bigint;
+    byDate: Map<string, { laborCostPaisa: bigint; employeeIds: Set<string> }>;
+    employeeIds: Set<string>;
+  }> {
+    let total = 0n;
+    const today = new Date();
+    const rangeStart = from ?? projectStart;
+    const rangeEnd = to ?? today;
+    const byDate = new Map<
+      string,
+      { laborCostPaisa: bigint; employeeIds: Set<string> }
+    >();
+    const allEmployeeIds = new Set<string>();
+
+    if (rangeStart > rangeEnd) {
+      return { totalCostPaisa: 0n, byDate, employeeIds: allEmployeeIds };
+    }
+
+    for (const assignment of assignments) {
+      const allAssignmentsForEmployee =
+        await this.prismaService.projectAssignment.findMany({
+          where: { employeeId: assignment.employee.id },
+        });
+      const start = this.maxDate(assignment.assignedAt, rangeStart);
+      const end = this.minDate(assignment.unassignedAt ?? rangeEnd, rangeEnd);
+      if (start > end) {
+        continue;
+      }
+      for (
+        let cursor = new Date(start);
+        cursor <= end;
+        cursor = new Date(cursor.getTime() + 86_400_000)
+      ) {
+        const salary = this.resolveSalary(
+          assignment.employee.salaryEntries,
+          cursor,
+        );
+        if (salary === null) {
+          continue;
+        }
+        const concurrent = allAssignmentsForEmployee.filter((item) => {
+          const assigned = item.assignedAt <= cursor;
+          const stillActive =
+            item.unassignedAt === null || item.unassignedAt >= cursor;
+          return assigned && stillActive;
+        }).length;
+        if (concurrent === 0) {
+          continue;
+        }
+        const dailyCost =
+          salary / BigInt(daysInMonth(cursor)) / BigInt(concurrent);
+        total += dailyCost;
+        allEmployeeIds.add(assignment.employee.id);
+
+        const dateKey = toIsoDate(cursor);
+        const bucket = byDate.get(dateKey) ?? {
+          laborCostPaisa: 0n,
+          employeeIds: new Set<string>(),
+        };
+        bucket.laborCostPaisa += dailyCost;
+        bucket.employeeIds.add(assignment.employee.id);
+        byDate.set(dateKey, bucket);
+      }
+    }
+
+    return { totalCostPaisa: total, byDate, employeeIds: allEmployeeIds };
   }
 
   private async calculateEmployeeCost(
@@ -327,7 +514,7 @@ export class ProfitabilityService {
     onDate: Date,
   ): bigint | null {
     const applicable = entries
-      .filter((entry) => entry.effectiveDate <= onDate)
+      .filter((entry) => toIsoDate(entry.effectiveDate) <= toIsoDate(onDate))
       .sort((a, b) => b.effectiveDate.getTime() - a.effectiveDate.getTime());
     return applicable[0]?.salaryPaisa ?? null;
   }

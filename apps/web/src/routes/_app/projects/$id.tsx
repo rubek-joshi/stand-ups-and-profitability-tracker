@@ -183,8 +183,19 @@ function parseProjectTab(value: unknown): ProjectTab {
     : "team"
 }
 
+export type ProjectIdSearch = {
+  tab?: ProjectTab
+  q?: string
+  employeeIds?: string
+  from?: string
+  to?: string
+  page?: number
+  pageSize?: PageSize
+  view?: "card" | "table"
+}
+
 export const Route = createFileRoute("/_app/projects/$id")({
-  validateSearch: (search: Record<string, unknown>) => {
+  validateSearch: (search: Record<string, unknown>): ProjectIdSearch => {
     const defaults = defaultStandupHistoryRange()
     const from = parseIsoSearchDate(search.from)
     const to = parseIsoSearchDate(search.to)
@@ -207,8 +218,16 @@ export const Route = createFileRoute("/_app/projects/$id")({
 function ProjectDetailPage() {
   const { id } = Route.useParams()
   const navigate = Route.useNavigate()
-  const { tab, q, employeeIds, from, to, page, pageSize, view = "card" } =
-    Route.useSearch()
+  const search = Route.useSearch()
+  const defaults = React.useMemo(() => defaultStandupHistoryRange(), [])
+  const tab = search.tab ?? "team"
+  const q = search.q ?? ""
+  const employeeIds = search.employeeIds ?? ""
+  const from = search.from ?? defaults.from
+  const to = search.to ?? defaults.to
+  const page = search.page ?? 1
+  const pageSize = search.pageSize ?? 10
+  const view = search.view ?? "card"
   const employeeIdList = React.useMemo(
     () =>
       employeeIds
@@ -332,8 +351,6 @@ function ProjectDetailPage() {
   const dashboard = project.dashboard
   const summary = dashboard?.summary
   const laborSeries = dashboard?.laborSeries ?? []
-  const canManageAssignments =
-    project.status !== "closed" && project.status !== "under_amc"
   const projectNeedsEndDate =
     project.status === "closed" || project.status === "under_amc"
   const todayIso = toIsoDateInput(new Date())
@@ -627,7 +644,12 @@ function ProjectDetailPage() {
                         await api(`/projects/${id}`, { method: "DELETE" })
                         void navigate({
                           to: "/projects",
-                          search: DEFAULT_LIST_SEARCH,
+                          search: {
+                            ...DEFAULT_LIST_SEARCH,
+                            status: undefined,
+                            sortBy: undefined,
+                            sortDir: undefined,
+                          },
                         })
                       } catch (e) {
                         alert(
