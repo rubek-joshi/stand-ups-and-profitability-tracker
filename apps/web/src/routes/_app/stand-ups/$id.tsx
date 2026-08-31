@@ -16,7 +16,12 @@ import {
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
 import { Badge } from "@workspace/ui/components/badge"
 import {
   AlertDialog,
@@ -65,7 +70,10 @@ import { StandupCardView } from "@/components/standup/standup-card-view"
 import { StandupTableView } from "@/components/standup/table-view"
 import { advanceStandupFocus } from "@/components/standup/standup-focus-nav"
 import { toggleMiscellaneousNotes } from "@/components/standup/miscellaneous-notes-toggle"
-import { focusStandupNotes, MarkdownNotes } from "@/components/standup/markdown-notes"
+import {
+  focusStandupNotes,
+  MarkdownNotes,
+} from "@/components/standup/markdown-notes"
 import { StandupGuidelinesControl } from "@/components/standup/standup-guidelines-dialog"
 import { formatTaskForCopy } from "@/components/standup/task-indent"
 import {
@@ -83,10 +91,7 @@ import {
 } from "@/lib/standup-age"
 import { toast } from "@workspace/ui/components/toast"
 import * as Y from "yjs"
-import {
-  connectStandupCollab,
-  type CollabPeer,
-} from "@/lib/standup-collab"
+import { connectStandupCollab, type CollabPeer } from "@/lib/standup-collab"
 import type {
   AssignmentResolution,
   MissingAssignmentAction,
@@ -100,7 +105,9 @@ export const Route = createFileRoute("/_app/stand-ups/$id")({
   component: StandupDetailPage,
 })
 
-function extractMissingAssignmentPayload(body: unknown): MissingProjectAssignment[] | null {
+function extractMissingAssignmentPayload(
+  body: unknown
+): MissingProjectAssignment[] | null {
   if (!body || typeof body !== "object") return null
 
   const direct = body as {
@@ -148,7 +155,9 @@ function missingAssignmentKey(item: MissingProjectAssignment): string {
   return `${item.employeeId}:${item.projectId}`
 }
 
-function defaultResolutionFor(item: MissingProjectAssignment): MissingAssignmentAction {
+function defaultResolutionFor(
+  item: MissingProjectAssignment
+): MissingAssignmentAction {
   if (item.availableActions?.includes("split")) return "split"
   if (item.availableActions?.includes("create")) return "create"
   return item.availableActions?.[0] ?? "remove_allocation"
@@ -156,7 +165,7 @@ function defaultResolutionFor(item: MissingProjectAssignment): MissingAssignment
 
 function resolutionLabel(
   action: MissingAssignmentAction,
-  item: MissingProjectAssignment,
+  item: MissingProjectAssignment
 ): string {
   switch (action) {
     case "split":
@@ -174,15 +183,17 @@ function resolutionLabel(
 }
 
 function findLaterActiveAssignment(
-  assignments: Array<{
-    assignedAt: string
-    unassignedAt: string | null
-    project?: { id: string }
-    projectId?: string
-    employeeId?: string
-  }> | undefined,
+  assignments:
+    | Array<{
+        assignedAt: string
+        unassignedAt: string | null
+        project?: { id: string }
+        projectId?: string
+        employeeId?: string
+      }>
+    | undefined,
   projectId: string,
-  standupDate: string,
+  standupDate: string
 ) {
   const day = String(standupDate).slice(0, 10)
   let latest: { assignedAt: string } | null = null
@@ -195,7 +206,8 @@ function findLaterActiveAssignment(
     if (assignedDay > day) {
       if (
         !latest ||
-        String(assignment.assignedAt).slice(0, 10) > String(latest.assignedAt).slice(0, 10)
+        String(assignment.assignedAt).slice(0, 10) >
+          String(latest.assignedAt).slice(0, 10)
       ) {
         latest = assignment
       }
@@ -205,7 +217,7 @@ function findLaterActiveAssignment(
 }
 
 function buildAvailableActions(
-  laterActive: { assignedAt: string } | null,
+  laterActive: { assignedAt: string } | null
 ): MissingAssignmentAction[] {
   const actions: MissingAssignmentAction[] = ["remove_allocation"]
   if (laterActive) {
@@ -219,7 +231,7 @@ function buildAvailableActions(
 function assignmentCoversDate(
   assignedAt: string,
   unassignedAt: string | null,
-  standupDate: string,
+  standupDate: string
 ): boolean {
   const day = String(standupDate).slice(0, 10)
   const assignedDay = String(assignedAt).slice(0, 10)
@@ -229,14 +241,16 @@ function assignmentCoversDate(
 }
 
 function hasAssignmentOnDate(
-  assignments: Array<{
-    assignedAt: string
-    unassignedAt: string | null
-    project?: { id: string }
-    projectId?: string
-  }> | undefined,
+  assignments:
+    | Array<{
+        assignedAt: string
+        unassignedAt: string | null
+        project?: { id: string }
+        projectId?: string
+      }>
+    | undefined,
   projectId: string,
-  standupDate: string,
+  standupDate: string
 ) {
   return (assignments ?? []).some((assignment) => {
     const matchesProject =
@@ -245,7 +259,7 @@ function hasAssignmentOnDate(
     return assignmentCoversDate(
       assignment.assignedAt,
       assignment.unassignedAt,
-      standupDate,
+      standupDate
     )
   })
 }
@@ -254,7 +268,7 @@ function hasProjectRosterAssignment(
   projects: Project[],
   employeeId: string,
   projectId: string,
-  standupDate: string,
+  standupDate: string
 ): boolean {
   const project = projects.find((item) => item.id === projectId)
   if (!project?.employeeAssignments?.length) return false
@@ -263,14 +277,14 @@ function hasProjectRosterAssignment(
     return assignmentCoversDate(
       assignment.assignedAt,
       assignment.unassignedAt,
-      standupDate,
+      standupDate
     )
   })
 }
 
 function entryHasTasks(draft: EntryDraft): boolean {
   return draft.allocations.some((a) =>
-    a.tasks.some((t) => t.text.trim().length > 0),
+    a.tasks.some((t) => t.text.trim().length > 0)
   )
 }
 
@@ -285,7 +299,7 @@ function shouldApplyAssignedDefaults(draft: EntryDraft): boolean {
 function assignedProjectIdsOnDate(
   entry: NonNullable<Standup["entries"]>[number],
   standupDate: string,
-  projects: Project[],
+  projects: Project[]
 ): string[] {
   const selectableProjects = projects.filter(isProjectSelectableForStandup)
   const selectableProjectIds = new Set(selectableProjects.map((p) => p.id))
@@ -297,7 +311,7 @@ function assignedProjectIdsOnDate(
       !assignmentCoversDate(
         assignment.assignedAt,
         assignment.unassignedAt,
-        standupDate,
+        standupDate
       )
     ) {
       continue
@@ -310,7 +324,7 @@ function assignedProjectIdsOnDate(
         selectableProjects,
         entry.employee.id,
         project.id,
-        standupDate,
+        standupDate
       )
     ) {
       names.set(project.id, project.name)
@@ -324,17 +338,17 @@ function assignedProjectIdsOnDate(
 function sameProjectSplit(left: DraftAlloc[], right: DraftAlloc[]): boolean {
   if (left.length !== right.length) return false
   const percents = new Map(
-    left.map((item) => [item.projectId, Number(item.percentage) || 0]),
+    left.map((item) => [item.projectId, Number(item.percentage) || 0])
   )
   return right.every(
-    (item) => percents.get(item.projectId) === (Number(item.percentage) || 0),
+    (item) => percents.get(item.projectId) === (Number(item.percentage) || 0)
   )
 }
 
 function applyAssignedProjectDefaults(
   drafts: Record<string, EntryDraft>,
   standup: Standup,
-  projects: Project[],
+  projects: Project[]
 ): Record<string, EntryDraft> {
   if (!isStandupEditable(String(standup.date))) return drafts
   const standupDate = String(standup.date).slice(0, 10)
@@ -344,12 +358,17 @@ function applyAssignedProjectDefaults(
     const draft = next[entry.id]
     if (!draft || !shouldApplyAssignedDefaults(draft)) continue
     const allocations = rebalance(
-      assignedProjectIdsOnDate(entry, standupDate, projects).map((projectId) => ({
-        projectId,
-        percentage: 0,
-        locked: false,
-      })),
-    ).map((a) => ({ ...a, tasks: [] as EntryDraft["allocations"][number]["tasks"] }))
+      assignedProjectIdsOnDate(entry, standupDate, projects).map(
+        (projectId) => ({
+          projectId,
+          percentage: 0,
+          locked: false,
+        })
+      )
+    ).map((a) => ({
+      ...a,
+      tasks: [] as EntryDraft["allocations"][number]["tasks"],
+    }))
     if (sameProjectSplit(draft.allocations, allocations)) continue
     next[entry.id] = { ...draft, allocations }
     changed = true
@@ -361,7 +380,7 @@ function getMissingAssignmentsFromStandup(
   standup: Standup,
   drafts: Record<string, EntryDraft>,
   projects: Project[],
-  employeeIds?: Set<string> | null,
+  employeeIds?: Set<string> | null
 ): MissingProjectAssignment[] {
   const seen = new Set<string>()
   const result: MissingProjectAssignment[] = []
@@ -371,18 +390,20 @@ function getMissingAssignmentsFromStandup(
     if (employeeIds && !employeeIds.has(entry.employee.id)) continue
     const draft = drafts[entry.id]
     if (!draft || draft.attendanceStatus === "absent") continue
-    for (const allocation of draft.allocations.filter((item) => item.projectId)) {
+    for (const allocation of draft.allocations.filter(
+      (item) => item.projectId
+    )) {
       if (
         hasAssignmentOnDate(
           entry.employee.assignments,
           allocation.projectId,
-          standup.date,
+          standup.date
         ) ||
         hasProjectRosterAssignment(
           projects,
           entry.employee.id,
           allocation.projectId,
-          standup.date,
+          standup.date
         )
       ) {
         continue
@@ -393,15 +414,19 @@ function getMissingAssignmentsFromStandup(
 
       const project = projects.find((item) => item.id === allocation.projectId)
       const projectRoster = project?.employeeAssignments?.filter(
-        (item) => item.employeeId === entry.employee.id,
+        (item) => item.employeeId === entry.employee.id
       )
       const laterActive =
         findLaterActiveAssignment(
           entry.employee.assignments,
           allocation.projectId,
-          standup.date,
+          standup.date
         ) ??
-        findLaterActiveAssignment(projectRoster, allocation.projectId, standup.date)
+        findLaterActiveAssignment(
+          projectRoster,
+          allocation.projectId,
+          standup.date
+        )
 
       const availableActions = buildAvailableActions(laterActive)
 
@@ -433,7 +458,7 @@ function serializeCollabEntry(draft: EntryDraft): string {
 
 function syncDraftsToYjs(
   map: Y.Map<string> | null,
-  drafts: Record<string, EntryDraft>,
+  drafts: Record<string, EntryDraft>
 ) {
   if (!map) return
   const apply = () => {
@@ -482,7 +507,8 @@ function StandupDetailPage() {
   const { confirm, dialog } = useConfirmDialog()
   const [standup, setStandup] = React.useState<Standup | null>(null)
   const [standupMiscNotes, setStandupMiscNotes] = React.useState("")
-  const [baselineStandupMiscNotes, setBaselineStandupMiscNotes] = React.useState("")
+  const [baselineStandupMiscNotes, setBaselineStandupMiscNotes] =
+    React.useState("")
   const [showOverallNotes, setShowOverallNotes] = React.useState(false)
   const [projects, setProjects] = React.useState<Project[]>([])
   const [drafts, setDrafts] = React.useState<Record<string, EntryDraft>>({})
@@ -497,11 +523,12 @@ function StandupDetailPage() {
   const [leaveBusy, setLeaveBusy] = React.useState(false)
   const [showScrollTop, setShowScrollTop] = React.useState(false)
   const [layout, setLayout] = React.useState<StandupLayoutPreference>(
-    () => user?.standupLayoutPreference ?? "card",
+    () => user?.standupLayoutPreference ?? "card"
   )
-  const [groupMemberIds, setGroupMemberIds] = React.useState<Set<string> | null>(null)
+  const [groupMemberIds, setGroupMemberIds] =
+    React.useState<Set<string> | null>(null)
   const [showAllEmployees, setShowAllEmployees] = React.useState(
-    () => user?.standupScopePreference !== "group",
+    () => user?.standupScopePreference !== "group"
   )
   const [missingAssignments, setMissingAssignments] = React.useState<
     MissingProjectAssignment[]
@@ -509,7 +536,8 @@ function StandupDetailPage() {
   const [resolutionChoices, setResolutionChoices] = React.useState<
     Record<string, MissingAssignmentAction>
   >({})
-  const [missingAssignmentOpen, setMissingAssignmentOpen] = React.useState(false)
+  const [missingAssignmentOpen, setMissingAssignmentOpen] =
+    React.useState(false)
   const [messageDialog, setMessageDialog] = React.useState<{
     title: string
     description: string
@@ -521,7 +549,7 @@ function StandupDetailPage() {
   const collabStateAppliedRef = React.useRef(false)
   const yjsHydratedFromServerRef = React.useRef(false)
   const hydrateYjsFromDraftsRef = React.useRef(
-    (_drafts?: Record<string, EntryDraft>) => {},
+    (_drafts?: Record<string, EntryDraft>) => {}
   )
   hydrateYjsFromDraftsRef.current = (incoming) => {
     const map = entriesMapRef.current
@@ -606,11 +634,13 @@ function StandupDetailPage() {
     }
     let cancelled = false
     void api<Envelope<{ members?: Array<{ employeeId: string }> }>>(
-      `/employee-groups/${groupId}`,
+      `/employee-groups/${groupId}`
     )
       .then((res) => {
         if (cancelled) return
-        const ids = new Set((res.data.members ?? []).map((member) => member.employeeId))
+        const ids = new Set(
+          (res.data.members ?? []).map((member) => member.employeeId)
+        )
         setGroupMemberIds(ids)
       })
       .catch(() => {
@@ -650,7 +680,10 @@ function StandupDetailPage() {
         for (const [entryId, raw] of entriesMap.entries()) {
           if (typeof raw !== "string" || !next[entryId]) continue
           const merged = parseCollabEntry(raw, next[entryId]!)
-          if (serializeCollabEntry(merged) === serializeCollabEntry(next[entryId]!)) {
+          if (
+            serializeCollabEntry(merged) ===
+            serializeCollabEntry(next[entryId]!)
+          ) {
             continue
           }
           next[entryId] = merged
@@ -683,102 +716,120 @@ function StandupDetailPage() {
     setMissingAssignments(normalized)
     setResolutionChoices(
       Object.fromEntries(
-        normalized.map((item) => [missingAssignmentKey(item), defaultResolutionFor(item)]),
-      ),
+        normalized.map((item) => [
+          missingAssignmentKey(item),
+          defaultResolutionFor(item),
+        ])
+      )
     )
     setMissingAssignmentOpen(true)
   }
 
-  const saveAll = React.useCallback(async (options?: {
-    assignmentResolutions?: AssignmentResolution[]
-    redirectToList?: boolean
-  }) => {
-    if (!standup || readonly) return false
-    const currentDrafts = draftsRef.current
-    const scopeEmployeeIds =
-      user?.standupScopePreference === "group" &&
-      user.standupPreferredGroupId &&
-      groupMemberIds &&
-      !showAllEmployees
-        ? groupMemberIds
-        : null
-    const entries = buildEntriesPayload(
-      standup.entries,
-      currentDrafts,
-      scopeEmployeeIds,
-    )
-    if (entries.length === 0) return true
-    if (!options?.assignmentResolutions) {
-      const pendingAssignments = getMissingAssignmentsFromStandup(
-        standup,
+  const saveAll = React.useCallback(
+    async (options?: {
+      assignmentResolutions?: AssignmentResolution[]
+      redirectToList?: boolean
+    }) => {
+      if (!standup || readonly) return false
+      const currentDrafts = draftsRef.current
+      const scopeEmployeeIds =
+        user?.standupScopePreference === "group" &&
+        user.standupPreferredGroupId &&
+        groupMemberIds &&
+        !showAllEmployees
+          ? groupMemberIds
+          : null
+      const entries = buildEntriesPayload(
+        standup.entries,
         currentDrafts,
-        projects,
-        scopeEmployeeIds,
+        scopeEmployeeIds
       )
-      if (pendingAssignments.length > 0) {
-        openMissingAssignmentDialog(pendingAssignments)
-        return false
-      }
-    }
-    setSaving(true)
-    try {
-      const res = await api<Envelope<Standup>>(`/standups/${id}/entries`, {
-        method: "PATCH",
-        body: {
-          entries,
-          miscellaneousNotes: standupMiscNotes,
-          assignmentResolutions: options?.assignmentResolutions,
-        },
-      })
-      setStandup(res.data)
-      setStandupMiscNotes(res.data.miscellaneousNotes ?? "")
-      setBaselineStandupMiscNotes(res.data.miscellaneousNotes ?? "")
-      const nextDrafts = draftsFromStandup(res.data.entries)
-      draftsRef.current = nextDrafts
-      setDrafts(nextDrafts)
-      setBaseline(serializeDrafts(nextDrafts))
-      syncDraftsToYjs(entriesMapRef.current, nextDrafts)
-      setMissingAssignments([])
-      setResolutionChoices({})
-      setMissingAssignmentOpen(false)
-      toast.add({
-        title: "Stand-up saved successfully",
-        type: "success",
-      })
-      if (options?.redirectToList !== false) {
-        skipLeaveBlockRef.current = true
-        await navigate({
-          to: "/stand-ups",
-          search: {
-            page: 1,
-            pageSize: 25,
-            view: "list",
-            q: "",
-            employeeIds: "",
-            projectId: "",
-            from: "",
-            to: "",
-          },
-        })
-      }
-      return true
-    } catch (e) {
-      if (e instanceof ApiError) {
-        const items = extractMissingAssignmentPayload(e.body)
-        if (items?.length) {
-          openMissingAssignmentDialog(items)
+      if (entries.length === 0) return true
+      if (!options?.assignmentResolutions) {
+        const pendingAssignments = getMissingAssignmentsFromStandup(
+          standup,
+          currentDrafts,
+          projects,
+          scopeEmployeeIds
+        )
+        if (pendingAssignments.length > 0) {
+          openMissingAssignmentDialog(pendingAssignments)
           return false
         }
       }
-      setMessageDialog({
-        title: "Save failed",
-        description: e instanceof ApiError ? e.message : "Failed to save stand-up changes.",
-      })
-      return false
-    } finally {
-      setSaving(false)
-    }
-  }, [id, standup, readonly, projects, user, groupMemberIds, showAllEmployees, navigate])
+      setSaving(true)
+      try {
+        const res = await api<Envelope<Standup>>(`/standups/${id}/entries`, {
+          method: "PATCH",
+          body: {
+            entries,
+            miscellaneousNotes: standupMiscNotes,
+            assignmentResolutions: options?.assignmentResolutions,
+          },
+        })
+        setStandup(res.data)
+        setStandupMiscNotes(res.data.miscellaneousNotes ?? "")
+        setBaselineStandupMiscNotes(res.data.miscellaneousNotes ?? "")
+        const nextDrafts = draftsFromStandup(res.data.entries)
+        draftsRef.current = nextDrafts
+        setDrafts(nextDrafts)
+        setBaseline(serializeDrafts(nextDrafts))
+        syncDraftsToYjs(entriesMapRef.current, nextDrafts)
+        setMissingAssignments([])
+        setResolutionChoices({})
+        setMissingAssignmentOpen(false)
+        toast.add({
+          title: "Stand-up saved successfully",
+          type: "success",
+        })
+        if (options?.redirectToList !== false) {
+          skipLeaveBlockRef.current = true
+          await navigate({
+            to: "/stand-ups",
+            search: {
+              page: 1,
+              pageSize: 25,
+              view: "list",
+              q: "",
+              employeeIds: "",
+              projectId: "",
+              from: "",
+              to: "",
+            },
+          })
+        }
+        return true
+      } catch (e) {
+        if (e instanceof ApiError) {
+          const items = extractMissingAssignmentPayload(e.body)
+          if (items?.length) {
+            openMissingAssignmentDialog(items)
+            return false
+          }
+        }
+        setMessageDialog({
+          title: "Save failed",
+          description:
+            e instanceof ApiError
+              ? e.message
+              : "Failed to save stand-up changes.",
+        })
+        return false
+      } finally {
+        setSaving(false)
+      }
+    },
+    [
+      id,
+      standup,
+      readonly,
+      projects,
+      user,
+      groupMemberIds,
+      showAllEmployees,
+      navigate,
+    ]
+  )
 
   const handleDraftChange = React.useCallback(
     (entryId: string, next: EntryDraft) => {
@@ -791,7 +842,7 @@ function StandupDetailPage() {
         map.set(entryId, serialized)
       }
     },
-    [],
+    []
   )
   const handleDraftChangeRef = React.useRef(handleDraftChange)
   handleDraftChangeRef.current = handleDraftChange
@@ -809,7 +860,7 @@ function StandupDetailPage() {
         // Preference persistence is best-effort.
       }
     },
-    [refreshUser],
+    [refreshUser]
   )
   const layoutRef = React.useRef(layout)
   layoutRef.current = layout
@@ -832,12 +883,14 @@ function StandupDetailPage() {
     const isDialogTarget = (target: EventTarget | null) =>
       target instanceof Element &&
       Boolean(
-        target.closest('[role="dialog"], [data-slot="alert-dialog-content"]'),
+        target.closest('[role="dialog"], [data-slot="alert-dialog-content"]')
       )
 
     const currentEntryId = (target: EventTarget | null) => {
       if (!(target instanceof Element)) return null
-      return target.closest("[data-standup-entry]")?.getAttribute("data-standup-entry")
+      return target
+        .closest("[data-standup-entry]")
+        ?.getAttribute("data-standup-entry")
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
@@ -868,7 +921,7 @@ function StandupDetailPage() {
         event.preventDefault()
         event.stopPropagation()
         void changeLayoutRef.current(
-          layoutRef.current === "table" ? "card" : "table",
+          layoutRef.current === "table" ? "card" : "table"
         )
         return
       }
@@ -882,7 +935,7 @@ function StandupDetailPage() {
         const moved = advanceStandupFocus(
           visibleEntriesRef.current,
           draftsRef.current,
-          event.target,
+          event.target
         )
         if (!moved) {
           toast.add({
@@ -934,8 +987,8 @@ function StandupDetailPage() {
         <AlertDialogHeader>
           <AlertDialogTitle>Unsaved changes</AlertDialogTitle>
           <AlertDialogDescription>
-            You have unsaved stand-up edits. Save them before leaving, or discard
-            and continue.
+            You have unsaved stand-up edits. Save them before leaving, or
+            discard and continue.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-col gap-2 sm:flex-row sm:justify-end">
@@ -983,8 +1036,8 @@ function StandupDetailPage() {
         <AlertDialogHeader>
           <AlertDialogTitle>Resolve project assignments</AlertDialogTitle>
           <AlertDialogDescription>
-            These employees are allocated to projects they were not assigned to on
-            the stand-up date. Choose how to resolve each item before saving.
+            These employees are allocated to projects they were not assigned to
+            on the stand-up date. Choose how to resolve each item before saving.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="max-h-80 space-y-3 overflow-y-auto rounded-md border p-3 text-sm">
@@ -992,7 +1045,7 @@ function StandupDetailPage() {
             const key = missingAssignmentKey(item)
             const actions = item.availableActions ?? ["remove_allocation"]
             const actionItems = Object.fromEntries(
-              actions.map((action) => [action, resolutionLabel(action, item)]),
+              actions.map((action) => [action, resolutionLabel(action, item)])
             )
             return (
               <div
@@ -1005,8 +1058,8 @@ function StandupDetailPage() {
                 </div>
                 {item.currentAssignedFrom ? (
                   <p className="text-xs text-muted-foreground">
-                    Currently assigned from {item.currentAssignedFrom}. The stand-up
-                    date is before that assignment started.
+                    Currently assigned from {item.currentAssignedFrom}. The
+                    stand-up date is before that assignment started.
                   </p>
                 ) : null}
                 <Select
@@ -1069,10 +1122,14 @@ function StandupDetailPage() {
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{messageDialog?.title}</AlertDialogTitle>
-          <AlertDialogDescription>{messageDialog?.description}</AlertDialogDescription>
+          <AlertDialogDescription>
+            {messageDialog?.description}
+          </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogAction onClick={() => setMessageDialog(null)}>OK</AlertDialogAction>
+          <AlertDialogAction onClick={() => setMessageDialog(null)}>
+            OK
+          </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -1128,10 +1185,14 @@ function StandupDetailPage() {
   })
   const absentCount = scopedEntries.length - working.length
 
-  const dateLabel = new Date(String(standup.date).slice(0, 10)).toLocaleDateString(
-    undefined,
-    { weekday: "long", day: "numeric", month: "long", year: "numeric" },
-  )
+  const dateLabel = new Date(
+    String(standup.date).slice(0, 10)
+  ).toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  })
 
   const copySummary = async () => {
     const lines = entries.map((e) => {
@@ -1139,17 +1200,20 @@ function StandupDetailPage() {
       if (!d) return `## ${e.employee.name}`
       const status =
         ATTENDANCE_META[d.attendanceStatus]?.label ?? d.attendanceStatus
-      if (!isWorking(d.attendanceStatus)) return `## ${e.employee.name} — ${status}`
+      if (!isWorking(d.attendanceStatus))
+        return `## ${e.employee.name} — ${status}`
       const split =
         d.allocations
           .map((a) => {
-            const name = projects.find((p) => p.id === a.projectId)?.name ?? a.projectId
+            const name =
+              projects.find((p) => p.id === a.projectId)?.name ?? a.projectId
             return `${name} ${a.percentage}%`
           })
           .join(", ") || "no projects"
       const taskBlocks = d.allocations
         .map((a) => {
-          const name = projects.find((p) => p.id === a.projectId)?.name ?? a.projectId
+          const name =
+            projects.find((p) => p.id === a.projectId)?.name ?? a.projectId
           const tasks = a.tasks.filter((t) => t.text.trim().length > 0)
           if (tasks.length === 0) return null
           return `### ${name}\n${tasks
@@ -1198,12 +1262,8 @@ function StandupDetailPage() {
       onClick={toggleOverallNotes}
     >
       <IconNotes className="size-3.5" />
-      <span>Notes</span>
       {standupMiscNotes.trim().length > 0 && !showOverallNotes ? (
-        <span
-          aria-hidden
-          className="size-1.5 rounded-full bg-primary"
-        />
+        <span aria-hidden className="size-1.5 rounded-full bg-primary" />
       ) : null}
     </Button>
   )
@@ -1247,7 +1307,20 @@ function StandupDetailPage() {
         title={`Stand-up · ${dateLabel}`}
         description="Attendance, tasks, and project allocations"
         breadcrumbs={[
-          { label: "Stand-ups", to: "/stand-ups", search: { page: 1, pageSize: 25, view: "list", q: "", employeeIds: "", projectId: "", from: "", to: "" } },
+          {
+            label: "Stand-ups",
+            to: "/stand-ups",
+            search: {
+              page: 1,
+              pageSize: 25,
+              view: "list",
+              q: "",
+              employeeIds: "",
+              projectId: "",
+              from: "",
+              to: "",
+            },
+          },
           { label: dateLabel },
         ]}
         actions={
@@ -1392,7 +1465,7 @@ function StandupDetailPage() {
         </div>
 
         <div className="relative w-full sm:w-52">
-          <IconSearch className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -1401,7 +1474,8 @@ function StandupDetailPage() {
           />
         </div>
 
-        {user?.standupScopePreference === "group" && user.standupPreferredGroupId ? (
+        {user?.standupScopePreference === "group" &&
+        user.standupPreferredGroupId ? (
           <Button
             type="button"
             size="sm"
@@ -1415,7 +1489,9 @@ function StandupDetailPage() {
         ) : null}
 
         {hiddenGroupCount > 0 && !query.trim() ? (
-          <Badge variant="outline">{hiddenGroupCount} hidden by group filter</Badge>
+          <Badge variant="outline">
+            {hiddenGroupCount} hidden by group filter
+          </Badge>
         ) : null}
 
         <StandupGuidelinesControl
@@ -1442,37 +1518,6 @@ function StandupDetailPage() {
 
         {saveAllButton}
       </div>
-
-      {showOverallNotes ? (
-        <Card className="mb-6 border-border bg-card">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
-            <div className="flex items-center gap-2">
-              <IconNotes className="size-4 text-primary" />
-              <CardTitle className="text-base font-semibold">
-                Stand-up miscellaneous notes
-              </CardTitle>
-            </div>
-            <Button
-              type="button"
-              size="icon-sm"
-              variant="ghost"
-              onClick={() => setShowOverallNotes(false)}
-              aria-label="Close stand-up notes"
-            >
-              <IconX className="size-4" />
-            </Button>
-          </CardHeader>
-          <CardContent>
-            <MarkdownNotes
-              editorKey={`standup-${id}-misc`}
-              value={standupMiscNotes}
-              disabled={readonly}
-              onChange={setStandupMiscNotes}
-              placeholder="General notes, announcements, or blockers for today's stand-up…"
-            />
-          </CardContent>
-        </Card>
-      ) : null}
 
       {visible.length === 0 ? (
         <Card>
@@ -1501,6 +1546,37 @@ function StandupDetailPage() {
           onDraftChange={handleDraftChange}
         />
       )}
+
+      {showOverallNotes ? (
+        <Card className="my-6 border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <div className="flex items-center gap-2">
+              <IconNotes className="size-4 text-primary" />
+              <CardTitle className="text-base font-semibold">
+                Stand-up miscellaneous notes
+              </CardTitle>
+            </div>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => setShowOverallNotes(false)}
+              aria-label="Close stand-up notes"
+            >
+              <IconX className="size-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <MarkdownNotes
+              editorKey={`standup-${id}-misc`}
+              value={standupMiscNotes}
+              disabled={readonly}
+              onChange={setStandupMiscNotes}
+              placeholder="General notes, announcements, or blockers for today's stand-up…"
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {!readonly && entries.length > 0 ? (
         <div className="mt-6 flex items-center gap-2 border-t pt-4">
