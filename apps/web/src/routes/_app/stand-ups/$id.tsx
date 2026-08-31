@@ -2,6 +2,7 @@ import * as React from "react"
 import { createFileRoute, useBlocker } from "@tanstack/react-router"
 import {
   IconArrowUp,
+  IconArrowsSort,
   IconCalendar,
   IconCheck,
   IconCopy,
@@ -89,7 +90,11 @@ import {
   mergeEmployeeOrder,
   sortStandupEntries,
 } from "@/lib/employee-order"
-import { primaryModifierPressed } from "@/lib/keyboard"
+import {
+  formatShortcutKey,
+  isApplePlatform,
+  primaryModifierPressed,
+} from "@/lib/keyboard"
 import {
   STANDUP_DELETABLE_DAYS,
   STANDUP_EDITABLE_DAYS,
@@ -530,6 +535,7 @@ function StandupDetailPage() {
   const [collabConnected, setCollabConnected] = React.useState(false)
   const [leaveBusy, setLeaveBusy] = React.useState(false)
   const [showScrollTop, setShowScrollTop] = React.useState(false)
+  const [reordering, setReordering] = React.useState(false)
   const [layout, setLayout] = React.useState<StandupLayoutPreference>(
     () => user?.standupLayoutPreference ?? "card"
   )
@@ -611,7 +617,7 @@ function StandupDetailPage() {
       draftsRef.current = next
       draftsReadyRef.current = true
       setDrafts(next)
-      setBaseline(serializeDrafts(fromServer))
+      setBaseline(serializeDrafts(next))
       setStandupMiscNotes(s.data.miscellaneousNotes ?? "")
       setBaselineStandupMiscNotes(s.data.miscellaneousNotes ?? "")
       hydrateYjsFromDraftsRef.current(next)
@@ -920,6 +926,12 @@ function StandupDetailPage() {
   const toggleOverallNotesRef = React.useRef(toggleOverallNotes)
   toggleOverallNotesRef.current = toggleOverallNotes
 
+  const toggleReordering = React.useCallback(() => {
+    setReordering((prev) => !prev)
+  }, [])
+  const toggleReorderingRef = React.useRef(toggleReordering)
+  toggleReorderingRef.current = toggleReordering
+
   React.useEffect(() => {
     const isDialogTarget = (target: EventTarget | null) =>
       target instanceof Element &&
@@ -937,6 +949,20 @@ function StandupDetailPage() {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
       if (isDialogTarget(event.target)) return
+
+      // Alt+R → toggle employee reorder mode
+      if (
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "r"
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        toggleReorderingRef.current()
+        return
+      }
 
       // Alt+M → toggle overall stand-up miscellaneous notes
       if (
@@ -1319,37 +1345,73 @@ function StandupDetailPage() {
     </Tooltip>
   )
 
+  const saveDisabledReason = saving
+    ? "Saving changes…"
+    : !isDirty
+      ? "No unsaved changes"
+      : null
+
   const saveAllButton = !readonly ? (
-    <Button
-      type="button"
-      size="sm"
-      variant={isDirty ? "default" : "outline"}
-      className="gap-1.5"
-      disabled={saving || !isDirty}
-      onClick={() => void saveAll()}
-    >
-      <IconDeviceFloppy className="size-3.5" />
-      {saving ? "Saving…" : "Save"}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            className={
+              saveDisabledReason
+                ? "inline-flex cursor-not-allowed"
+                : "inline-flex"
+            }
+          />
+        }
+      >
+        <Button
+          type="button"
+          size="sm"
+          variant={isDirty ? "default" : "outline"}
+          className="gap-1.5"
+          disabled={saving || !isDirty}
+          onClick={() => void saveAll()}
+        >
+          <IconDeviceFloppy className="size-3.5" />
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{saveDisabledReason ?? "Save stand-up"}</TooltipContent>
+    </Tooltip>
   ) : null
 
   const saveAllEndButton = !readonly ? (
-    <Button
-      type="button"
-      size="sm"
-      variant={isDirty ? "default" : "outline"}
-      className={`gap-1.5 ${!isDirty || saving ? "opacity-50" : ""}`}
-      data-standup-save-all=""
-      disabled={saving}
-      aria-disabled={!isDirty || saving}
-      onClick={() => {
-        if (!isDirty || saving) return
-        void saveAll()
-      }}
-    >
-      <IconDeviceFloppy className="size-3.5" />
-      {saving ? "Saving…" : "Save"}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span
+            className={
+              saveDisabledReason
+                ? "inline-flex cursor-not-allowed"
+                : "inline-flex"
+            }
+          />
+        }
+      >
+        <Button
+          type="button"
+          size="sm"
+          variant={isDirty ? "default" : "outline"}
+          className={`gap-1.5 ${!isDirty || saving ? "opacity-50" : ""}`}
+          data-standup-save-all=""
+          disabled={saving || !isDirty}
+          aria-disabled={!isDirty || saving}
+          onClick={() => {
+            if (!isDirty || saving) return
+            void saveAll()
+          }}
+        >
+          <IconDeviceFloppy className="size-3.5" />
+          {saving ? "Saving…" : "Save"}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{saveDisabledReason ?? "Save stand-up"}</TooltipContent>
+    </Tooltip>
   ) : null
 
   return (
@@ -1490,53 +1552,6 @@ function StandupDetailPage() {
           <span>{absentCount} absent</span>
         </div>
 
-        <div className="flex items-center gap-1 rounded-md border p-0.5">
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant={layout === "card" ? "secondary" : "ghost"}
-                  aria-label="Cards view"
-                  aria-pressed={layout === "card"}
-                  onClick={() => void changeLayout("card")}
-                />
-              }
-            >
-              <IconLayoutGrid className="size-4" />
-            </TooltipTrigger>
-            <TooltipContent>Cards view</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  type="button"
-                  size="icon-sm"
-                  variant={layout === "table" ? "secondary" : "ghost"}
-                  aria-label="Table view"
-                  aria-pressed={layout === "table"}
-                  onClick={() => void changeLayout("table")}
-                />
-              }
-            >
-              <IconTable className="size-4" />
-            </TooltipTrigger>
-            <TooltipContent>Table view</TooltipContent>
-          </Tooltip>
-        </div>
-
-        <div className="relative w-full sm:w-52">
-          <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Find someone…"
-            className="h-9 pl-8 text-sm"
-          />
-        </div>
-
         {user?.standupScopePreference === "group" &&
         user.standupPreferredGroupId ? (
           <Tooltip>
@@ -1575,6 +1590,79 @@ function StandupDetailPage() {
           </Badge>
         ) : null}
 
+        <div className="flex items-center gap-1 rounded-md border p-0.5">
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant={layout === "card" ? "secondary" : "ghost"}
+                  aria-label="Cards view"
+                  aria-pressed={layout === "card"}
+                  onClick={() => void changeLayout("card")}
+                />
+              }
+            >
+              <IconLayoutGrid className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent>Cards view</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant={layout === "table" ? "secondary" : "ghost"}
+                  aria-label="Table view"
+                  aria-pressed={layout === "table"}
+                  onClick={() => void changeLayout("table")}
+                />
+              }
+            >
+              <IconTable className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent>Table view</TooltipContent>
+          </Tooltip>
+        </div>
+
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                size="icon-sm"
+                variant={reordering ? "secondary" : "outline"}
+                aria-label={
+                  reordering
+                    ? `Done reordering (${formatShortcutKey("Alt", isApplePlatform())}+R)`
+                    : `Reorder employees (${formatShortcutKey("Alt", isApplePlatform())}+R)`
+                }
+                aria-pressed={reordering}
+                onClick={toggleReordering}
+              />
+            }
+          >
+            <IconArrowsSort className="size-4" />
+          </TooltipTrigger>
+          <TooltipContent>
+            {reordering
+              ? `Done reordering (${formatShortcutKey("Alt", isApplePlatform())}+R)`
+              : `Reorder employees (${formatShortcutKey("Alt", isApplePlatform())}+R)`}
+          </TooltipContent>
+        </Tooltip>
+
+        <div className="relative w-full sm:w-52">
+          <IconSearch className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find someone…"
+            className="h-9 pl-8 text-sm"
+          />
+        </div>
+
         <StandupGuidelinesControl
           viewingEveryone={
             user?.standupScopePreference !== "group" ||
@@ -1605,6 +1693,8 @@ function StandupDetailPage() {
           <TooltipContent>{copied ? "Copied" : "Copy summary"}</TooltipContent>
         </Tooltip>
 
+        {miscNotesButton}
+
         {saveAllButton}
       </div>
 
@@ -1625,7 +1715,10 @@ function StandupDetailPage() {
           projects={projects}
           readonly={readonly}
           disabledReorder={
-            readonly || Boolean(query.trim()) || visible.length <= 1
+            readonly ||
+            !reordering ||
+            Boolean(query.trim()) ||
+            visible.length <= 1
           }
           onDraftChange={handleDraftChange}
           onReorder={handleReorder}
@@ -1637,7 +1730,10 @@ function StandupDetailPage() {
           projects={projects}
           readonly={readonly}
           disabledReorder={
-            readonly || Boolean(query.trim()) || visible.length <= 1
+            readonly ||
+            !reordering ||
+            Boolean(query.trim()) ||
+            visible.length <= 1
           }
           onDraftChange={handleDraftChange}
           onReorder={handleReorder}
