@@ -198,9 +198,30 @@ export function StandupTableView({
       onDragEnd={(event) => {
         if (event.canceled) return
         const { source, target } = event.operation
-        if (!source || !target || source.id === target.id) return
-        const fromIndex = entries.findIndex((e) => e.id === source.id)
-        const toIndex = entries.findIndex((e) => e.id === target.id)
+        if (!source) return
+
+        let fromIndex = -1
+        let toIndex = -1
+
+        if (
+          "initialIndex" in source &&
+          typeof source.initialIndex === "number" &&
+          "index" in source &&
+          typeof source.index === "number"
+        ) {
+          fromIndex = source.initialIndex
+          toIndex = source.index
+        }
+
+        if (fromIndex === -1 || toIndex === -1 || fromIndex === toIndex) {
+          const srcIdx = entries.findIndex((e) => e.id === source.id)
+          const tgtIdx = target ? entries.findIndex((e) => e.id === target.id) : -1
+          if (srcIdx !== -1 && tgtIdx !== -1 && srcIdx !== tgtIdx) {
+            fromIndex = srcIdx
+            toIndex = tgtIdx
+          }
+        }
+
         if (fromIndex !== -1 && toIndex !== -1 && fromIndex !== toIndex) {
           onReorder?.(fromIndex, toIndex)
         }

@@ -536,6 +536,19 @@ function StandupDetailPage() {
   const [leaveBusy, setLeaveBusy] = React.useState(false)
   const [showScrollTop, setShowScrollTop] = React.useState(false)
   const [reordering, setReordering] = React.useState(false)
+  const [employeeOrder, setEmployeeOrder] = React.useState<string[] | null>(
+    () => user?.standupEmployeeOrder ?? null
+  )
+  const employeeOrderRef = React.useRef(employeeOrder)
+  employeeOrderRef.current = employeeOrder
+  const orderDirtyRef = React.useRef(false)
+
+  React.useEffect(() => {
+    if (!orderDirtyRef.current) {
+      setEmployeeOrder(user?.standupEmployeeOrder ?? null)
+    }
+  }, [user?.standupEmployeeOrder])
+
   const [layout, setLayout] = React.useState<StandupLayoutPreference>(
     () => user?.standupLayoutPreference ?? "card"
   )
@@ -773,6 +786,18 @@ function StandupDetailPage() {
       }
       setSaving(true)
       try {
+        if (orderDirtyRef.current && employeeOrderRef.current) {
+          try {
+            await api("/auth/me", {
+              method: "PATCH",
+              body: { standupEmployeeOrder: employeeOrderRef.current },
+            })
+            orderDirtyRef.current = false
+            void refreshUser()
+          } catch {
+            // Preference persistence is best-effort.
+          }
+        }
         const res = await api<Envelope<Standup>>(`/standups/${id}/entries`, {
           method: "PATCH",
           body: {
@@ -881,8 +906,40 @@ function StandupDetailPage() {
   const changeLayoutRef = React.useRef(changeLayout)
   changeLayoutRef.current = changeLayout
 
+  const saveEmployeeOrder = React.useCallback(
+    async (orderToSave?: string[], notify = false) => {
+      const order = orderToSave ?? employeeOrderRef.current
+      if (!order) return
+      try {
+        await api("/auth/me", {
+          method: "PATCH",
+          body: { standupEmployeeOrder: order },
+        })
+        orderDirtyRef.current = false
+        await refreshUser()
+        if (notify) {
+          toast.add({
+            title: "Employee order saved",
+            type: "success",
+          })
+        }
+      } catch (e) {
+        if (notify) {
+          toast.add({
+            title: "Failed to save employee order",
+            description: e instanceof Error ? e.message : "Please try again.",
+            type: "error",
+          })
+        }
+      }
+    },
+    [refreshUser]
+  )
+  const saveEmployeeOrderRef = React.useRef(saveEmployeeOrder)
+  saveEmployeeOrderRef.current = saveEmployeeOrder
+
   const handleReorder = React.useCallback(
-    async (fromIndex: number, toIndex: number) => {
+    (fromIndex: number, toIndex: number) => {
       if (!standup) return
       const currentVisible = visibleEntriesRef.current
       if (!currentVisible.length) return
@@ -890,28 +947,16 @@ function StandupDetailPage() {
       const visibleIds = currentVisible.map((e) => e.employee.id)
       const newVisibleIds = reorderedVisible.map((e) => e.employee.id)
       const newMasterOrder = mergeEmployeeOrder(
-        user?.standupEmployeeOrder,
+        employeeOrderRef.current ?? user?.standupEmployeeOrder,
         visibleIds,
         newVisibleIds
       )
 
-      const nextEntries = sortStandupEntries(
-        standup.entries ?? [],
-        newMasterOrder
-      )
-      setStandup((prev) => (prev ? { ...prev, entries: nextEntries } : prev))
-
-      try {
-        await api("/auth/me", {
-          method: "PATCH",
-          body: { standupEmployeeOrder: newMasterOrder },
-        })
-        await refreshUser()
-      } catch {
-        // Preference persistence is best-effort.
-      }
+      orderDirtyRef.current = true
+      employeeOrderRef.current = newMasterOrder
+      setEmployeeOrder(newMasterOrder)
     },
-    [standup, user?.standupEmployeeOrder, refreshUser]
+    [standup, user?.standupEmployeeOrder]
   )
 
   const toggleOverallNotes = React.useCallback(() => {
@@ -926,8 +971,16 @@ function StandupDetailPage() {
   const toggleOverallNotesRef = React.useRef(toggleOverallNotes)
   toggleOverallNotesRef.current = toggleOverallNotes
 
+  const reorderingRef = React.useRef(reordering)
+  reorderingRef.current = reordering
+
   const toggleReordering = React.useCallback(() => {
-    setReordering((prev) => !prev)
+    const next = !reorderingRef.current
+    reorderingRef.current = next
+    setReordering(next)
+    if (!next && orderDirtyRef.current && employeeOrderRef.current) {
+      void saveEmployeeOrderRef.current(employeeOrderRef.current, true)
+    }
   }, [])
   const toggleReorderingRef = React.useRef(toggleReordering)
   toggleReorderingRef.current = toggleReordering
@@ -1221,7 +1274,10 @@ function StandupDetailPage() {
   if (!standup) return leaveDialog
 
   const rawEntries = standup.entries ?? []
-  const entries = sortStandupEntries(rawEntries, user?.standupEmployeeOrder)
+  const entries = sortStandupEntries(
+    rawEntries,
+    employeeOrder ?? user?.standupEmployeeOrder
+  )
   const q = query.trim().toLowerCase()
   const groupFilterActive =
     user?.standupScopePreference === "group" &&
