@@ -42,6 +42,9 @@ export class UserResponseDto {
   @ApiPropertyOptional({ nullable: true })
   standupPreferredGroup?: { id: string; name: string } | null;
 
+  @ApiProperty({ type: [String] })
+  standupEmployeeOrder!: string[];
+
   @ApiProperty()
   createdAt!: Date;
 

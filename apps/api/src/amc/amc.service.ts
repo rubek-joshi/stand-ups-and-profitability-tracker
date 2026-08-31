@@ -188,6 +188,20 @@ export class AmcService {
       throw new BadRequestException("endDate must be on or after startDate");
     }
 
+    const overlapping = await this.prismaService.amcRecord.findFirst({
+      where: {
+        projectId,
+        status: { not: AmcStatus.cancelled },
+        startDate: { lte: end },
+        endDate: { gte: start },
+      },
+    });
+    if (overlapping) {
+      throw new BadRequestException(
+        "AMC dates overlap with an existing AMC period for this project",
+      );
+    }
+
     if (dto.type === AmcType.paid && dto.amcAmountNpr === undefined) {
       throw new BadRequestException("Paid AMC requires an amount");
     }
@@ -250,6 +264,21 @@ export class AmcService {
     const endDate = dto.endDate ? parseIsoDate(dto.endDate) : before.endDate;
     if (endDate.getTime() < startDate.getTime()) {
       throw new BadRequestException("endDate must be on or after startDate");
+    }
+
+    const overlapping = await this.prismaService.amcRecord.findFirst({
+      where: {
+        id: { not: id },
+        projectId: before.projectId,
+        status: { not: AmcStatus.cancelled },
+        startDate: { lte: endDate },
+        endDate: { gte: startDate },
+      },
+    });
+    if (overlapping) {
+      throw new BadRequestException(
+        "AMC dates overlap with an existing AMC period for this project",
+      );
     }
 
     const nextType = dto.type ?? before.type;

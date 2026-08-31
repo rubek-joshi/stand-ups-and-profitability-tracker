@@ -14,6 +14,7 @@ export type AuthUser = {
   standupProjectAccentPreference?: "off" | "muted" | "on"
   standupPreferredGroupId?: string | null
   standupPreferredGroup?: { id: string; name: string } | null
+  standupEmployeeOrder?: string[]
   createdAt?: string
   updatedAt?: string
 }

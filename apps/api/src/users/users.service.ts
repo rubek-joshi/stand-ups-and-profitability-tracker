@@ -281,6 +281,7 @@ export class UsersService {
       standupLayoutPreference?: "card" | "table";
       standupProjectAccentPreference?: "off" | "muted" | "on";
       standupPreferredGroupId?: string | null;
+      standupEmployeeOrder?: string[];
     },
   ): Promise<UserResponseDto> {
     const current = await this.findById(userId);
@@ -324,6 +325,9 @@ export class UsersService {
                 dto.standupProjectAccentPreference,
             }
           : {}),
+        ...(dto.standupEmployeeOrder !== undefined
+          ? { standupEmployeeOrder: dto.standupEmployeeOrder }
+          : {}),
       },
       include: {
         standupPreferredGroup: { select: { id: true, name: true } },
@@ -366,6 +370,7 @@ export class UsersService {
       standupProjectAccentPreference: user.standupProjectAccentPreference,
       standupPreferredGroupId: user.standupPreferredGroupId,
       standupPreferredGroup: user.standupPreferredGroup ?? null,
+      standupEmployeeOrder: user.standupEmployeeOrder ?? [],
       createdAt: user.createdAt,
       updatedAt: user.updatedAt,
     };

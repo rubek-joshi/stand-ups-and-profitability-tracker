@@ -1,5 +1,6 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import {
+  IsArray,
   IsBoolean,
   IsEmail,
   IsIn,
@@ -131,4 +132,13 @@ export class UpdateMyPreferencesDto {
   @IsOptional()
   @IsString()
   standupPreferredGroupId?: string | null;
+
+  @ApiPropertyOptional({
+    type: [String],
+    description: "Custom stand-up employee ordering preference",
+  })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  standupEmployeeOrder?: string[];
 }

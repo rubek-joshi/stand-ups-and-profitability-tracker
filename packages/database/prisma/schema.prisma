@@ -176,6 +176,7 @@ model User {
   standupLayoutPreference  StandupLayoutPreference  @default(card)
   standupProjectAccentPreference StandupProjectAccentPreference @default(muted)
   standupPreferredGroupId  String?
+  standupEmployeeOrder     String[]                 @default([])
   createdAt                DateTime                 @default(now())
   updatedAt                DateTime                 @updatedAt
 

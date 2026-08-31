@@ -3,7 +3,8 @@ import { createFileRoute, useBlocker } from "@tanstack/react-router"
 import {
   IconArrowUp,
   IconCalendar,
-  IconClipboard,
+  IconCheck,
+  IconCopy,
   IconDeviceFloppy,
   IconDotsVertical,
   IconLayoutGrid,
@@ -12,6 +13,7 @@ import {
   IconTable,
   IconTrash,
   IconUsers,
+  IconUsersGroup,
   IconX,
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
@@ -82,6 +84,11 @@ import {
 } from "@/components/standup/project-allocations"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
+import {
+  arrayMove,
+  mergeEmployeeOrder,
+  sortStandupEntries,
+} from "@/lib/employee-order"
 import { primaryModifierPressed } from "@/lib/keyboard"
 import {
   STANDUP_DELETABLE_DAYS,
@@ -98,6 +105,7 @@ import type {
   MissingProjectAssignment,
   Project,
   Standup,
+  StandupEntry,
   StandupLayoutPreference,
 } from "@/lib/types"
 
@@ -562,7 +570,7 @@ function StandupDetailPage() {
     syncDraftsToYjs(map, draftsToWrite)
     yjsHydratedFromServerRef.current = true
   }
-  const visibleEntriesRef = React.useRef<Array<{ id: string }>>([])
+  const visibleEntriesRef = React.useRef<StandupEntry[]>([])
 
   const readonly = Boolean(standup && !isStandupEditable(String(standup.date)))
   const canDelete =
@@ -867,6 +875,39 @@ function StandupDetailPage() {
   const changeLayoutRef = React.useRef(changeLayout)
   changeLayoutRef.current = changeLayout
 
+  const handleReorder = React.useCallback(
+    async (fromIndex: number, toIndex: number) => {
+      if (!standup) return
+      const currentVisible = visibleEntriesRef.current
+      if (!currentVisible.length) return
+      const reorderedVisible = arrayMove(currentVisible, fromIndex, toIndex)
+      const visibleIds = currentVisible.map((e) => e.employee.id)
+      const newVisibleIds = reorderedVisible.map((e) => e.employee.id)
+      const newMasterOrder = mergeEmployeeOrder(
+        user?.standupEmployeeOrder,
+        visibleIds,
+        newVisibleIds
+      )
+
+      const nextEntries = sortStandupEntries(
+        standup.entries ?? [],
+        newMasterOrder
+      )
+      setStandup((prev) => (prev ? { ...prev, entries: nextEntries } : prev))
+
+      try {
+        await api("/auth/me", {
+          method: "PATCH",
+          body: { standupEmployeeOrder: newMasterOrder },
+        })
+        await refreshUser()
+      } catch {
+        // Preference persistence is best-effort.
+      }
+    },
+    [standup, user?.standupEmployeeOrder, refreshUser]
+  )
+
   const toggleOverallNotes = React.useCallback(() => {
     setShowOverallNotes((prev) => {
       const next = !prev
@@ -1153,7 +1194,8 @@ function StandupDetailPage() {
   }
   if (!standup) return leaveDialog
 
-  const entries = standup.entries ?? []
+  const rawEntries = standup.entries ?? []
+  const entries = sortStandupEntries(rawEntries, user?.standupEmployeeOrder)
   const q = query.trim().toLowerCase()
   const groupFilterActive =
     user?.standupScopePreference === "group" &&
@@ -1247,25 +1289,34 @@ function StandupDetailPage() {
   }
 
   const miscNotesButton = (
-    <Button
-      type="button"
-      size="sm"
-      variant={showOverallNotes ? "secondary" : "outline"}
-      className="gap-1.5"
-      aria-expanded={showOverallNotes}
-      aria-label={
-        showOverallNotes
-          ? "Hide stand-up miscellaneous notes"
-          : "Show stand-up miscellaneous notes"
-      }
-      title="Stand-up notes (Alt+M)"
-      onClick={toggleOverallNotes}
-    >
-      <IconNotes className="size-3.5" />
-      {standupMiscNotes.trim().length > 0 && !showOverallNotes ? (
-        <span aria-hidden className="size-1.5 rounded-full bg-primary" />
-      ) : null}
-    </Button>
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            size="icon-sm"
+            variant={showOverallNotes ? "secondary" : "outline"}
+            className="relative"
+            aria-expanded={showOverallNotes}
+            aria-label={
+              showOverallNotes
+                ? "Hide stand-up miscellaneous notes"
+                : "Show stand-up miscellaneous notes"
+            }
+            onClick={toggleOverallNotes}
+          />
+        }
+      >
+        <IconNotes className="size-4" />
+        {standupMiscNotes.trim().length > 0 && !showOverallNotes ? (
+          <span
+            aria-hidden
+            className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary"
+          />
+        ) : null}
+      </TooltipTrigger>
+      <TooltipContent>Miscellaneous notes (Alt+M)</TooltipContent>
+    </Tooltip>
   )
 
   const saveAllButton = !readonly ? (
@@ -1278,7 +1329,7 @@ function StandupDetailPage() {
       onClick={() => void saveAll()}
     >
       <IconDeviceFloppy className="size-3.5" />
-      {saving ? "Saving…" : "Save all"}
+      {saving ? "Saving…" : "Save"}
     </Button>
   ) : null
 
@@ -1297,7 +1348,7 @@ function StandupDetailPage() {
       }}
     >
       <IconDeviceFloppy className="size-3.5" />
-      {saving ? "Saving…" : "Save all"}
+      {saving ? "Saving…" : "Save"}
     </Button>
   ) : null
 
@@ -1440,28 +1491,40 @@ function StandupDetailPage() {
         </div>
 
         <div className="flex items-center gap-1 rounded-md border p-0.5">
-          <Button
-            type="button"
-            size="sm"
-            variant={layout === "card" ? "secondary" : "ghost"}
-            className="h-8 gap-1.5 px-2.5"
-            aria-pressed={layout === "card"}
-            onClick={() => void changeLayout("card")}
-          >
-            <IconLayoutGrid className="size-3.5" />
-            Cards
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={layout === "table" ? "secondary" : "ghost"}
-            className="h-8 gap-1.5 px-2.5"
-            aria-pressed={layout === "table"}
-            onClick={() => void changeLayout("table")}
-          >
-            <IconTable className="size-3.5" />
-            Table
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant={layout === "card" ? "secondary" : "ghost"}
+                  aria-label="Cards view"
+                  aria-pressed={layout === "card"}
+                  onClick={() => void changeLayout("card")}
+                />
+              }
+            >
+              <IconLayoutGrid className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent>Cards view</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant={layout === "table" ? "secondary" : "ghost"}
+                  aria-label="Table view"
+                  aria-pressed={layout === "table"}
+                  onClick={() => void changeLayout("table")}
+                />
+              }
+            >
+              <IconTable className="size-4" />
+            </TooltipTrigger>
+            <TooltipContent>Table view</TooltipContent>
+          </Tooltip>
         </div>
 
         <div className="relative w-full sm:w-52">
@@ -1476,16 +1539,34 @@ function StandupDetailPage() {
 
         {user?.standupScopePreference === "group" &&
         user.standupPreferredGroupId ? (
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={() => setShowAllEmployees((prev) => !prev)}
-          >
-            {showAllEmployees
-              ? `Show ${user.standupPreferredGroup?.name ?? "my group"}`
-              : "Show everyone"}
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="outline"
+                  aria-label={
+                    showAllEmployees
+                      ? `Show ${user.standupPreferredGroup?.name ?? "my group"}`
+                      : "Show everyone"
+                  }
+                  onClick={() => setShowAllEmployees((prev) => !prev)}
+                />
+              }
+            >
+              {showAllEmployees ? (
+                <IconUsersGroup className="size-4" />
+              ) : (
+                <IconUsers className="size-4" />
+              )}
+            </TooltipTrigger>
+            <TooltipContent>
+              {showAllEmployees
+                ? `Show ${user.standupPreferredGroup?.name ?? "my group"}`
+                : "Show everyone"}
+            </TooltipContent>
+          </Tooltip>
         ) : null}
 
         {hiddenGroupCount > 0 && !query.trim() ? (
@@ -1503,18 +1584,26 @@ function StandupDetailPage() {
           preferredGroupId={user?.standupPreferredGroupId}
         />
 
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="gap-1.5"
-          onClick={() => void copySummary()}
-        >
-          <IconClipboard className="size-3.5" />
-          {copied ? "Copied" : "Copy summary"}
-        </Button>
-
-        {miscNotesButton}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="outline"
+                aria-label={copied ? "Copied" : "Copy summary"}
+                onClick={() => void copySummary()}
+              />
+            }
+          >
+            {copied ? (
+              <IconCheck className="size-4 text-emerald-500" />
+            ) : (
+              <IconCopy className="size-4" />
+            )}
+          </TooltipTrigger>
+          <TooltipContent>{copied ? "Copied" : "Copy summary"}</TooltipContent>
+        </Tooltip>
 
         {saveAllButton}
       </div>
@@ -1535,7 +1624,11 @@ function StandupDetailPage() {
           drafts={drafts}
           projects={projects}
           readonly={readonly}
+          disabledReorder={
+            readonly || Boolean(query.trim()) || visible.length <= 1
+          }
           onDraftChange={handleDraftChange}
+          onReorder={handleReorder}
         />
       ) : (
         <StandupCardView
@@ -1543,7 +1636,11 @@ function StandupDetailPage() {
           drafts={drafts}
           projects={projects}
           readonly={readonly}
+          disabledReorder={
+            readonly || Boolean(query.trim()) || visible.length <= 1
+          }
           onDraftChange={handleDraftChange}
+          onReorder={handleReorder}
         />
       )}
 

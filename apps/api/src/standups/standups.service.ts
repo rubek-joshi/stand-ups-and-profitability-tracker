@@ -1201,14 +1201,6 @@ export class StandupsService {
           amcRecords: {
             where: {
               status: { not: AmcStatus.cancelled },
-              NOT: {
-                renewalDecision: {
-                  in: [
-                    AmcRenewalDecision.declined,
-                    AmcRenewalDecision.renewed,
-                  ],
-                },
-              },
             },
             orderBy: { endDate: "desc" },
             take: 1,
@@ -1218,10 +1210,10 @@ export class StandupsService {
       if (!project) {
         throw new NotFoundException(`Project ${projectId} not found`);
       }
-      const currentAmc = project.amcRecords[0] ?? null;
+      const hasAmc = project.amcRecords.length > 0;
       const blocked =
         project.status === ProjectStatus.closed ||
-        (project.status === ProjectStatus.under_amc && currentAmc === null);
+        (project.status === ProjectStatus.under_amc && !hasAmc);
       if (blocked) {
         throw new BadRequestException(
           `Project ${project.name} is closed or cancelled and cannot be allocated`,
