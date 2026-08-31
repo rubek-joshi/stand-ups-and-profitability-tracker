@@ -7,14 +7,16 @@ import {
   IconDeviceFloppy,
   IconDotsVertical,
   IconLayoutGrid,
+  IconNotes,
   IconSearch,
   IconTable,
   IconTrash,
   IconUsers,
+  IconX,
 } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
-import { Card, CardContent } from "@workspace/ui/components/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
 import { Badge } from "@workspace/ui/components/badge"
 import {
   AlertDialog,
@@ -63,6 +65,7 @@ import { StandupCardView } from "@/components/standup/standup-card-view"
 import { StandupTableView } from "@/components/standup/table-view"
 import { advanceStandupFocus } from "@/components/standup/standup-focus-nav"
 import { toggleMiscellaneousNotes } from "@/components/standup/miscellaneous-notes-toggle"
+import { focusStandupNotes, MarkdownNotes } from "@/components/standup/markdown-notes"
 import { StandupGuidelinesControl } from "@/components/standup/standup-guidelines-dialog"
 import { formatTaskForCopy } from "@/components/standup/task-indent"
 import {
@@ -478,6 +481,9 @@ function StandupDetailPage() {
   const { user, refreshUser } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
   const [standup, setStandup] = React.useState<Standup | null>(null)
+  const [standupMiscNotes, setStandupMiscNotes] = React.useState("")
+  const [baselineStandupMiscNotes, setBaselineStandupMiscNotes] = React.useState("")
+  const [showOverallNotes, setShowOverallNotes] = React.useState(false)
   const [projects, setProjects] = React.useState<Project[]>([])
   const [drafts, setDrafts] = React.useState<Record<string, EntryDraft>>({})
   const [baseline, setBaseline] = React.useState("")
@@ -540,7 +546,11 @@ function StandupDetailPage() {
   const navigate = Route.useNavigate()
   const skipLeaveBlockRef = React.useRef(false)
   const isDirty =
-    Boolean(standup) && !readonly && baseline !== "" && serializeDrafts(drafts) !== baseline
+    Boolean(standup) &&
+    !readonly &&
+    baseline !== "" &&
+    (serializeDrafts(drafts) !== baseline ||
+      standupMiscNotes !== baselineStandupMiscNotes)
 
   const blocker = useBlocker({
     shouldBlockFn: () => isDirty && !skipLeaveBlockRef.current,
@@ -566,6 +576,8 @@ function StandupDetailPage() {
       draftsReadyRef.current = true
       setDrafts(next)
       setBaseline(serializeDrafts(fromServer))
+      setStandupMiscNotes(s.data.miscellaneousNotes ?? "")
+      setBaselineStandupMiscNotes(s.data.miscellaneousNotes ?? "")
       hydrateYjsFromDraftsRef.current(next)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Failed to load stand-up")
@@ -714,10 +726,13 @@ function StandupDetailPage() {
         method: "PATCH",
         body: {
           entries,
+          miscellaneousNotes: standupMiscNotes,
           assignmentResolutions: options?.assignmentResolutions,
         },
       })
       setStandup(res.data)
+      setStandupMiscNotes(res.data.miscellaneousNotes ?? "")
+      setBaselineStandupMiscNotes(res.data.miscellaneousNotes ?? "")
       const nextDrafts = draftsFromStandup(res.data.entries)
       draftsRef.current = nextDrafts
       setDrafts(nextDrafts)
@@ -801,6 +816,18 @@ function StandupDetailPage() {
   const changeLayoutRef = React.useRef(changeLayout)
   changeLayoutRef.current = changeLayout
 
+  const toggleOverallNotes = React.useCallback(() => {
+    setShowOverallNotes((prev) => {
+      const next = !prev
+      if (next) {
+        window.setTimeout(() => focusStandupNotes(`standup-${id}-misc`), 40)
+      }
+      return next
+    })
+  }, [id])
+  const toggleOverallNotesRef = React.useRef(toggleOverallNotes)
+  toggleOverallNotesRef.current = toggleOverallNotes
+
   React.useEffect(() => {
     const isDialogTarget = (target: EventTarget | null) =>
       target instanceof Element &&
@@ -815,8 +842,23 @@ function StandupDetailPage() {
 
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.repeat) return
-      if (event.altKey) return
       if (isDialogTarget(event.target)) return
+
+      // Alt+M → toggle overall stand-up miscellaneous notes
+      if (
+        event.altKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.shiftKey &&
+        event.key.toLowerCase() === "m"
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        toggleOverallNotesRef.current()
+        return
+      }
+
+      if (event.altKey) return
 
       const mod = primaryModifierPressed(event)
       const key = event.key.toLowerCase()
@@ -1126,7 +1168,8 @@ function StandupDetailPage() {
       if (!taskBlocks && !misc) parts.push("(no notes)")
       return parts.join("\n")
     })
-    const text = `# Stand-up · ${dateLabel}\n\n${lines.join("\n\n")}`
+    const overallMisc = standupMiscNotes.trim()
+    const text = `# Stand-up · ${dateLabel}${overallMisc ? `\n\n## Stand-up Notes\n${overallMisc}` : ""}\n\n${lines.join("\n\n")}`
     try {
       await navigator.clipboard.writeText(text)
       setCopied(true)
@@ -1138,6 +1181,32 @@ function StandupDetailPage() {
       })
     }
   }
+
+  const miscNotesButton = (
+    <Button
+      type="button"
+      size="sm"
+      variant={showOverallNotes ? "secondary" : "outline"}
+      className="gap-1.5"
+      aria-expanded={showOverallNotes}
+      aria-label={
+        showOverallNotes
+          ? "Hide stand-up miscellaneous notes"
+          : "Show stand-up miscellaneous notes"
+      }
+      title="Stand-up notes (Alt+M)"
+      onClick={toggleOverallNotes}
+    >
+      <IconNotes className="size-3.5" />
+      <span>Notes</span>
+      {standupMiscNotes.trim().length > 0 && !showOverallNotes ? (
+        <span
+          aria-hidden
+          className="size-1.5 rounded-full bg-primary"
+        />
+      ) : null}
+    </Button>
+  )
 
   const saveAllButton = !readonly ? (
     <Button
@@ -1369,8 +1438,41 @@ function StandupDetailPage() {
           {copied ? "Copied" : "Copy summary"}
         </Button>
 
+        {miscNotesButton}
+
         {saveAllButton}
       </div>
+
+      {showOverallNotes ? (
+        <Card className="mb-6 border-border bg-card">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+            <div className="flex items-center gap-2">
+              <IconNotes className="size-4 text-primary" />
+              <CardTitle className="text-base font-semibold">
+                Stand-up miscellaneous notes
+              </CardTitle>
+            </div>
+            <Button
+              type="button"
+              size="icon-sm"
+              variant="ghost"
+              onClick={() => setShowOverallNotes(false)}
+              aria-label="Close stand-up notes"
+            >
+              <IconX className="size-4" />
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <MarkdownNotes
+              editorKey={`standup-${id}-misc`}
+              value={standupMiscNotes}
+              disabled={readonly}
+              onChange={setStandupMiscNotes}
+              placeholder="General notes, announcements, or blockers for today's stand-up…"
+            />
+          </CardContent>
+        </Card>
+      ) : null}
 
       {visible.length === 0 ? (
         <Card>
@@ -1401,7 +1503,10 @@ function StandupDetailPage() {
       )}
 
       {!readonly && entries.length > 0 ? (
-        <div className="mt-6 flex border-t pt-4">{saveAllEndButton}</div>
+        <div className="mt-6 flex items-center gap-2 border-t pt-4">
+          {miscNotesButton}
+          {saveAllEndButton}
+        </div>
       ) : null}
 
       {leaveDialog}

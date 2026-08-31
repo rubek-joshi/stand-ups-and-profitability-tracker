@@ -325,6 +325,7 @@ export type Standup = {
   date: string
   employeeGroupId?: string | null
   employeeGroup?: { id: string; name: string } | null
+  miscellaneousNotes?: string | null
   createdAt?: string
   updatedAt?: string
   createdBy?: { id: string; name: string; email: string }

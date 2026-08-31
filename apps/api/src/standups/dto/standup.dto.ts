@@ -142,6 +142,11 @@ export class BatchUpdateStandupEntriesDto {
   @Type(() => BatchUpdateStandupEntryItemDto)
   entries!: BatchUpdateStandupEntryItemDto[];
 
+  @ApiPropertyOptional({ nullable: true })
+  @IsOptional()
+  @IsString()
+  miscellaneousNotes?: string | null;
+
   @ApiPropertyOptional({
     type: [AssignmentResolutionItemDto],
     description:

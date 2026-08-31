@@ -314,6 +314,7 @@ export class StandupsService {
     const data = standups.map((standup) => ({
       date: toIsoDate(standup.date),
       standupId: standup.id,
+      miscellaneousNotes: projectId ? null : standup.miscellaneousNotes,
       records: standup.entries.map((entry) => ({
         id: entry.id,
         employee: entry.employee,
@@ -491,6 +492,7 @@ export class StandupsService {
     limit: number,
   ) {
     const hasFilter = Boolean(q || employeeIds?.length || projectId);
+    const searchPattern = q ? `%${q}%` : null;
     if (hasFilter) {
       if (cursorDate && cursorId) {
         return this.prismaService.$queryRaw<Array<{ id: string; date: Date }>>`
@@ -499,7 +501,40 @@ export class StandupsService {
           WHERE (s.date, s.id) < (${cursorDate}::date, ${cursorId})
           AND (${fromDate}::date IS NULL OR s.date >= ${fromDate}::date)
           AND (${toDate}::date IS NULL OR s.date <= ${toDate}::date)
-          AND EXISTS (
+          AND (
+            (${q}::text IS NOT NULL AND ${employeeIds}::text[] IS NULL AND ${projectId}::text IS NULL AND s."miscellaneousNotes" ILIKE ${searchPattern})
+            OR EXISTS (
+              SELECT 1 FROM standup_entries se
+              WHERE se."standupId" = s.id
+              AND (
+                ${employeeIds}::text[] IS NULL
+                OR se."employeeId" = ANY(${employeeIds})
+              )
+              AND (
+                ${projectId}::text IS NULL
+                OR EXISTS (
+                  SELECT 1 FROM project_allocations pa
+                  WHERE pa."standupEntryId" = se.id AND pa."projectId" = ${projectId}
+                )
+              )
+              AND (
+                ${q}::text IS NULL
+                OR standup_entry_matches_search(se.search_text, se.search_vector, ${q})
+              )
+            )
+          )
+          ORDER BY s.date DESC, s.id DESC
+          LIMIT ${limit}
+        `;
+      }
+      return this.prismaService.$queryRaw<Array<{ id: string; date: Date }>>`
+        SELECT s.id, s.date
+        FROM standups s
+        WHERE (${fromDate}::date IS NULL OR s.date >= ${fromDate}::date)
+        AND (${toDate}::date IS NULL OR s.date <= ${toDate}::date)
+        AND (
+          (${q}::text IS NOT NULL AND ${employeeIds}::text[] IS NULL AND ${projectId}::text IS NULL AND s."miscellaneousNotes" ILIKE ${searchPattern})
+          OR EXISTS (
             SELECT 1 FROM standup_entries se
             WHERE se."standupId" = s.id
             AND (
@@ -517,33 +552,6 @@ export class StandupsService {
               ${q}::text IS NULL
               OR standup_entry_matches_search(se.search_text, se.search_vector, ${q})
             )
-          )
-          ORDER BY s.date DESC, s.id DESC
-          LIMIT ${limit}
-        `;
-      }
-      return this.prismaService.$queryRaw<Array<{ id: string; date: Date }>>`
-        SELECT s.id, s.date
-        FROM standups s
-        WHERE (${fromDate}::date IS NULL OR s.date >= ${fromDate}::date)
-        AND (${toDate}::date IS NULL OR s.date <= ${toDate}::date)
-        AND EXISTS (
-          SELECT 1 FROM standup_entries se
-          WHERE se."standupId" = s.id
-          AND (
-            ${employeeIds}::text[] IS NULL
-            OR se."employeeId" = ANY(${employeeIds})
-          )
-          AND (
-            ${projectId}::text IS NULL
-            OR EXISTS (
-              SELECT 1 FROM project_allocations pa
-              WHERE pa."standupEntryId" = se.id AND pa."projectId" = ${projectId}
-            )
-          )
-          AND (
-            ${q}::text IS NULL
-            OR standup_entry_matches_search(se.search_text, se.search_vector, ${q})
           )
         )
         ORDER BY s.date DESC, s.id DESC
@@ -757,7 +765,15 @@ export class StandupsService {
       }
       await tx.standup.update({
         where: { id: standupId },
-        data: { updatedById: actorId },
+        data: {
+          updatedById: actorId,
+          ...(dto.miscellaneousNotes !== undefined
+            ? {
+                miscellaneousNotes:
+                  dto.miscellaneousNotes?.trim() || null,
+              }
+            : {}),
+        },
       });
       return results;
     });

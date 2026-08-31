@@ -11,7 +11,7 @@ import {
 } from "./entry-draft"
 import { MiscellaneousNotesToggle } from "./miscellaneous-notes-toggle"
 import { ProjectAllocations } from "./project-allocations"
-import { StatusSelect } from "./standup-controls"
+import { StatusDropdown } from "./standup-controls"
 import { TaskEditor, type TaskDraft } from "./task-editor"
 
 type Props = {
@@ -62,7 +62,7 @@ export function StandupCardView({
                   </p>
                 </div>
               </div>
-              <StatusSelect
+              <StatusDropdown
                 value={draft.attendanceStatus}
                 disabled={readonly}
                 onChange={(status: AttendanceStatus) =>
@@ -91,7 +91,7 @@ export function StandupCardView({
                 </div>
               </aside>
 
-              <div className="max-h-[32rem] space-y-6 overflow-y-auto p-5">
+              <div className="max-h-128 space-y-6 overflow-y-auto p-5">
                 {draft.allocations.map((a) => {
                   const project = projects.find((p) => p.id === a.projectId)
                   return (

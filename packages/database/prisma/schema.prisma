@@ -535,14 +535,15 @@ model CoreMemberSalaryEntry {
 }
 
 model Standup {
-  id              String    @id @default(cuid())
-  date            DateTime  @db.Date
-  createdById     String
-  updatedById     String
-  employeeGroupId String?
-  yjsState        Bytes?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  id                 String    @id @default(cuid())
+  date               DateTime  @db.Date
+  createdById        String
+  updatedById        String
+  employeeGroupId    String?
+  yjsState           Bytes?
+  miscellaneousNotes String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   createdBy     User              @relation("StandupCreator", fields: [createdById], references: [id])
   updatedBy     User              @relation("StandupUpdater", fields: [updatedById], references: [id])
