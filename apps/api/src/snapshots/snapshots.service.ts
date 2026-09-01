@@ -12,6 +12,26 @@ import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 
 const execFileAsync = promisify(execFile);
+const MAX_DUMP_BUFFER = 1024 * 1024 * 100;
+
+function isCommandNotFound(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as NodeJS.ErrnoException).code === "ENOENT"
+  );
+}
+
+function dumpErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    if ("stderr" in error && typeof error.stderr === "string" && error.stderr.trim()) {
+      return error.stderr.trim();
+    }
+    return error.message;
+  }
+  return "pg_dump failed";
+}
 
 @Injectable()
 export class SnapshotsService {
@@ -39,15 +59,10 @@ export class SnapshotsService {
     const fileName = `db-snapshot-${Date.now()}.sql`;
     const filePath = resolve(snapshotsDir, fileName);
     try {
-      await execFileAsync("pg_dump", [databaseUrl, "-f", filePath], {
-        env: process.env,
-        maxBuffer: 1024 * 1024 * 100,
-      });
+      await this.createDumpFile(databaseUrl, filePath);
     } catch (error: unknown) {
-      const message =
-        error instanceof Error ? error.message : "pg_dump failed";
       throw new InternalServerErrorException(
-        `Failed to create database snapshot: ${message}`,
+        `Failed to create database snapshot: ${dumpErrorMessage(error)}`,
       );
     }
     const stats = await fs.stat(filePath);
@@ -76,5 +91,69 @@ export class SnapshotsService {
       sizeBytes: String(snapshot.sizeBytes),
       createdAt: snapshot.createdAt,
     };
+  }
+
+  private async createDumpFile(databaseUrl: string, filePath: string) {
+    const pgDumpBin =
+      this.configService.get<string>("PG_DUMP_PATH") ?? "pg_dump";
+
+    try {
+      await execFileAsync(
+        pgDumpBin,
+        [`--dbname=${databaseUrl}`, "-f", filePath],
+        {
+          env: process.env,
+          maxBuffer: MAX_DUMP_BUFFER,
+        },
+      );
+      return;
+    } catch (error: unknown) {
+      if (!isCommandNotFound(error)) {
+        throw error;
+      }
+    }
+
+    await this.createDumpFileViaDocker(filePath);
+  }
+
+  private async createDumpFileViaDocker(filePath: string) {
+    const container =
+      this.configService.get<string>("POSTGRES_CONTAINER") ??
+      "profitability-tracker-postgres";
+    const user = this.configService.get<string>("POSTGRES_USER") ?? "postgres";
+    const db =
+      this.configService.get<string>("POSTGRES_DB") ?? "profitability_tracker";
+
+    try {
+      const { stdout } = await execFileAsync(
+        "docker",
+        [
+          "exec",
+          container,
+          "pg_dump",
+          "-U",
+          user,
+          "-d",
+          db,
+          "--no-owner",
+          "--no-acl",
+        ],
+        {
+          env: process.env,
+          maxBuffer: MAX_DUMP_BUFFER,
+          encoding: "buffer",
+        },
+      );
+      await fs.writeFile(filePath, stdout);
+    } catch (error: unknown) {
+      if (isCommandNotFound(error)) {
+        throw new Error(
+          "pg_dump is not installed locally and the docker CLI is unavailable. Install PostgreSQL client tools or Docker.",
+        );
+      }
+      throw new Error(
+        `docker exec pg_dump failed for container "${container}": ${dumpErrorMessage(error)}`,
+      );
+    }
   }
 }

@@ -46,6 +46,68 @@ function looksLikeHtml(text: string, contentType: string): boolean {
   return start.startsWith("<!doctype") || start.startsWith("<html")
 }
 
+function parseContentDispositionFileName(
+  contentDisposition: string | null,
+): string | null {
+  if (!contentDisposition) return null
+  const quoted = /filename="([^"]+)"/i.exec(contentDisposition)
+  if (quoted?.[1]) return quoted[1]
+  const unquoted = /filename=([^;]+)/i.exec(contentDisposition)
+  return unquoted?.[1]?.trim() ?? null
+}
+
+export async function downloadFile(
+  path: string,
+  options: Omit<ApiOptions, "body"> = {},
+): Promise<{ blob: Blob; fileName: string }> {
+  const { token, skipAuth, headers: initHeaders, ...rest } = options
+  const headers = new Headers(initHeaders)
+
+  const authToken = skipAuth ? null : (token ?? getToken())
+  if (authToken) headers.set("Authorization", `Bearer ${authToken}`)
+
+  const res = await fetch(apiUrl(path), {
+    ...rest,
+    headers,
+  })
+
+  if (!res.ok) {
+    const text = await res.text()
+    const contentType = res.headers.get("content-type") ?? ""
+    let json: unknown = null
+    if (text) {
+      try {
+        json = JSON.parse(text)
+      } catch {
+        throw new ApiError(
+          res.status,
+          "Download failed with a non-JSON response.",
+          text.slice(0, 200),
+        )
+      }
+    }
+    const problem = json as { detail?: string; title?: string; message?: string } | null
+    const message =
+      problem?.detail || problem?.title || problem?.message || res.statusText || "Download failed"
+    throw new ApiError(res.status, message, json)
+  }
+
+  const blob = await res.blob()
+  const fileName =
+    parseContentDispositionFileName(res.headers.get("Content-Disposition")) ??
+    "download"
+  return { blob, fileName }
+}
+
+export function triggerBrowserDownload(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement("a")
+  anchor.href = url
+  anchor.download = fileName
+  anchor.click()
+  URL.revokeObjectURL(url)
+}
+
 export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { body, token, skipAuth, headers: initHeaders, ...rest } = options
   const headers = new Headers(initHeaders)

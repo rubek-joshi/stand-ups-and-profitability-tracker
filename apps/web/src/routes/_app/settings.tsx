@@ -41,7 +41,13 @@ import { PasswordInput } from "@/components/password-input"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { NumberField } from "@/components/settings/number-field"
 import { ErrorState, LoadingState } from "@/components/ui-states"
-import { api, ApiError, type Envelope } from "@/lib/api"
+import {
+  api,
+  ApiError,
+  downloadFile,
+  triggerBrowserDownload,
+  type Envelope,
+} from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import type { OrgSettings } from "@/lib/types"
 
@@ -583,11 +589,17 @@ function SettingsPage() {
               if (!ok) return
               setSnapshotting(true)
               try {
-                const res = await api<Envelope<SnapshotMeta>>(
+                const { blob, fileName } = await downloadFile(
                   "/snapshots/download",
                   { method: "POST" },
                 )
-                setSnapshot(res.data)
+                triggerBrowserDownload(blob, fileName)
+                setSnapshot({
+                  fileName,
+                  filePath: "",
+                  sizeBytes: String(blob.size),
+                  createdAt: new Date().toISOString(),
+                })
               } catch (err) {
                 alert(err instanceof ApiError ? err.message : "Snapshot failed")
               } finally {

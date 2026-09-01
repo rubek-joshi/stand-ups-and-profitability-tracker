@@ -13,6 +13,7 @@ dist-ssr
 .vinxi
 __unconfig*
 todos.json
+apps/api/snapshots
 
 # turbo
 .turbo

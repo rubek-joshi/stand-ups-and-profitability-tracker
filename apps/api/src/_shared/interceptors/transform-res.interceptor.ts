@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   NestInterceptor,
+  StreamableFile,
 } from "@nestjs/common";
 import { Observable, map } from "rxjs";
 
@@ -16,9 +17,12 @@ export class TransformResInterceptor implements NestInterceptor {
   intercept(
     _context: ExecutionContext,
     next: CallHandler,
-  ): Observable<WrappedResponse> {
+  ): Observable<WrappedResponse | StreamableFile> {
     return next.handle().pipe(
       map((payload: unknown) => {
+        if (payload instanceof StreamableFile) {
+          return payload;
+        }
         if (
           payload !== null &&
           typeof payload === "object" &&
