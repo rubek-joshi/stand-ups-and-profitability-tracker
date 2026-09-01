@@ -52,7 +52,11 @@ import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { toIsoDateInput } from "@/lib/dashboard-metrics"
 import { buildListQuery, parsePage, parsePageSize, totalPagesFor } from "@/lib/list-query"
-import { STANDUP_EDITABLE_DAYS, isStandupEditable } from "@/lib/standup-age"
+import {
+  STANDUP_EDITABLE_DAYS,
+  isStandupEditable,
+  nptTodayIso,
+} from "@/lib/standup-age"
 import type { EmployeeGroup, Standup } from "@/lib/types"
 import { format, parseISO, subDays } from "date-fns"
 
@@ -282,6 +286,12 @@ function StandupsPage() {
                             onClick={(event) => event.stopPropagation()}
                           >
                             {formatStandupDate(String(s.date))}
+                            {String(s.date).slice(0, 10) === nptTodayIso() ? (
+                              <span className="text-muted-foreground">
+                                {" "}
+                                (Today)
+                              </span>
+                            ) : null}
                           </Link>
                         </TableCell>
                         <TableCell className="tabular-nums">

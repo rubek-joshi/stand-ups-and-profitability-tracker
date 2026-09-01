@@ -9,8 +9,18 @@ import {
   IconX,
 } from "@tabler/icons-react"
 import { toast } from "@workspace/ui/components/toast"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@workspace/ui/components/tooltip"
 import { cn } from "@workspace/ui/lib/utils"
-import { primaryModifierPressed } from "@/lib/keyboard"
+import {
+  formatShortcutKey,
+  isApplePlatform,
+  primaryModifierPressed,
+} from "@/lib/keyboard"
 import type { StandupTask, StandupTaskState } from "@/lib/types"
 import { applyTaskIndentKey } from "./task-indent"
 
@@ -124,8 +134,8 @@ function AutoTextarea({
         onKeyDown?.(e)
       }}
       className={cn(
-        "w-full resize-none overflow-hidden whitespace-pre-wrap bg-transparent outline-none placeholder:text-muted-foreground/60 disabled:cursor-not-allowed",
-        className,
+        "w-full resize-none overflow-hidden bg-transparent whitespace-pre-wrap outline-none placeholder:text-muted-foreground/60 disabled:cursor-not-allowed",
+        className
       )}
     />
   )
@@ -142,11 +152,61 @@ const ACTIONS: Array<{
   state: StandupTaskState
   label: string
   icon: typeof IconCheck
+  shortcutKeys: string[]
 }> = [
-  { state: "done", label: "Completed", icon: IconCheck },
-  { state: "tomorrow", label: "Move to tomorrow", icon: IconSun },
-  { state: "progress", label: "In progress", icon: IconLoader2 },
+  {
+    state: "done",
+    label: "Completed",
+    icon: IconCheck,
+    shortcutKeys: ["Alt", "Enter"],
+  },
+  {
+    state: "tomorrow",
+    label: "Move to tomorrow",
+    icon: IconSun,
+    shortcutKeys: ["Alt", "T"],
+  },
+  {
+    state: "progress",
+    label: "In progress",
+    icon: IconLoader2,
+    shortcutKeys: ["Alt", "P"],
+  },
 ]
+
+const BLOCKER_SHORTCUT_KEYS = ["Ctrl", "Shift", "B"]
+
+const TASK_ACTION_TOOLTIP_DELAY_MS = 500
+
+function TaskActionTooltipContent({
+  label,
+  shortcutKeys,
+}: {
+  label: string
+  shortcutKeys?: string[]
+}) {
+  const apple = isApplePlatform()
+
+  return (
+    <TooltipContent className="data-instant:animate-none data-instant:transition-none">
+      <span className="flex items-center">
+        <span>{label}</span>&nbsp;
+        {shortcutKeys?.length ? (
+          <span>
+            (
+            {shortcutKeys.map((key, index) => (
+              <span key={key}>
+                {formatShortcutKey(key, apple)}
+                {index < shortcutKeys.length - 1 ? " + " : ""}
+              </span>
+            ))}
+            )
+          </span>
+        ) : null}
+      </span>
+    </TooltipContent>
+  )
+}
 
 export function TaskEditor({
   tasks,
@@ -159,7 +219,9 @@ export function TaskEditor({
   disabled?: boolean
   placeholder?: string
 }) {
-  const [editingBlocker, setEditingBlocker] = React.useState<string | null>(null)
+  const [editingBlocker, setEditingBlocker] = React.useState<string | null>(
+    null
+  )
   const [draft, setDraft] = React.useState("")
   const focusNext = React.useRef<number | null>(null)
   const ignoreBlockerBlur = React.useRef(false)
@@ -177,7 +239,7 @@ export function TaskEditor({
     const idx = focusNext.current
     focusNext.current = null
     const el = rowsRef.current?.querySelectorAll<HTMLTextAreaElement>(
-      "textarea[data-task]",
+      "textarea[data-task]"
     )[idx]
     el?.focus()
     el?.setSelectionRange(el.value.length, el.value.length)
@@ -209,8 +271,8 @@ export function TaskEditor({
           listRef.current.map((item) =>
             item.id === task.id
               ? { ...item, state: item.state === state ? "open" : state }
-              : item,
-          ),
+              : item
+          )
         )
       }
 
@@ -239,7 +301,8 @@ export function TaskEditor({
           event.stopPropagation()
           toast.add({
             title: "Task is blocked",
-            description: "Remove the blocker before marking this task complete.",
+            description:
+              "Remove the blocker before marking this task complete.",
             type: "warning",
           })
           return
@@ -307,7 +370,7 @@ export function TaskEditor({
   const focusTaskAt = (index: number) => {
     window.requestAnimationFrame(() => {
       const el = rowsRef.current?.querySelectorAll<HTMLTextAreaElement>(
-        "textarea[data-task]",
+        "textarea[data-task]"
       )[index]
       el?.focus()
       const len = el?.value.length ?? 0
@@ -316,7 +379,10 @@ export function TaskEditor({
   }
 
   return (
-    <div ref={rowsRef} className={cn("group/editor space-y-0.5", disabled && "opacity-45")}>
+    <div
+      ref={rowsRef}
+      className={cn("group/editor space-y-0.5", disabled && "opacity-45")}
+    >
       {list.length === 0 && (
         <button
           type="button"
@@ -342,7 +408,7 @@ export function TaskEditor({
                 t.state === "open" && "bg-muted-foreground/50",
                 t.state === "done" && "bg-muted-foreground/30",
                 t.state === "tomorrow" && "bg-task-tomorrow",
-                t.state === "progress" && "bg-task-progress",
+                t.state === "progress" && "bg-task-progress"
               )}
             />
             <AutoTextarea
@@ -372,7 +438,8 @@ export function TaskEditor({
                 ) {
                   return
                 }
-                if (t.text !== "" || e.currentTarget.selectionStart !== 0) return
+                if (t.text !== "" || e.currentTarget.selectionStart !== 0)
+                  return
 
                 // Empty task → step back into this task's blocker (and consume one char).
                 if (t.blocker) {
@@ -402,58 +469,94 @@ export function TaskEditor({
               className={cn(
                 "py-0.5 text-sm leading-6 transition-colors",
                 STATE_STYLES[t.state],
-                t.blocker && "decoration-task-blocker/60",
+                t.blocker && "decoration-task-blocker/60"
               )}
             />
-            <div
-              className={cn(
-                "pointer-events-none absolute right-1.5 top-1 flex -translate-y-0.5 items-center gap-0.5 rounded-md border border-border bg-card p-0.5 opacity-0 shadow-sm transition-all",
-                !disabled &&
-                  "group-hover/task:pointer-events-auto group-hover/task:translate-y-0 group-hover/task:opacity-100 group-focus-within/task:pointer-events-auto group-focus-within/task:opacity-100",
-              )}
-            >
-              {ACTIONS.map(({ state, label, icon: Icon }) => {
-                const isCompleteAction = state === "done"
-                const isBlocked = Boolean(t.blocker)
-                const isActionDisabled = disabled || (isCompleteAction && isBlocked)
-
-                return (
-                  <button
-                    key={state}
-                    type="button"
-                    disabled={isActionDisabled}
-                    title={
-                      isCompleteAction && isBlocked
-                        ? "Cannot complete a task with an active blocker"
-                        : label
-                    }
-                    aria-label={label}
-                    onClick={() => toggleState(t, state)}
-                    className={cn(
-                      "rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
-                      t.state === state && "bg-accent text-foreground",
-                      isActionDisabled &&
-                        "cursor-not-allowed opacity-40 hover:bg-transparent hover:text-muted-foreground",
-                    )}
-                  >
-                    <Icon className="size-3.5" />
-                  </button>
-                )
-              })}
-              <span className="mx-0.5 h-4 w-px bg-border" />
-              <button
-                type="button"
-                title="Blocker"
-                aria-label="Add blocker"
-                onClick={() => openBlocker(t, t.blocker ?? "")}
+            <TooltipProvider delay={TASK_ACTION_TOOLTIP_DELAY_MS}>
+              <div
                 className={cn(
-                  "rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-task-blocker",
-                  t.blocker && "text-task-blocker",
+                  "pointer-events-none absolute top-1 right-1.5 flex -translate-y-0.5 items-center gap-0.5 rounded-md border border-border bg-card p-0.5 opacity-0 shadow-sm transition-all",
+                  !disabled &&
+                    "group-focus-within/task:pointer-events-auto group-focus-within/task:opacity-100 group-hover/task:pointer-events-auto group-hover/task:translate-y-0 group-hover/task:opacity-100"
                 )}
               >
-                <IconAlertOctagon className="size-3.5" />
-              </button>
-            </div>
+                {ACTIONS.map(({ state, label, icon: Icon, shortcutKeys }) => {
+                  const isCompleteAction = state === "done"
+                  const isBlocked = Boolean(t.blocker)
+                  const isActionDisabled =
+                    disabled || (isCompleteAction && isBlocked)
+                  const tooltipLabel =
+                    isCompleteAction && isBlocked
+                      ? "Cannot complete a task with an active blocker"
+                      : label
+
+                  return (
+                    <Tooltip key={state}>
+                      <TooltipTrigger
+                        render={
+                          isActionDisabled ? (
+                            <span className="inline-flex" />
+                          ) : (
+                            <button
+                              type="button"
+                              aria-label={label}
+                              onClick={() => toggleState(t, state)}
+                              className={cn(
+                                "rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground",
+                                t.state === state && "bg-accent text-foreground"
+                              )}
+                            />
+                          )
+                        }
+                      >
+                        {isActionDisabled ? (
+                          <button
+                            type="button"
+                            disabled
+                            aria-label={label}
+                            className={cn(
+                              "rounded p-1 text-muted-foreground transition-colors",
+                              t.state === state && "bg-accent text-foreground",
+                              "cursor-not-allowed opacity-40"
+                            )}
+                          >
+                            <Icon className="size-3.5" />
+                          </button>
+                        ) : (
+                          <Icon className="size-3.5" />
+                        )}
+                      </TooltipTrigger>
+                      <TaskActionTooltipContent
+                        label={tooltipLabel}
+                        shortcutKeys={shortcutKeys}
+                      />
+                    </Tooltip>
+                  )
+                })}
+                <span className="mx-0.5 h-4 w-px bg-border" />
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        aria-label="Add blocker"
+                        onClick={() => openBlocker(t, t.blocker ?? "")}
+                        className={cn(
+                          "rounded p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-task-blocker",
+                          t.blocker && "text-task-blocker"
+                        )}
+                      />
+                    }
+                  >
+                    <IconAlertOctagon className="size-3.5" />
+                  </TooltipTrigger>
+                  <TaskActionTooltipContent
+                    label="Blocker"
+                    shortcutKeys={BLOCKER_SHORTCUT_KEYS}
+                  />
+                </Tooltip>
+              </div>
+            </TooltipProvider>
           </div>
 
           {editingBlocker === t.id ? (
@@ -475,7 +578,9 @@ export function TaskEditor({
                   ) {
                     e.preventDefault()
                     ignoreBlockerBlur.current = true
-                    const blocker = draft.trim() ? draft.replace(/\s+$/, "") : null
+                    const blocker = draft.trim()
+                      ? draft.replace(/\s+$/, "")
+                      : null
                     const nextState =
                       blocker && (t.state === "done" || t.state === "open")
                         ? "tomorrow"
@@ -490,7 +595,11 @@ export function TaskEditor({
                     return
                   }
 
-                  if (e.key === "Backspace" && draft === "" && e.currentTarget.selectionStart === 0) {
+                  if (
+                    e.key === "Backspace" &&
+                    draft === "" &&
+                    e.currentTarget.selectionStart === 0
+                  ) {
                     e.preventDefault()
                     ignoreBlockerBlur.current = true
                     setEditingBlocker(null)
@@ -514,10 +623,10 @@ export function TaskEditor({
             t.blocker && (
               <div className="group/blocker relative ml-6 flex items-start gap-2 rounded-md border-l-2 border-task-blocker/50 bg-task-blocker/5 px-2 py-1 pr-14">
                 <IconCornerDownRight className="mt-0.5 size-3.5 shrink-0 text-task-blocker/70" />
-                <p className="whitespace-pre-wrap text-[0.8rem] leading-5 text-task-blocker">
+                <p className="text-[0.8rem] leading-5 whitespace-pre-wrap text-task-blocker">
                   {t.blocker}
                 </p>
-                <div className="pointer-events-none absolute right-1 top-0.5 flex items-center gap-0.5 rounded-md border border-border bg-card p-0.5 opacity-0 shadow-sm transition-opacity group-hover/blocker:pointer-events-auto group-hover/blocker:opacity-100">
+                <div className="pointer-events-none absolute top-0.5 right-1 flex items-center gap-0.5 rounded-md border border-border bg-card p-0.5 opacity-0 shadow-sm transition-opacity group-hover/blocker:pointer-events-auto group-hover/blocker:opacity-100">
                   <button
                     type="button"
                     title="Edit blocker"
@@ -547,7 +656,7 @@ export function TaskEditor({
         <button
           type="button"
           onClick={() => addAfter(list.length - 1)}
-          className="ml-2 rounded px-1 py-0.5 text-xs text-muted-foreground/70 opacity-0 transition-opacity hover:text-foreground group-hover/editor:opacity-100"
+          className="ml-2 rounded px-1 py-0.5 text-xs text-muted-foreground/70 opacity-0 transition-opacity group-hover/editor:opacity-100 hover:text-foreground"
         >
           + add line
         </button>
