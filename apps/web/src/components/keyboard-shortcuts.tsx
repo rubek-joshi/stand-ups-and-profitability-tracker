@@ -27,9 +27,10 @@ const GLOBAL_SHORTCUTS: Array<{ keys: string[]; description: string }> = [
 
 const STANDUP_SHORTCUTS: Array<{ keys: string[]; description: string }> = [
   { keys: ["Ctrl", "Enter"], description: "Next project / employee" },
+  { keys: ["Ctrl", "Shift", "Enter"], description: "Previous project / employee" },
   { keys: ["Ctrl", "Shift", "V"], description: "Toggle card / table view" },
-  { keys: ["Ctrl", "Shift", "A"], description: "Toggle Absent / Present" },
-  { keys: ["Ctrl", "Shift", "N"], description: "Toggle miscellaneous notes" },
+  { keys: ["Alt", "Shift", "A"], description: "Toggle Absent / Present" },
+  { keys: ["Alt", "Shift", "N"], description: "Toggle miscellaneous notes" },
   { keys: ["Ctrl", "Shift", "B"], description: "Add blocker to focused task" },
   { keys: ["Shift", "Enter"], description: "New line in task (keeps indent)" },
   { keys: ["Tab"], description: "Indent task line" },

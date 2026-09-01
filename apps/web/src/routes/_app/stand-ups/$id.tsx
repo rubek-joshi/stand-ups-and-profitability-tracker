@@ -71,7 +71,7 @@ import {
 } from "@/components/standup/entry-draft"
 import { StandupCardView } from "@/components/standup/standup-card-view"
 import { StandupTableView } from "@/components/standup/table-view"
-import { advanceStandupFocus } from "@/components/standup/standup-focus-nav"
+import { advanceStandupFocus, retreatStandupFocus } from "@/components/standup/standup-focus-nav"
 import { toggleMiscellaneousNotes } from "@/components/standup/miscellaneous-notes-toggle"
 import {
   focusStandupNotes,
@@ -1031,6 +1031,51 @@ function StandupDetailPage() {
         return
       }
 
+      // Alt+Shift+A → toggle Absent / Present for current employee
+      if (
+        event.altKey &&
+        event.shiftKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        event.code === "KeyA"
+      ) {
+        if (!readonly) {
+          const entryId = currentEntryId(event.target)
+          if (entryId) {
+            const draft = draftsRef.current[entryId]
+            if (draft) {
+              event.preventDefault()
+              event.stopPropagation()
+              handleDraftChangeRef.current(entryId, {
+                ...draft,
+                attendanceStatus:
+                  draft.attendanceStatus === "absent" ? "present" : "absent",
+              })
+            }
+          }
+        }
+        return
+      }
+
+      // Alt+Shift+N → toggle miscellaneous notes for current employee
+      if (
+        event.altKey &&
+        event.shiftKey &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        event.code === "KeyN"
+      ) {
+        if (!readonly) {
+          const entryId = currentEntryId(event.target)
+          if (entryId) {
+            event.preventDefault()
+            event.stopPropagation()
+            toggleMiscellaneousNotes(entryId)
+          }
+        }
+        return
+      }
+
       if (event.altKey) return
 
       const mod = primaryModifierPressed(event)
@@ -1066,29 +1111,22 @@ function StandupDetailPage() {
         return
       }
 
-      // Ctrl+Shift+A → toggle Absent / Present for current employee
-      if (mod && event.shiftKey && key === "a") {
-        const entryId = currentEntryId(event.target)
-        if (!entryId) return
-        const draft = draftsRef.current[entryId]
-        if (!draft) return
+      // Ctrl+Shift+Enter → previous project / employee
+      if (mod && event.shiftKey && event.key === "Enter") {
         event.preventDefault()
         event.stopPropagation()
-        handleDraftChangeRef.current(entryId, {
-          ...draft,
-          attendanceStatus:
-            draft.attendanceStatus === "absent" ? "present" : "absent",
-        })
+        const moved = retreatStandupFocus(
+          visibleEntriesRef.current,
+          draftsRef.current,
+          event.target
+        )
+        if (!moved) {
+          toast.add({
+            title: "Reached the beginning",
+            type: "info",
+          })
+        }
         return
-      }
-
-      // Ctrl+Shift+N → toggle miscellaneous notes for current employee
-      if (mod && event.shiftKey && key === "n") {
-        const entryId = currentEntryId(event.target)
-        if (!entryId) return
-        event.preventDefault()
-        event.stopPropagation()
-        toggleMiscellaneousNotes(entryId)
       }
     }
 

@@ -3,6 +3,7 @@ import { IconNotes } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { cn } from "@workspace/ui/lib/utils"
 import { focusStandupNotes, MarkdownNotes } from "./markdown-notes"
+import { focusEmployeeLastProjectTask } from "./standup-focus-nav"
 
 type Props = {
   entryId: string
@@ -24,7 +25,7 @@ export function openMiscellaneousNotes(entryId: string) {
   miscControllers.get(entryId)?.open()
 }
 
-/** Toggle miscellaneous markdown for an entry (Ctrl+Shift+N). */
+/** Toggle miscellaneous markdown for an entry (Alt+Shift+N). */
 export function toggleMiscellaneousNotes(entryId: string) {
   miscControllers.get(entryId)?.toggle()
 }
@@ -48,6 +49,8 @@ export function MiscellaneousNotesToggle({
           const next = !prev
           if (next) {
             window.setTimeout(() => focusStandupNotes(entryId), 40)
+          } else {
+            window.setTimeout(() => focusEmployeeLastProjectTask(entryId), 40)
           }
           return next
         }),

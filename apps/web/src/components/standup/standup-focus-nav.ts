@@ -58,6 +58,41 @@ export function focusStandupProject(entryId: string, projectId: string) {
   empty?.click()
 }
 
+/** Focus the last task or open blocker editor in the employee's last project. */
+export function focusEmployeeLastProjectTask(entryId: string): boolean {
+  const entry = document.querySelector(
+    `[data-standup-entry="${escapeAttr(entryId)}"]`,
+  )
+  if (!entry) return false
+
+  const projects = entry.querySelectorAll<HTMLElement>("[data-standup-project]")
+  if (projects.length === 0) return false
+
+  const lastProject = projects[projects.length - 1]!
+  lastProject.scrollIntoView({ block: "center", behavior: "smooth" })
+
+  const blocker = lastProject.querySelector<HTMLTextAreaElement>(
+    "textarea[data-blocker]",
+  )
+  if (blocker) {
+    blocker.focus()
+    const len = blocker.value.length
+    blocker.setSelectionRange(len, len)
+    return true
+  }
+
+  const tasks = lastProject.querySelectorAll<HTMLTextAreaElement>(
+    "textarea[data-task]",
+  )
+  if (tasks.length === 0) return false
+
+  const lastTask = tasks[tasks.length - 1]!
+  lastTask.focus()
+  const len = lastTask.value.length
+  lastTask.setSelectionRange(len, len)
+  return true
+}
+
 export function focusStandupStop(stop: StandupFocusStop) {
   if (stop.type === "project") {
     focusStandupProject(stop.entryId, stop.projectId)
@@ -138,5 +173,22 @@ export function advanceStandupFocus(
   if (nextIndex >= stops.length) return false
 
   focusStandupStop(stops[nextIndex]!)
+  return true
+}
+
+/** Move focus to the previous project / employee stop. Returns false when already at the start. */
+export function retreatStandupFocus(
+  entries: Array<{ id: string }>,
+  drafts: Record<string, EntryDraft>,
+  target: EventTarget | null,
+): boolean {
+  const stops = buildStandupFocusStops(entries, drafts)
+  if (stops.length === 0) return false
+
+  const current = findCurrentStopIndex(stops, target)
+  const prevIndex = current < 0 ? stops.length - 1 : current - 1
+  if (prevIndex < 0) return false
+
+  focusStandupStop(stops[prevIndex]!)
   return true
 }
