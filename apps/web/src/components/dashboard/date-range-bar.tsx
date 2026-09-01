@@ -1,7 +1,7 @@
 import { IconCalendar } from "@tabler/icons-react"
 import { format } from "date-fns"
 import type { DateRange as DayPickerRange } from "react-day-picker"
-import { buttonVariants } from "@workspace/ui/components/button"
+import { Button } from "@workspace/ui/components/button"
 import { Calendar } from "@workspace/ui/components/calendar"
 import {
   Popover,
@@ -79,10 +79,12 @@ export function DateRangeBar({
 
       <Popover>
         <PopoverTrigger
-          className={buttonVariants({
-            variant: "outline",
-            className: "justify-start gap-2 font-normal",
-          })}
+          render={
+            <Button
+              variant="outline"
+              className="justify-start gap-2 font-normal"
+            />
+          }
         >
           <IconCalendar className="size-4" />
           {format(range.from, "d MMM yyyy")} — {format(range.to, "d MMM yyyy")}
