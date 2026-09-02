@@ -20,6 +20,10 @@ export const USER_ROLES = [
 ] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
+/** Roles that receive automated system notification emails. */
+export const MAIL_RECIPIENT_ROLES = ["super_admin", "admin"] as const satisfies
+  readonly UserRole[];
+
 export class CreateUserDto {
   @ApiProperty()
   @IsString()

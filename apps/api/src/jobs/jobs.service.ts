@@ -9,6 +9,7 @@ import { AuditService } from "../audit/audit.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { QueuesService } from "../queues/queues.service";
 import { StandupsService } from "../standups/standups.service";
+import { UsersService } from "../users/users.service";
 
 const AUTO_EXTEND_REASON =
   "Automatically extended — project was not closed by its end date";
@@ -22,6 +23,7 @@ export class JobsService {
     private readonly auditService: AuditService,
     private readonly queuesService: QueuesService,
     private readonly standupsService: StandupsService,
+    private readonly usersService: UsersService,
   ) {}
 
   @Cron(CronExpression.EVERY_HOUR)
@@ -58,11 +60,9 @@ export class JobsService {
     if (due.length === 0) {
       return;
     }
-    const admins = await this.prismaService.user.findMany({
-      where: { isActive: true },
-    });
+    const mailRecipients = await this.usersService.findActiveMailRecipients();
     for (const project of due) {
-      const systemUser = admins[0];
+      const systemUser = mailRecipients[0];
       if (!systemUser) {
         this.logger.warn("No user available to attribute auto-extension");
         continue;
@@ -93,9 +93,9 @@ export class JobsService {
         targetId: project.id,
         metadata: { reason: AUTO_EXTEND_REASON },
       });
-      for (const admin of admins) {
+      for (const recipient of mailRecipients) {
         await this.queuesService.enqueueMail({
-          to: admin.email,
+          to: recipient.email,
           subject: `Project auto-extended: ${project.name}`,
           text: `Project "${project.name}" was not closed by its end date and was automatically extended.`,
         });
@@ -117,9 +117,7 @@ export class JobsService {
       },
       include: { project: true },
     });
-    const admins = await this.prismaService.user.findMany({
-      where: { isActive: true },
-    });
+    const mailRecipients = await this.usersService.findActiveMailRecipients();
     for (const record of records) {
       const freeUntil = new Date(record.endDate);
       freeUntil.setUTCHours(0, 0, 0, 0);
@@ -151,9 +149,9 @@ export class JobsService {
         (!record.reminderSentAt ||
           nextStatus === AmcStatus.overdue);
       if (shouldEmail && !record.reminderSentAt) {
-        for (const admin of admins) {
+        for (const recipient of mailRecipients) {
           await this.queuesService.enqueueMail({
-            to: admin.email,
+            to: recipient.email,
             subject: `AMC ${nextStatus}: ${record.project.name}`,
             text: `AMC for project "${record.project.name}" is ${nextStatus}. Free until ${freeUntil.toISOString().slice(0, 10)}.`,
           });

@@ -5,7 +5,9 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import nodemailer, { Transporter } from "nodemailer";
+import { CasbinService } from "../casbin/casbin.service";
 import { PrismaService } from "../prisma/prisma.service";
+import { MAIL_RECIPIENT_ROLES } from "../users/dto/user.dto";
 
 export type SendMailPayload = {
   to: string;
@@ -30,9 +32,16 @@ export class MailService {
   constructor(
     private readonly configService: ConfigService,
     private readonly prismaService: PrismaService,
+    private readonly casbinService: CasbinService,
   ) {}
 
   async sendMail(payload: SendMailPayload): Promise<void> {
+    if (!(await this.canReceiveAutomatedMail(payload.to))) {
+      this.logger.log(
+        `Mail skipped (non-admin recipient): to=${payload.to} subject=${payload.subject}`,
+      );
+      return;
+    }
     const smtp = await this.resolveSmtp();
     if (!smtp) {
       this.logger.log(
@@ -83,6 +92,21 @@ export class MailService {
           ? { user: smtp.user, pass: smtp.pass }
           : undefined,
     });
+  }
+
+  private async canReceiveAutomatedMail(email: string): Promise<boolean> {
+    const normalized = email.trim().toLowerCase();
+    const user = await this.prismaService.user.findUnique({
+      where: { email: normalized },
+    });
+    if (!user?.isActive) {
+      return false;
+    }
+    const role = await this.casbinService.getPrimaryRoleForUser(user.id);
+    return (
+      role !== null &&
+      (MAIL_RECIPIENT_ROLES as readonly string[]).includes(role)
+    );
   }
 
   private async resolveSmtp(): Promise<ResolvedSmtp | null> {

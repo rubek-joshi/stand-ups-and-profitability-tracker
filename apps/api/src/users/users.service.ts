@@ -15,6 +15,7 @@ import {
 import { PrismaService } from "../prisma/prisma.service";
 import {
   CreateUserDto,
+  MAIL_RECIPIENT_ROLES,
   SetUserPasswordDto,
   UpdateUserDto,
   USER_ROLES,
@@ -33,6 +34,25 @@ export class UsersService {
 
   async findByEmail(email: string): Promise<User | null> {
     return this.prismaService.user.findUnique({ where: { email } });
+  }
+
+  async findActiveMailRecipients(): Promise<User[]> {
+    const users = await this.prismaService.user.findMany({
+      where: { isActive: true },
+      orderBy: { name: "asc" },
+    });
+    if (users.length === 0) {
+      return [];
+    }
+    const roleMap = await this.casbinService.getRoleMap(users.map((u) => u.id));
+    return users.filter((user) => {
+      const role = roleMap.get(user.id);
+      return (
+        role !== null &&
+        role !== undefined &&
+        (MAIL_RECIPIENT_ROLES as readonly string[]).includes(role)
+      );
+    });
   }
 
   async findById(id: string): Promise<User> {
