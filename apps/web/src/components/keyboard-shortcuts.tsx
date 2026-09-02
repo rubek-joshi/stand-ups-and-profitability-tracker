@@ -55,10 +55,10 @@ function ShortcutList({
       {shortcuts.map((shortcut) => (
         <li
           key={shortcut.description}
-          className="flex items-center justify-between gap-4"
+          className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
         >
-          <span className="text-sm">{shortcut.description}</span>
-          <KbdGroup>
+          <span className="min-w-0 text-sm">{shortcut.description}</span>
+          <KbdGroup className="shrink-0 self-start sm:self-auto">
             {shortcut.keys.map((key) => (
               <Kbd key={key}>{formatShortcutKey(key, apple)}</Kbd>
             ))}
@@ -130,8 +130,8 @@ export function KeyboardShortcuts() {
         <IconKeyboard />
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
+        <DialogContent className="flex max-h-[min(90dvh,40rem)] flex-col overflow-hidden sm:max-w-md">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Keyboard shortcuts</DialogTitle>
             <DialogDescription>
               {apple
@@ -139,19 +139,21 @@ export function KeyboardShortcuts() {
                 : "Shortcuts available in the app and on stand-up pages."}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-col gap-5">
-            <section className="space-y-3">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Global
-              </h3>
-              <ShortcutList shortcuts={GLOBAL_SHORTCUTS} apple={apple} />
-            </section>
-            <section className="space-y-3">
-              <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Stand-up page
-              </h3>
-              <ShortcutList shortcuts={STANDUP_SHORTCUTS} apple={apple} />
-            </section>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1">
+            <div className="flex flex-col gap-5">
+              <section className="space-y-3">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Global
+                </h3>
+                <ShortcutList shortcuts={GLOBAL_SHORTCUTS} apple={apple} />
+              </section>
+              <section className="space-y-3">
+                <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Stand-up page
+                </h3>
+                <ShortcutList shortcuts={STANDUP_SHORTCUTS} apple={apple} />
+              </section>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
