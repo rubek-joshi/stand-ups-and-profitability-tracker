@@ -217,11 +217,18 @@ function StandupsPage() {
   const totalPages = totalPagesFor(total, pageSize)
   const groupItems = Object.fromEntries(groups.map((g) => [g.id, g.name]))
 
-  const afterCreate = async (standupId: string) => {
+  const afterCreate = async (
+    standupId: string,
+    scope: { viewScope: "everyone" | "group"; groupId?: string },
+  ) => {
     setOpen(false)
     await navigate({
       to: "/stand-ups/$id",
       params: { id: standupId },
+      search:
+        scope.viewScope === "group" && scope.groupId
+          ? { viewScope: "group", groupId: scope.groupId }
+          : {},
     })
   }
 
@@ -439,7 +446,10 @@ function StandupsPage() {
                   method: "POST",
                   body: { date },
                 })
-                await afterCreate(res.data.id)
+                await afterCreate(res.data.id, {
+                  viewScope: effectiveScope,
+                  groupId: effectiveGroupId,
+                })
               } catch (err) {
                 alert(err instanceof ApiError ? err.message : "Failed")
               } finally {

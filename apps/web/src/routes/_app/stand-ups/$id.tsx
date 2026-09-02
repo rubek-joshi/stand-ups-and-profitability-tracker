@@ -104,8 +104,14 @@ import {
 import { toast } from "@workspace/ui/components/toast"
 import * as Y from "yjs"
 import { connectStandupCollab, type CollabPeer } from "@/lib/standup-collab"
+import {
+  initialShowAllEmployees,
+  parseStandupViewScopeSearch,
+  resolveStandupActiveGroupId,
+} from "@/lib/standup-view-scope"
 import type {
   AssignmentResolution,
+  EmployeeGroup,
   MissingAssignmentAction,
   MissingProjectAssignment,
   Project,
@@ -115,6 +121,8 @@ import type {
 } from "@/lib/types"
 
 export const Route = createFileRoute("/_app/stand-ups/$id")({
+  validateSearch: (search: Record<string, unknown>) =>
+    parseStandupViewScopeSearch(search),
   component: StandupDetailPage,
 })
 
@@ -516,6 +524,7 @@ function parseCollabEntry(raw: string, fallback: EntryDraft): EntryDraft {
 
 function StandupDetailPage() {
   const { id } = Route.useParams()
+  const { viewScope, groupId: viewGroupId } = Route.useSearch()
   const { user, refreshUser } = useAuth()
   const { confirm, dialog } = useConfirmDialog()
   const [standup, setStandup] = React.useState<Standup | null>(null)
@@ -554,8 +563,30 @@ function StandupDetailPage() {
   )
   const [groupMemberIds, setGroupMemberIds] =
     React.useState<Set<string> | null>(null)
-  const [showAllEmployees, setShowAllEmployees] = React.useState(
-    () => user?.standupScopePreference !== "group"
+  const [activeGroupName, setActiveGroupName] = React.useState<string | null>(
+    null,
+  )
+  const activeGroupId = React.useMemo(
+    () =>
+      resolveStandupActiveGroupId({
+        viewScope,
+        groupId: viewGroupId,
+        profileScope: user?.standupScopePreference,
+        profileGroupId: user?.standupPreferredGroupId,
+      }),
+    [
+      viewScope,
+      viewGroupId,
+      user?.standupScopePreference,
+      user?.standupPreferredGroupId,
+    ],
+  )
+  const [showAllEmployees, setShowAllEmployees] = React.useState(() =>
+    initialShowAllEmployees({
+      viewScope,
+      groupId: viewGroupId,
+      profileScope: user?.standupScopePreference,
+    }),
   )
   const [missingAssignments, setMissingAssignments] = React.useState<
     MissingProjectAssignment[]
@@ -650,33 +681,41 @@ function StandupDetailPage() {
   }, [user?.standupLayoutPreference, id])
 
   React.useEffect(() => {
-    setShowAllEmployees(user?.standupScopePreference !== "group")
-  }, [user?.standupScopePreference, id])
+    setShowAllEmployees(
+      initialShowAllEmployees({
+        viewScope,
+        groupId: viewGroupId,
+        profileScope: user?.standupScopePreference,
+      }),
+    )
+  }, [viewScope, viewGroupId, user?.standupScopePreference, id])
 
   React.useEffect(() => {
-    const groupId = user?.standupPreferredGroupId
-    if (user?.standupScopePreference !== "group" || !groupId) {
+    if (!activeGroupId) {
       setGroupMemberIds(null)
+      setActiveGroupName(null)
       return
     }
     let cancelled = false
-    void api<Envelope<{ members?: Array<{ employeeId: string }> }>>(
-      `/employee-groups/${groupId}`
-    )
+    void api<Envelope<EmployeeGroup>>(`/employee-groups/${activeGroupId}`)
       .then((res) => {
         if (cancelled) return
         const ids = new Set(
-          (res.data.members ?? []).map((member) => member.employeeId)
+          (res.data.members ?? []).map((member) => member.employeeId),
         )
         setGroupMemberIds(ids)
+        setActiveGroupName(res.data.name)
       })
       .catch(() => {
-        if (!cancelled) setGroupMemberIds(null)
+        if (!cancelled) {
+          setGroupMemberIds(null)
+          setActiveGroupName(null)
+        }
       })
     return () => {
       cancelled = true
     }
-  }, [user?.standupScopePreference, user?.standupPreferredGroupId])
+  }, [activeGroupId])
 
   React.useEffect(() => {
     const onScroll = () => {
@@ -760,10 +799,7 @@ function StandupDetailPage() {
       if (!standup || readonly) return false
       const currentDrafts = draftsRef.current
       const scopeEmployeeIds =
-        user?.standupScopePreference === "group" &&
-        user.standupPreferredGroupId &&
-        groupMemberIds &&
-        !showAllEmployees
+        activeGroupId && groupMemberIds && !showAllEmployees
           ? groupMemberIds
           : null
       const entries = buildEntriesPayload(
@@ -863,7 +899,7 @@ function StandupDetailPage() {
       standup,
       readonly,
       projects,
-      user,
+      activeGroupId,
       groupMemberIds,
       showAllEmployees,
       navigate,
@@ -1318,10 +1354,9 @@ function StandupDetailPage() {
   )
   const q = query.trim().toLowerCase()
   const groupFilterActive =
-    user?.standupScopePreference === "group" &&
-    user?.standupPreferredGroupId &&
-    groupMemberIds &&
-    !showAllEmployees
+    Boolean(activeGroupId) && groupMemberIds && !showAllEmployees
+  const groupLabel =
+    activeGroupName ?? user?.standupPreferredGroup?.name ?? "my group"
   const visible = entries.filter((e) => {
     if (groupFilterActive && !groupMemberIds.has(e.employee.id)) return false
     if (!q) return true
@@ -1646,8 +1681,7 @@ function StandupDetailPage() {
           <span>{absentCount} absent</span>
         </div>
 
-        {user?.standupScopePreference === "group" &&
-        user.standupPreferredGroupId ? (
+        {activeGroupId ? (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -1657,7 +1691,7 @@ function StandupDetailPage() {
                   variant="outline"
                   aria-label={
                     showAllEmployees
-                      ? `Show ${user.standupPreferredGroup?.name ?? "my group"}`
+                      ? `Show ${groupLabel}`
                       : "Show everyone"
                   }
                   onClick={() => setShowAllEmployees((prev) => !prev)}
@@ -1672,7 +1706,7 @@ function StandupDetailPage() {
             </TooltipTrigger>
             <TooltipContent>
               {showAllEmployees
-                ? `Show ${user.standupPreferredGroup?.name ?? "my group"}`
+                ? `Show ${groupLabel}`
                 : "Show everyone"}
             </TooltipContent>
           </Tooltip>
@@ -1758,12 +1792,8 @@ function StandupDetailPage() {
         </div>
 
         <StandupGuidelinesControl
-          viewingEveryone={
-            user?.standupScopePreference !== "group" ||
-            !user?.standupPreferredGroupId ||
-            showAllEmployees
-          }
-          preferredGroupId={user?.standupPreferredGroupId}
+          viewingEveryone={!activeGroupId || showAllEmployees}
+          preferredGroupId={activeGroupId ?? user?.standupPreferredGroupId}
         />
 
         <Tooltip>
