@@ -45,6 +45,7 @@ import { StatusBadge } from "@/components/health-badge"
 import { MailLink, TelLink } from "@/components/contact-link"
 import { JoinedDate } from "@/components/joined-date"
 import { useConfirmDialog } from "@/components/confirm-dialog"
+import { DateInput } from "@/components/datetime-picker"
 import { MarkLeftDialog } from "@/components/mark-left-dialog"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import {
@@ -412,12 +413,13 @@ function CoreMemberDetailPage() {
             </div>
             <div className="space-y-2">
               <Label>Effective date</Label>
-              <Input
-                type="date"
-                required
+              <DateInput
                 value={salaryForm.effectiveDate}
-                onChange={(e) =>
-                  setSalaryForm((f) => ({ ...f, effectiveDate: e.target.value }))
+                onChange={(next) =>
+                  setSalaryForm((f) => ({
+                    ...f,
+                    effectiveDate: next ?? "",
+                  }))
                 }
               />
             </div>

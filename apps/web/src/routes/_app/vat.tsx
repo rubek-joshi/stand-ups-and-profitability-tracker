@@ -8,6 +8,7 @@ import { Progress } from "@workspace/ui/components/progress"
 import { Skeleton } from "@workspace/ui/components/skeleton"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { PageHeader } from "@/components/page-header"
+import { DateInput } from "@/components/datetime-picker"
 import { ErrorState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { buildListQuery, parseOptionalString } from "@/lib/list-query"
@@ -148,15 +149,15 @@ function VatPage() {
           <div className="mb-4 flex flex-wrap items-end gap-3">
             <div className="grid gap-1.5">
               <Label className="text-xs text-muted-foreground">From</Label>
-              <Input
-                type="date"
+              <DateInput
                 className="w-40"
-                value={from ?? ""}
-                onChange={(e) => {
+                clearable
+                value={from}
+                onChange={(next) => {
                   void navigate({
                     search: (prev) => ({
                       ...prev,
-                      from: e.target.value || undefined,
+                      from: next,
                     }),
                   })
                 }}
@@ -164,15 +165,15 @@ function VatPage() {
             </div>
             <div className="grid gap-1.5">
               <Label className="text-xs text-muted-foreground">To</Label>
-              <Input
-                type="date"
+              <DateInput
                 className="w-40"
-                value={to ?? ""}
-                onChange={(e) => {
+                clearable
+                value={to}
+                onChange={(next) => {
                   void navigate({
                     search: (prev) => ({
                       ...prev,
-                      to: e.target.value || undefined,
+                      to: next,
                     }),
                   })
                 }}

@@ -10,6 +10,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { DateInput } from "@/components/datetime-picker"
 import {
   Select,
   SelectContent,
@@ -257,23 +258,23 @@ export function CreateProjectDialog({
             <div className={`grid ${form.isIndefinite ? "grid-cols-1" : "grid-cols-2"} gap-3`}>
               <div className="space-y-2">
                 <Label>Start</Label>
-                <Input
-                  type="date"
-                  required
+                <DateInput
                   disabled={loadingOptions || saving}
                   value={form.startDate}
-                  onChange={(e) => setForm((f) => ({ ...f, startDate: e.target.value }))}
+                  onChange={(next) =>
+                    setForm((f) => ({ ...f, startDate: next ?? "" }))
+                  }
                 />
               </div>
               {!form.isIndefinite ? (
                 <div className="space-y-2">
                   <Label>End</Label>
-                  <Input
-                    type="date"
-                    required
+                  <DateInput
                     disabled={loadingOptions || saving}
                     value={form.endDate}
-                    onChange={(e) => setForm((f) => ({ ...f, endDate: e.target.value }))}
+                    onChange={(next) =>
+                      setForm((f) => ({ ...f, endDate: next ?? "" }))
+                    }
                   />
                 </div>
               ) : null}

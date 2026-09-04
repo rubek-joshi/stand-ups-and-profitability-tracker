@@ -30,6 +30,7 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { JoinedDate } from "@/components/joined-date"
+import { DateInput } from "@/components/datetime-picker"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { parseNprInput } from "@/lib/money"
 import type { CoreMember } from "@/lib/types"
@@ -223,11 +224,11 @@ function CoreMembersPage() {
             </div>
             <div className="space-y-2">
               <Label>Date joined</Label>
-              <Input
-                type="date"
-                required
+              <DateInput
                 value={form.dateJoined}
-                onChange={(e) => setForm((f) => ({ ...f, dateJoined: e.target.value }))}
+                onChange={(next) =>
+                  setForm((f) => ({ ...f, dateJoined: next ?? "" }))
+                }
               />
             </div>
             <div className="space-y-2">

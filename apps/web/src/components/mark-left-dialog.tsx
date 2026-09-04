@@ -8,8 +8,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
-import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { DateInput } from "@/components/datetime-picker"
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10)
@@ -59,12 +59,10 @@ export function MarkLeftDialog({
           }}
         >
           <Label htmlFor="mark-left-date">Date left</Label>
-          <Input
+          <DateInput
             id="mark-left-date"
-            type="date"
-            required
             value={dateLeft}
-            onChange={(e) => setDateLeft(e.target.value)}
+            onChange={(next) => setDateLeft(next ?? "")}
           />
           <DialogFooter className="pt-2">
             <Button

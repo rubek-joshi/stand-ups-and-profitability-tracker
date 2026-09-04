@@ -38,6 +38,7 @@ import { Spinner } from "@workspace/ui/components/spinner"
 import { Switch } from "@workspace/ui/components/switch"
 import { PageHeader } from "@/components/page-header"
 import { PasswordInput } from "@/components/password-input"
+import { DateInput } from "@/components/datetime-picker"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { NumberField } from "@/components/settings/number-field"
 import { ErrorState, LoadingState } from "@/components/ui-states"
@@ -291,14 +292,13 @@ function SettingsPage() {
               <FieldLabel htmlFor="standup-tracking-start">
                 Stand-up tracking start date
               </FieldLabel>
-              <Input
+              <DateInput
                 id="standup-tracking-start"
-                type="date"
                 value={form.standupTrackingStartDate}
-                onChange={(e) =>
+                onChange={(next) =>
                   setForm((f) => ({
                     ...f,
-                    standupTrackingStartDate: e.target.value,
+                    standupTrackingStartDate: next ?? "",
                   }))
                 }
               />

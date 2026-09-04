@@ -11,6 +11,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { DateInput } from "@/components/datetime-picker"
 import { Textarea } from "@workspace/ui/components/textarea"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { amcEnd, amcStart } from "@/lib/amc"
@@ -124,22 +125,18 @@ export function EditAmcDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="grid gap-2">
               <Label htmlFor="edit-amc-start">Start date</Label>
-              <Input
+              <DateInput
                 id="edit-amc-start"
-                type="date"
-                required
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(next) => setStartDate(next ?? "")}
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-amc-end">End date</Label>
-              <Input
+              <DateInput
                 id="edit-amc-end"
-                type="date"
-                required
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(next) => setEndDate(next ?? "")}
               />
             </div>
           </div>

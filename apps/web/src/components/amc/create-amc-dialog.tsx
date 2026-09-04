@@ -11,6 +11,7 @@ import {
 } from "@workspace/ui/components/dialog"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
+import { DateInput } from "@/components/datetime-picker"
 import {
   Select,
   SelectContent,
@@ -239,16 +240,14 @@ export function CreateAmcDialog({
           <div className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="amc-start">Start date</Label>
-              <Input
+              <DateInput
                 id="amc-start"
-                type="date"
-                required
                 value={startDate}
-                onChange={(e) => {
-                  const next = e.target.value
-                  setStartDate(next)
-                  if (!customEnd) {
-                    setEndDate(addMonths(next, months))
+                onChange={(next) => {
+                  const value = next ?? ""
+                  setStartDate(value)
+                  if (!customEnd && value) {
+                    setEndDate(addMonths(value, months))
                   }
                 }}
               />
@@ -300,16 +299,14 @@ export function CreateAmcDialog({
                   </div>
                   <div className="grid gap-2">
                     <Label htmlFor="amc-end">End date</Label>
-                    <Input
+                    <DateInput
                       id="amc-end"
-                      type="date"
-                      required
-                      min={startDate}
+                      min={startDate || undefined}
                       value={endDate}
-                      onChange={(e) => {
+                      onChange={(next) => {
                         setDurationPreset("custom")
                         setCustomEnd(true)
-                        setEndDate(e.target.value)
+                        setEndDate(next ?? "")
                       }}
                     />
                   </div>

@@ -32,6 +32,7 @@ import {
   TableActionsHead,
 } from "@/components/table-row-actions"
 import { JoinedDate } from "@/components/joined-date"
+import { DateInput } from "@/components/datetime-picker"
 import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { buildListQuery, parseListSearch, totalPagesFor } from "@/lib/list-query"
 import { formatNpr, parseNprInput } from "@/lib/money"
@@ -309,20 +310,22 @@ function EmployeesPage() {
             </div>
             <div className="space-y-2">
               <Label>Date joined</Label>
-              <Input
-                type="date"
-                required
+              <DateInput
                 value={form.dateJoined}
-                onChange={(e) => setForm((f) => ({ ...f, dateJoined: e.target.value }))}
+                onChange={(next) =>
+                  setForm((f) => ({ ...f, dateJoined: next ?? "" }))
+                }
               />
             </div>
             <div className="space-y-2">
               <Label>Date of birth (optional)</Label>
-              <Input
-                type="date"
+              <DateInput
+                clearable
                 max={new Date().toISOString().slice(0, 10)}
                 value={form.dateOfBirth}
-                onChange={(e) => setForm((f) => ({ ...f, dateOfBirth: e.target.value }))}
+                onChange={(next) =>
+                  setForm((f) => ({ ...f, dateOfBirth: next ?? "" }))
+                }
               />
             </div>
             <div className="space-y-2">

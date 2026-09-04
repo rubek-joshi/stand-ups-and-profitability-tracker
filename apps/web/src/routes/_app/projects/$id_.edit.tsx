@@ -20,6 +20,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Switch } from "@workspace/ui/components/switch"
 import { useConfirmDialog } from "@/components/confirm-dialog"
+import { DateInput } from "@/components/datetime-picker"
 import { PageHeader } from "@/components/page-header"
 import { ProjectThemeColorField } from "@/components/project-theme-color-field"
 import { DEFAULT_PROJECT_THEME_COLOR } from "@/components/standup/entry-draft"
@@ -229,24 +230,20 @@ function ProjectEditPage() {
                 <div className={`grid ${edit.isIndefinite ? "grid-cols-1" : "grid-cols-2"} gap-3`}>
                   <div className="space-y-2">
                     <Label>Start</Label>
-                    <Input
-                      type="date"
-                      required
+                    <DateInput
                       value={edit.startDate}
-                      onChange={(e) =>
-                        setEdit((f) => ({ ...f, startDate: e.target.value }))
+                      onChange={(next) =>
+                        setEdit((f) => ({ ...f, startDate: next ?? "" }))
                       }
                     />
                   </div>
                   {!edit.isIndefinite ? (
                     <div className="space-y-2">
                       <Label>End</Label>
-                      <Input
-                        type="date"
-                        required
+                      <DateInput
                         value={edit.endDate}
-                        onChange={(e) =>
-                          setEdit((f) => ({ ...f, endDate: e.target.value }))
+                        onChange={(next) =>
+                          setEdit((f) => ({ ...f, endDate: next ?? "" }))
                         }
                       />
                     </div>

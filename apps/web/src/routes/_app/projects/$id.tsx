@@ -43,6 +43,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Progress } from "@workspace/ui/components/progress"
 import { Textarea } from "@workspace/ui/components/textarea"
+import { DateInput } from "@/components/datetime-picker"
 import {
   Card,
   CardContent,
@@ -782,14 +783,12 @@ function ProjectDetailPage() {
                             <Label htmlFor="employee-assigned-from">
                               Assigned from
                             </Label>
-                            <Input
+                            <DateInput
                               id="employee-assigned-from"
-                              type="date"
-                              required
                               max={todayIso}
                               value={employeeAssignedFrom}
-                              onChange={(e) =>
-                                setEmployeeAssignedFrom(e.target.value)
+                              onChange={(next) =>
+                                setEmployeeAssignedFrom(next ?? "")
                               }
                             />
                             <p className="text-xs text-muted-foreground">
@@ -800,15 +799,14 @@ function ProjectDetailPage() {
                             <Label htmlFor="employee-last-day">
                               Last day assigned
                             </Label>
-                            <Input
+                            <DateInput
                               id="employee-last-day"
-                              type="date"
-                              required={projectNeedsEndDate}
-                              min={employeeAssignedFrom}
+                              min={employeeAssignedFrom || undefined}
                               max={todayIso}
+                              clearable={!projectNeedsEndDate}
                               value={employeeLastDay}
-                              onChange={(e) =>
-                                setEmployeeLastDay(e.target.value)
+                              onChange={(next) =>
+                                setEmployeeLastDay(next ?? "")
                               }
                             />
                             <p className="text-xs text-muted-foreground">
@@ -1004,10 +1002,8 @@ function ProjectDetailPage() {
                         <Label htmlFor="employee-release-date">
                           Last day assigned
                         </Label>
-                        <Input
+                        <DateInput
                           id="employee-release-date"
-                          type="date"
-                          required
                           min={
                             releaseEmployeeAssignment
                               ? String(
@@ -1017,8 +1013,8 @@ function ProjectDetailPage() {
                           }
                           max={todayIso}
                           value={employeeReleaseDate}
-                          onChange={(e) =>
-                            setEmployeeReleaseDate(e.target.value)
+                          onChange={(next) =>
+                            setEmployeeReleaseDate(next ?? "")
                           }
                         />
                         <DialogFooter className="pt-2">
@@ -1234,14 +1230,12 @@ function ProjectDetailPage() {
                             <Label htmlFor="core-assigned-from">
                               Assigned from
                             </Label>
-                            <Input
+                            <DateInput
                               id="core-assigned-from"
-                              type="date"
-                              required
                               max={todayIso}
                               value={coreAssignedFrom}
-                              onChange={(e) =>
-                                setCoreAssignedFrom(e.target.value)
+                              onChange={(next) =>
+                                setCoreAssignedFrom(next ?? "")
                               }
                             />
                             <p className="text-xs text-muted-foreground">
@@ -1252,14 +1246,13 @@ function ProjectDetailPage() {
                             <Label htmlFor="core-last-day">
                               Last day assigned
                             </Label>
-                            <Input
+                            <DateInput
                               id="core-last-day"
-                              type="date"
-                              required={projectNeedsEndDate}
-                              min={coreAssignedFrom}
+                              min={coreAssignedFrom || undefined}
                               max={todayIso}
+                              clearable={!projectNeedsEndDate}
                               value={coreLastDay}
-                              onChange={(e) => setCoreLastDay(e.target.value)}
+                              onChange={(next) => setCoreLastDay(next ?? "")}
                             />
                             <p className="text-xs text-muted-foreground">
                               {projectNeedsEndDate
@@ -1448,10 +1441,8 @@ function ProjectDetailPage() {
                         <Label htmlFor="core-release-date">
                           Last day assigned
                         </Label>
-                        <Input
+                        <DateInput
                           id="core-release-date"
-                          type="date"
-                          required
                           min={
                             releaseAssignment
                               ? String(releaseAssignment.assignedAt).slice(
@@ -1462,7 +1453,7 @@ function ProjectDetailPage() {
                           }
                           max={todayIso}
                           value={releaseDate}
-                          onChange={(e) => setReleaseDate(e.target.value)}
+                          onChange={(next) => setReleaseDate(next ?? "")}
                         />
                         <DialogFooter className="pt-2">
                           <Button
@@ -1778,9 +1769,7 @@ function ProjectDetailPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>New end date</Label>
-                      <Input
-                        type="date"
-                        required
+                      <DateInput
                         min={
                           project.endDate
                             ? (() => {
@@ -1793,7 +1782,7 @@ function ProjectDetailPage() {
                             : String(project.startDate).slice(0, 10)
                         }
                         value={extEndDate}
-                        onChange={(e) => setExtEndDate(e.target.value)}
+                        onChange={(next) => setExtEndDate(next ?? "")}
                       />
                       <p className="text-xs text-muted-foreground">
                         Current end date:{" "}
@@ -2194,14 +2183,12 @@ function ProjectDetailPage() {
           >
             <div className="grid gap-2">
               <Label htmlFor="project-close-date">Close date</Label>
-              <Input
+              <DateInput
                 id="project-close-date"
-                type="date"
-                required
                 min={minCloseDate > todayIso ? undefined : minCloseDate}
                 max={todayIso}
                 value={closeDate}
-                onChange={(event) => setCloseDate(event.target.value)}
+                onChange={(next) => setCloseDate(next ?? "")}
               />
               {latestAssignmentEnd ? (
                 <p className="text-xs text-muted-foreground">

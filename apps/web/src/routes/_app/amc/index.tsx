@@ -13,7 +13,6 @@ import { format, parseISO } from "date-fns"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
 import { Card, CardContent } from "@workspace/ui/components/card"
-import { Input } from "@workspace/ui/components/input"
 import {
   Select,
   SelectContent,
@@ -32,6 +31,7 @@ import { CreateAmcDialog } from "@/components/amc/create-amc-dialog"
 import { DeclineAmcDialog } from "@/components/amc/decline-amc-dialog"
 import { EditAmcDialog } from "@/components/amc/edit-amc-dialog"
 import { useConfirmDialog } from "@/components/confirm-dialog"
+import { DateInput } from "@/components/datetime-picker"
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
 import { ErrorState, LoadingState, EmptyState } from "@/components/ui-states"
@@ -383,12 +383,11 @@ function AmcPage() {
             <span className="text-xs font-medium text-muted-foreground">
               From
             </span>
-            <Input
-              type="date"
+            <DateInput
               className="w-40"
-              value={from ?? ""}
-              onChange={(e) => {
-                const next = e.target.value || undefined
+              clearable
+              value={from}
+              onChange={(next) => {
                 void navigate({
                   search: (prev) => ({ ...prev, from: next, page: 1 }),
                 })
@@ -399,12 +398,11 @@ function AmcPage() {
             <span className="text-xs font-medium text-muted-foreground">
               To
             </span>
-            <Input
-              type="date"
+            <DateInput
               className="w-40"
-              value={to ?? ""}
-              onChange={(e) => {
-                const next = e.target.value || undefined
+              clearable
+              value={to}
+              onChange={(next) => {
                 void navigate({
                   search: (prev) => ({ ...prev, to: next, page: 1 }),
                 })

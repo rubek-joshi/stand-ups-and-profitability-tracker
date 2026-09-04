@@ -4,6 +4,7 @@ import { Button, buttonVariants } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import { DateInput } from "@/components/datetime-picker"
 import { PageHeader } from "@/components/page-header"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { api, ApiError, type Envelope } from "@/lib/api"
@@ -124,11 +125,9 @@ function CoreMemberEditPage() {
             </div>
             <div className="space-y-2">
               <Label>Date joined</Label>
-              <Input
-                type="date"
-                required
+              <DateInput
                 value={dateJoined}
-                onChange={(e) => setDateJoined(e.target.value)}
+                onChange={(next) => setDateJoined(next ?? "")}
               />
             </div>
             <div className="flex gap-2 pt-1">

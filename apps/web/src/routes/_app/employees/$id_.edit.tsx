@@ -14,6 +14,7 @@ import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { TelLink } from "@/components/contact-link"
+import { DateInput } from "@/components/datetime-picker"
 import { PageHeader } from "@/components/page-header"
 import { TableActionButton } from "@/components/table-row-actions"
 import { ErrorState, LoadingState } from "@/components/ui-states"
@@ -183,20 +184,18 @@ function EmployeeEditPage() {
               </div>
               <div className="space-y-2">
                 <Label>Date joined</Label>
-                <Input
-                  type="date"
-                  required
+                <DateInput
                   value={dateJoined}
-                  onChange={(e) => setDateJoined(e.target.value)}
+                  onChange={(next) => setDateJoined(next ?? "")}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Date of birth (optional)</Label>
-                <Input
-                  type="date"
+                <DateInput
+                  clearable
                   max={new Date().toISOString().slice(0, 10)}
                   value={dateOfBirth}
-                  onChange={(e) => setDateOfBirth(e.target.value)}
+                  onChange={(next) => setDateOfBirth(next ?? "")}
                 />
               </div>
               <div className="flex gap-2 pt-1">
