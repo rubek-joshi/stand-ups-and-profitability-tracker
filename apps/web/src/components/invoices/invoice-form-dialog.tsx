@@ -11,13 +11,14 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
-import { DatePicker } from "@/components/datetime-picker"
+import { DateInput } from "@/components/datetime-picker"
 import { ProjectCombobox } from "@/components/project-combobox"
 import { api, ApiError } from "@/lib/api"
 import type { Envelope, PaginatedEnvelope } from "@/lib/api"
 import { paisaNumber } from "@/lib/invoice-analytics"
 import { formatNpr, nprToPaisa, parseNprInput, paisaToNpr } from "@/lib/money"
 import { nptTodayIso } from "@/lib/standup-age"
+import { dateStringParser, isDateValid } from "@/lib/date-input"
 import type { Invoice, Project } from "@/lib/types"
 
 type ProjectOption = Pick<
@@ -177,15 +178,19 @@ export function InvoiceFormDialog({
       setError("Amount must be greater than zero")
       return
     }
-    if (!invoiceDate) {
-      setError("Invoice date is required")
+    const parsedInvoiceDate = dateStringParser(invoiceDate)
+    if (
+      !parsedInvoiceDate ||
+      !isDateValid({ date: parsedInvoiceDate, maxDate: nptTodayIso() })
+    ) {
+      setError("Enter a valid invoice date")
       return
     }
     setSaving(true)
     const body = {
       projectId: project.id,
       invoiceNumber: invoiceNumber.trim(),
-      invoiceDate,
+      invoiceDate: parsedInvoiceDate,
       amountNpr: parsed,
       notes: notes.trim() || undefined,
     }
@@ -249,12 +254,12 @@ export function InvoiceFormDialog({
             />
           </div>
           <div className="flex flex-col gap-2">
-            <Label>Invoice date</Label>
-            <DatePicker
+            <Label htmlFor="invoice-date">Invoice date</Label>
+            <DateInput
+              id="invoice-date"
               value={invoiceDate}
               onChange={(next) => setInvoiceDate(next ?? "")}
               max={nptTodayIso()}
-              modal
             />
           </div>
           <div className="flex flex-col gap-2">

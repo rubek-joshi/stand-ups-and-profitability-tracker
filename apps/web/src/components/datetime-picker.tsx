@@ -17,6 +17,13 @@ import {
   PopoverTrigger,
 } from "@workspace/ui/components/popover"
 import { cn } from "@workspace/ui/lib/utils"
+import { Input } from "@workspace/ui/components/input"
+import {
+  dateInputErrorMessage,
+  dateStringParser,
+  formatDateInputValue,
+  isDateValid,
+} from "@/lib/date-input"
 
 const NPT_TIME_ZONE = "Asia/Kathmandu"
 const MONTH_LABELS = [
@@ -36,6 +43,13 @@ const MONTH_LABELS = [
 
 type CalendarView = "day" | "month" | "year"
 
+/** Subset of Base UI's popover change details we rely on. */
+export type PopoverOpenChangeDetails = {
+  reason?: string
+  event?: Event
+  cancel?: () => void
+}
+
 export type DateTimePickerProps = {
   value: Date | undefined
   onChange: (date: Date | undefined) => void
@@ -46,6 +60,21 @@ export type DateTimePickerProps = {
   hideTime?: boolean
   clearable?: boolean
   modal?: boolean
+  /** Controlled open state. */
+  open?: boolean
+  onOpenChange?: (open: boolean, details?: PopoverOpenChangeDetails) => void
+  /** Close the popover after picking a day. @default true */
+  closeOnSelect?: boolean
+  /**
+   * When false, opening the calendar does not move focus into the popup
+   * (keeps a text input caret). @default true
+   */
+  autoFocus?: boolean
+  /**
+   * Position the popup against this element instead of a PopoverTrigger.
+   * When set, `renderTrigger` is rendered as a plain node (not a toggle trigger).
+   */
+  anchorRef?: React.RefObject<Element | null>
   classNames?: { trigger?: string }
   renderTrigger?: (props: {
     value: Date | undefined
@@ -53,6 +82,10 @@ export type DateTimePickerProps = {
     setOpen: (open: boolean) => void
     disabled?: boolean
   }) => React.ReactNode
+}
+
+function detailsCanceled(details: PopoverOpenChangeDetails): boolean {
+  return Boolean((details as { isCanceled?: boolean }).isCanceled)
 }
 
 function startOfLocalDay(date: Date) {
@@ -312,10 +345,17 @@ export function DateTimePicker({
   hideTime = true,
   clearable,
   modal = false,
+  open: openProp,
+  onOpenChange,
+  closeOnSelect = true,
+  autoFocus = true,
+  anchorRef,
   classNames,
   renderTrigger,
 }: DateTimePickerProps) {
-  const [open, setOpen] = React.useState(false)
+  const [uncontrolledOpen, setUncontrolledOpen] = React.useState(false)
+  const isOpenControlled = openProp !== undefined
+  const open = isOpenControlled ? Boolean(openProp) : uncontrolledOpen
   const [view, setView] = React.useState<CalendarView>("day")
   const selected = value ? startOfLocalDay(value) : undefined
   const minDay = min ? startOfLocalDay(min) : undefined
@@ -323,28 +363,141 @@ export function DateTimePicker({
   const [viewDate, setViewDate] = React.useState(() =>
     startOfMonth(selected ?? new Date()),
   )
+  const useAnchor = Boolean(anchorRef)
 
   const label = selected
     ? format(selected, hideTime ? "yyyy-MM-dd" : "yyyy-MM-dd HH:mm")
     : "Pick a date"
 
-  function handleOpenChange(next: boolean) {
-    setOpen(next)
+  function handleOpenChange(next: boolean, details?: PopoverOpenChangeDetails) {
+    onOpenChange?.(next, details)
+    if (details && detailsCanceled(details)) {
+      return
+    }
+    if (!isOpenControlled) {
+      setUncontrolledOpen(next)
+    }
     if (next) {
       setView("day")
       setViewDate(startOfMonth(selected ?? new Date()))
     }
   }
 
-  return (
-    <Popover open={open} onOpenChange={handleOpenChange} modal={modal}>
-      {renderTrigger ? (
-        renderTrigger({
+  // Keep the calendar on the selected month while open (e.g. typing a date).
+  const selectedTime = selected?.getTime()
+  React.useEffect(() => {
+    if (!open || selectedTime == null) return
+    setViewDate(startOfMonth(new Date(selectedTime)))
+    setView("day")
+  }, [open, selectedTime])
+
+  const calendar = (
+    <div className="flex w-66 flex-col gap-1 p-3">
+      <CalendarNavHeader
+        view={view}
+        viewDate={viewDate}
+        min={minDay}
+        max={maxDay}
+        onViewChange={setView}
+        onViewDateChange={setViewDate}
+      />
+      {view === "day" ? (
+        <Calendar
+          mode="single"
+          selected={selected}
+          month={viewDate}
+          onMonthChange={(next) => setViewDate(startOfMonth(next))}
+          onSelect={(next) => {
+            if (!next) return
+            onChange(startOfLocalDay(next))
+            if (hideTime && closeOnSelect) handleOpenChange(false)
+          }}
+          disabled={[
+            ...(minDay ? [{ before: minDay }] : []),
+            ...(maxDay ? [{ after: maxDay }] : []),
+          ]}
+          timeZone={timezone}
+          className="p-0"
+          classNames={{
+            nav: "hidden",
+            month_caption: "hidden",
+          }}
+        />
+      ) : null}
+      {view === "month" ? (
+        <MonthGrid
+          viewDate={viewDate}
+          selected={selected}
+          min={minDay}
+          max={maxDay}
+          onSelect={(monthIndex) => {
+            setViewDate(new Date(viewDate.getFullYear(), monthIndex, 1))
+            setView("day")
+          }}
+        />
+      ) : null}
+      {view === "year" ? (
+        <YearGrid
+          viewDate={viewDate}
+          selected={selected}
+          min={minDay}
+          max={maxDay}
+          onSelect={(year) => {
+            setViewDate(new Date(year, viewDate.getMonth(), 1))
+            setView("month")
+          }}
+        />
+      ) : null}
+    </div>
+  )
+
+  const popup = (
+    <PopoverContent
+      className="w-auto p-0"
+      align="start"
+      anchor={useAnchor ? anchorRef : undefined}
+      initialFocus={autoFocus}
+      finalFocus={autoFocus}
+      onMouseDown={(event) => {
+        // Keep focus in the text input (Mantine DateInput behavior).
+        if (!autoFocus) {
+          event.preventDefault()
+        }
+      }}
+    >
+      {calendar}
+    </PopoverContent>
+  )
+
+  if (useAnchor) {
+    return (
+      <Popover open={open} onOpenChange={handleOpenChange} modal={modal}>
+        {renderTrigger?.({
           value: selected,
           open,
           setOpen: handleOpenChange,
           disabled,
-        })
+        })}
+        {popup}
+      </Popover>
+    )
+  }
+
+  return (
+    <Popover open={open} onOpenChange={handleOpenChange} modal={modal}>
+      {renderTrigger ? (
+        <PopoverTrigger
+          disabled={disabled}
+          nativeButton={false}
+          render={
+            renderTrigger({
+              value: selected,
+              open,
+              setOpen: handleOpenChange,
+              disabled,
+            }) as React.ReactElement
+          }
+        />
       ) : (
         <PopoverTrigger
           disabled={disabled}
@@ -366,14 +519,14 @@ export function DateTimePicker({
                 event.preventDefault()
                 event.stopPropagation()
                 onChange(undefined)
-                setOpen(false)
+                handleOpenChange(false)
               }}
               onKeyDown={(event) => {
                 if (event.key !== "Enter" && event.key !== " ") return
                 event.preventDefault()
                 event.stopPropagation()
                 onChange(undefined)
-                setOpen(false)
+                handleOpenChange(false)
               }}
             >
               <IconX className="size-3.5" />
@@ -381,65 +534,7 @@ export function DateTimePicker({
           ) : null}
         </PopoverTrigger>
       )}
-      <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex w-66 flex-col gap-1 p-3">
-          <CalendarNavHeader
-            view={view}
-            viewDate={viewDate}
-            min={minDay}
-            max={maxDay}
-            onViewChange={setView}
-            onViewDateChange={setViewDate}
-          />
-          {view === "day" ? (
-            <Calendar
-              mode="single"
-              selected={selected}
-              month={viewDate}
-              onMonthChange={(next) => setViewDate(startOfMonth(next))}
-              onSelect={(next) => {
-                if (!next) return
-                onChange(startOfLocalDay(next))
-                if (hideTime) setOpen(false)
-              }}
-              disabled={[
-                ...(minDay ? [{ before: minDay }] : []),
-                ...(maxDay ? [{ after: maxDay }] : []),
-              ]}
-              timeZone={timezone}
-              className="p-0"
-              classNames={{
-                nav: "hidden",
-                month_caption: "hidden",
-              }}
-            />
-          ) : null}
-          {view === "month" ? (
-            <MonthGrid
-              viewDate={viewDate}
-              selected={selected}
-              min={minDay}
-              max={maxDay}
-              onSelect={(monthIndex) => {
-                setViewDate(new Date(viewDate.getFullYear(), monthIndex, 1))
-                setView("day")
-              }}
-            />
-          ) : null}
-          {view === "year" ? (
-            <YearGrid
-              viewDate={viewDate}
-              selected={selected}
-              min={minDay}
-              max={maxDay}
-              onSelect={(year) => {
-                setViewDate(new Date(year, viewDate.getMonth(), 1))
-                setView("month")
-              }}
-            />
-          ) : null}
-        </div>
-      </PopoverContent>
+      {popup}
     </Popover>
   )
 }
@@ -490,5 +585,327 @@ export function DatePicker({
       modal={modal}
       classNames={{ trigger: className }}
     />
+  )
+}
+
+const FOCUSABLE_SELECTOR = [
+  "a[href]",
+  "button:not([disabled])",
+  "input:not([disabled])",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  '[tabindex]:not([tabindex="-1"])',
+].join(",")
+
+function isVisibleTabbable(element: HTMLElement) {
+  if (element.getAttribute("tabindex") === "-1") return false
+  if (
+    element.hasAttribute("inert") ||
+    element.getAttribute("aria-hidden") === "true" ||
+    element.hasAttribute("data-floating-ui-focus-guard") ||
+    element.hasAttribute("data-base-ui-focus-guard")
+  ) {
+    return false
+  }
+  return element.offsetParent !== null || element.getClientRects().length > 0
+}
+
+/** Mantine-style date field: type/paste freely while focused; format on blur. */
+export function DateInput({
+  value,
+  onChange,
+  min,
+  max,
+  disabled,
+  clearable,
+  modal: _modal,
+  className,
+  placeholder = "YYYY-MM-DD",
+  fixOnBlur = true,
+  id,
+  "aria-label": ariaLabel,
+}: {
+  value?: string
+  onChange: (value: string | undefined) => void
+  min?: string
+  max?: string
+  disabled?: boolean
+  clearable?: boolean
+  modal?: boolean
+  className?: string
+  placeholder?: string
+  fixOnBlur?: boolean
+  id?: string
+  "aria-label"?: string
+}) {
+  const [inputValue, setInputValue] = React.useState(() =>
+    formatDateInputValue(value),
+  )
+  const [open, setOpen] = React.useState(false)
+  const [touched, setTouched] = React.useState(false)
+  // Value present when the field was focused — used to restore on invalid blur.
+  const baselineRef = React.useRef<string | undefined>(value)
+  const inputRef = React.useRef<HTMLInputElement>(null)
+  const rootRef = React.useRef<HTMLDivElement>(null)
+  const inputValueRef = React.useRef(inputValue)
+
+  function updateInputValue(next: string) {
+    inputValueRef.current = next
+    setInputValue(next)
+  }
+
+  function focusInput() {
+    requestAnimationFrame(() => {
+      inputRef.current?.focus()
+    })
+  }
+
+  // Mirror the controlled value into the text field only when not editing.
+  React.useEffect(() => {
+    if (!open) {
+      const formatted = formatDateInputValue(value)
+      inputValueRef.current = formatted
+      setInputValue(formatted)
+    }
+  }, [value, open])
+
+  const selected = value ? parseIsoDay(value) : undefined
+  const error =
+    touched && !open
+      ? dateInputErrorMessage({
+          text: inputValue,
+          value,
+          minDate: min,
+          maxDate: max,
+        })
+      : null
+
+  function restoreBaseline() {
+    const baseline = baselineRef.current
+    onChange(baseline)
+    updateInputValue(formatDateInputValue(baseline))
+    setTouched(false)
+  }
+
+  function commitInputValue() {
+    if (!fixOnBlur) {
+      setTouched(true)
+      return
+    }
+
+    const trimmed = inputValueRef.current.trim()
+    if (!trimmed) {
+      if (
+        clearable ||
+        baselineRef.current == null ||
+        baselineRef.current === ""
+      ) {
+        baselineRef.current = undefined
+        onChange(undefined)
+        updateInputValue("")
+        setTouched(false)
+        return
+      }
+      restoreBaseline()
+      return
+    }
+
+    const parsed = dateStringParser(trimmed)
+    if (parsed && isDateValid({ date: parsed, minDate: min, maxDate: max })) {
+      onChange(parsed)
+      updateInputValue(formatDateInputValue(parsed))
+      baselineRef.current = parsed
+      setTouched(false)
+      return
+    }
+
+    restoreBaseline()
+  }
+
+  function closeCalendar() {
+    setOpen(false)
+  }
+
+  function closeField() {
+    setOpen(false)
+    commitInputValue()
+  }
+
+  function openField() {
+    baselineRef.current = value
+    setOpen(true)
+    focusInput()
+  }
+
+  function handleInputChange(raw: string) {
+    updateInputValue(raw)
+
+    const trimmed = raw.trim()
+    if (!trimmed) return
+
+    const parsed = dateStringParser(trimmed)
+    if (parsed && isDateValid({ date: parsed, minDate: min, maxDate: max })) {
+      onChange(parsed)
+    }
+  }
+
+  // Tab must reach the next form field, never the calendar popup (which is
+  // portaled after everything else in the DOM).
+  function moveFocusToAdjacentField(backwards: boolean) {
+    const input = inputRef.current
+    if (!input) return
+
+    // Stay inside the dialog when the field lives in one, mirroring its focus trap.
+    const scope = input.closest<HTMLElement>('[role="dialog"]') ?? document.body
+    const candidates = Array.from(
+      scope.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR),
+    ).filter(
+      (element) =>
+        !element.closest('[data-slot="popover-content"]') &&
+        (element === input || isVisibleTabbable(element)),
+    )
+
+    const index = candidates.indexOf(input)
+    if (index === -1 || candidates.length < 2) return
+
+    const offset = backwards ? -1 : 1
+    const next =
+      candidates[(index + offset + candidates.length) % candidates.length]
+    next?.focus()
+  }
+
+  return (
+    <div className={cn("flex flex-col gap-1", className)}>
+      <div ref={rootRef} className="relative w-full">
+        <DateTimePicker
+          value={selected}
+          open={open}
+          onOpenChange={(next, details) => {
+            if (next) {
+              baselineRef.current = value
+              setOpen(true)
+              return
+            }
+            // Pressing the input or the calendar icon reads as an outside press
+            // (the field is an anchor, not a trigger) — keep the calendar open.
+            const target = details?.event?.target
+            if (
+              details?.reason === "outside-press" &&
+              target instanceof Node &&
+              rootRef.current?.contains(target)
+            ) {
+              details.cancel?.()
+              return
+            }
+            closeField()
+          }}
+          closeOnSelect
+          autoFocus={false}
+          anchorRef={rootRef}
+          onChange={(next) => {
+            const nextValue = next ? formatIsoDay(next) : undefined
+            onChange(nextValue)
+            updateInputValue(formatDateInputValue(nextValue))
+            baselineRef.current = nextValue
+            setTouched(false)
+            focusInput()
+          }}
+          min={min ? parseIsoDay(min) : undefined}
+          max={max ? parseIsoDay(max) : undefined}
+          hideTime
+          timezone={NPT_TIME_ZONE}
+          disabled={disabled}
+          clearable={clearable}
+          modal={false}
+          renderTrigger={({ disabled: pickerDisabled }) => (
+            <Input
+              ref={inputRef}
+              id={id}
+              autoComplete="off"
+              aria-label={ariaLabel}
+              aria-invalid={Boolean(error)}
+              disabled={pickerDisabled}
+              placeholder={placeholder}
+              value={inputValue}
+              className={cn("w-full pr-9", error && "border-destructive")}
+              onChange={(event) => handleInputChange(event.target.value)}
+              onFocus={() => {
+                baselineRef.current = value
+                setOpen(true)
+              }}
+              onClick={() => {
+                // Re-open after picking a day / pressing Escape without blurring.
+                if (!open) {
+                  baselineRef.current = value
+                  setOpen(true)
+                }
+              }}
+              onBlur={(event) => {
+                const next = event.relatedTarget
+                // Keep open when focus moves into the calendar popup.
+                if (
+                  next instanceof Element &&
+                  next.closest('[data-slot="popover-content"]')
+                ) {
+                  return
+                }
+                // Keep open when focus moves to the calendar icon button.
+                if (
+                  next instanceof Node &&
+                  rootRef.current?.contains(next)
+                ) {
+                  return
+                }
+                closeField()
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Tab") {
+                  // Skip the portaled calendar and land on the next form field;
+                  // the resulting blur closes the calendar and commits.
+                  event.preventDefault()
+                  moveFocusToAdjacentField(event.shiftKey)
+                  return
+                }
+                if (event.key === "Escape") {
+                  event.preventDefault()
+                  restoreBaseline()
+                  closeCalendar()
+                }
+                if (event.key === "Enter") {
+                  event.preventDefault()
+                  closeField()
+                }
+              }}
+            />
+          )}
+        />
+        <button
+          type="button"
+          disabled={disabled}
+          className="absolute inset-y-0 right-0 z-10 flex w-9 items-center justify-center text-muted-foreground hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+          aria-label="Open calendar"
+          tabIndex={-1}
+          onMouseDown={(event) => {
+            event.preventDefault()
+          }}
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            if (open) {
+              focusInput()
+              return
+            }
+            openField()
+          }}
+        >
+          <IconCalendar className="size-4" />
+        </button>
+      </div>
+      {error ? (
+        <p className="text-xs text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
   )
 }

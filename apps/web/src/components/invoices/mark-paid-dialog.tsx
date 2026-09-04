@@ -10,7 +10,8 @@ import {
   AlertDialogTitle,
 } from "@workspace/ui/components/alert-dialog"
 import { Label } from "@workspace/ui/components/label"
-import { DatePicker } from "@/components/datetime-picker"
+import { DateInput } from "@/components/datetime-picker"
+import { dateStringParser, isDateValid } from "@/lib/date-input"
 import { formatNpr } from "@/lib/money"
 import { nptTodayIso } from "@/lib/standup-age"
 import type { Invoice } from "@/lib/types"
@@ -26,11 +27,13 @@ export function MarkPaidDialog({
 }) {
   const [date, setDate] = React.useState(nptTodayIso)
   const [busy, setBusy] = React.useState(false)
+  const [dateError, setDateError] = React.useState<string | null>(null)
 
   React.useEffect(() => {
     if (invoice) {
       setDate(nptTodayIso())
       setBusy(false)
+      setDateError(null)
     }
   }, [invoice])
 
@@ -52,16 +55,22 @@ export function MarkPaidDialog({
         </AlertDialogHeader>
         <div className="flex flex-col gap-2 py-2">
           <Label htmlFor="payment-date">Payment date</Label>
-          <DatePicker
+          <DateInput
+            id="payment-date"
             value={date}
             min={invoiceDay || undefined}
             max={nptTodayIso()}
             disabled={busy}
-            modal
             onChange={(next) => {
+              setDateError(null)
               if (next) setDate(next)
             }}
           />
+          {dateError ? (
+            <p className="text-xs text-destructive" role="alert">
+              {dateError}
+            </p>
+          ) : null}
         </div>
         <AlertDialogFooter>
           <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
@@ -69,9 +78,21 @@ export function MarkPaidDialog({
             disabled={busy || !date}
             onClick={async (event) => {
               event.preventDefault()
+              const parsed = dateStringParser(date)
+              if (
+                !parsed ||
+                !isDateValid({
+                  date: parsed,
+                  minDate: invoiceDay || undefined,
+                  maxDate: nptTodayIso(),
+                })
+              ) {
+                setDateError("Enter a valid payment date")
+                return
+              }
               setBusy(true)
               try {
-                await onConfirm(date)
+                await onConfirm(parsed)
                 onClose()
               } finally {
                 setBusy(false)
