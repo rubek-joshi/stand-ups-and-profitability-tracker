@@ -73,7 +73,6 @@ export async function downloadFile(
 
   if (!res.ok) {
     const text = await res.text()
-    const contentType = res.headers.get("content-type") ?? ""
     let json: unknown = null
     if (text) {
       try {

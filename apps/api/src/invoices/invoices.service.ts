@@ -24,6 +24,28 @@ import {
 
 const INVOICE_MONEY_FIELDS = ['amountPaisa', 'vatPaisa', 'totalPaisa'] as const;
 
+const INVOICE_SORT_FIELDS = {
+  invoiceNumber: 'invoiceNumber',
+  invoiceDate: 'invoiceDate',
+} as const;
+
+type InvoiceSortBy = keyof typeof INVOICE_SORT_FIELDS;
+type SortDir = 'asc' | 'desc';
+
+function resolveInvoiceOrder(
+  sortBy?: string,
+  sortDir?: string,
+): Prisma.InvoiceOrderByWithRelationInput[] {
+  const dir: SortDir = sortDir === 'asc' ? 'asc' : 'desc';
+  if (sortBy === 'invoiceNumber') {
+    return [{ invoiceNumber: dir }, { invoiceDate: 'desc' }];
+  }
+  if (sortBy === 'invoiceDate') {
+    return [{ invoiceDate: dir }, { createdAt: 'desc' }];
+  }
+  return [{ invoiceDate: 'desc' }, { createdAt: 'desc' }];
+}
+
 const projectInclude = {
   client: { select: { id: true, name: true } },
 } as const;
@@ -60,6 +82,8 @@ export class InvoicesService {
       clientId?: string;
       from?: string;
       to?: string;
+      sortBy?: string;
+      sortDir?: string;
       page?: string;
       pageSize?: string;
     } = {},
@@ -102,7 +126,7 @@ export class InvoicesService {
       this.prismaService.invoice.findMany({
         where,
         include: { project: { include: projectInclude } },
-        orderBy: [{ invoiceDate: 'desc' }, { createdAt: 'desc' }],
+        orderBy: resolveInvoiceOrder(filters.sortBy, filters.sortDir),
         ...(pagination ? { skip: pagination.skip, take: pagination.take } : {}),
       }),
       this.prismaService.invoice.count({ where }),

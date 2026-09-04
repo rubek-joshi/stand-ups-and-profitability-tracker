@@ -37,7 +37,11 @@ import {
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { InvoiceAnalytics } from "@/components/invoices/invoice-analytics"
 import { InvoiceFormDialog } from "@/components/invoices/invoice-form-dialog"
-import { InvoiceTable } from "@/components/invoices/invoice-table"
+import {
+  defaultInvoiceSortDir,
+  InvoiceTable,
+  type InvoiceSortBy,
+} from "@/components/invoices/invoice-table"
 import { MarkPaidDialog } from "@/components/invoices/mark-paid-dialog"
 import { ListViewToggle } from "@/components/list-view-toggle"
 import { PaginationBar } from "@/components/pagination-bar"
@@ -54,7 +58,7 @@ import {
   paisaNumber,
 } from "@/lib/invoice-analytics"
 import { toDateKey } from "@/lib/dates"
-import { clampPage, totalPagesFor } from "@/lib/list-query"
+import { clampPage, totalPagesFor, type SortDir } from "@/lib/list-query"
 import type { PageSize } from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
 import { nptTodayIso } from "@/lib/standup-age"
@@ -135,6 +139,8 @@ export function ProjectInvoicesTab({
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Invoice | null>(null)
   const [paying, setPaying] = React.useState<Invoice | null>(null)
+  const [sortBy, setSortBy] = React.useState<InvoiceSortBy>("invoiceDate")
+  const [sortDir, setSortDir] = React.useState<SortDir>("desc")
 
   React.useLayoutEffect(() => {
     if (view === "table") {
@@ -176,16 +182,27 @@ export function ProjectInvoicesTab({
   const budget = paisaNumber(budgetPaisa)
   const remainingToInvoice = budget - analytics.totalAmountPaisa
   const stale = isInvoiceListStale(invoices)
-  const sorted = React.useMemo(
-    () =>
-      [...invoices].sort((a, b) =>
-        String(b.invoiceDate).localeCompare(String(a.invoiceDate))
-      ),
-    [invoices]
-  )
+  const sorted = React.useMemo(() => {
+    const dir = sortDir === "asc" ? 1 : -1
+    return [...invoices].sort((a, b) => {
+      if (sortBy === "invoiceNumber") {
+        return dir * a.invoiceNumber.localeCompare(b.invoiceNumber)
+      }
+      return dir * String(a.invoiceDate).localeCompare(String(b.invoiceDate))
+    })
+  }, [invoices, sortBy, sortDir])
   const totalPages = totalPagesFor(sorted.length, pageSize)
   const safePage = clampPage(page, totalPages)
   const paged = sorted.slice((safePage - 1) * pageSize, safePage * pageSize)
+
+  const toggleSort = (column: InvoiceSortBy) => {
+    if (sortBy !== column) {
+      setSortBy(column)
+      setSortDir(defaultInvoiceSortDir(column))
+      return
+    }
+    setSortDir((prev) => (prev === "desc" ? "asc" : "desc"))
+  }
 
   async function markPaid(paymentDate: string) {
     if (!paying) return
@@ -332,6 +349,9 @@ export function ProjectInvoicesTab({
                   showProject={false}
                   canMutate={canMutate}
                   onEdit={setEditing}
+                  sortBy={sortBy}
+                  sortDir={sortDir}
+                  onSort={toggleSort}
                 />
               ) : (
                 <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">

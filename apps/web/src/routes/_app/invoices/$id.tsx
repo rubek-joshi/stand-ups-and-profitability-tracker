@@ -35,7 +35,7 @@ import {
   isInvoiceOverdue,
   paisaNumber,
 } from "@/lib/invoice-analytics"
-import { DEFAULT_LIST_SEARCH } from "@/lib/list-query"
+import { DEFAULT_INVOICE_LIST_SEARCH } from "@/routes/_app/invoices/index"
 import { formatNpr } from "@/lib/money"
 import type { Invoice, Project } from "@/lib/types"
 
@@ -191,7 +191,7 @@ function InvoiceDetailPage() {
     if (!ok) return
     try {
       await api(`/invoices/${current.id}`, { method: "DELETE" })
-      void navigate({ to: "/invoices", search: DEFAULT_LIST_SEARCH })
+      void navigate({ to: "/invoices", search: DEFAULT_INVOICE_LIST_SEARCH })
     } catch (e) {
       alert(e instanceof ApiError ? e.message : "Delete failed")
     }
@@ -203,7 +203,7 @@ function InvoiceDetailPage() {
       <PageHeader
         title={invoice.invoiceNumber}
         breadcrumbs={[
-          { label: "Invoices", to: "/invoices", search: DEFAULT_LIST_SEARCH },
+          { label: "Invoices", to: "/invoices", search: DEFAULT_INVOICE_LIST_SEARCH },
           { label: invoice.invoiceNumber },
         ]}
         description={

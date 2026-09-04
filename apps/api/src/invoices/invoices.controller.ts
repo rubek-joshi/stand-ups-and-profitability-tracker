@@ -39,6 +39,8 @@ export class InvoicesController {
     @Query('clientId') clientId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -49,6 +51,8 @@ export class InvoicesController {
       clientId,
       from,
       to,
+      sortBy,
+      sortDir,
       page,
       pageSize,
     });

@@ -12,7 +12,12 @@ import {
 } from "@workspace/ui/components/select"
 import { DatePicker } from "@/components/datetime-picker"
 import { InvoiceFormDialog } from "@/components/invoices/invoice-form-dialog"
-import { InvoiceTable } from "@/components/invoices/invoice-table"
+import {
+  defaultInvoiceSortDir,
+  INVOICE_SORT_FIELDS,
+  InvoiceTable,
+  type InvoiceSortBy,
+} from "@/components/invoices/invoice-table"
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
 import { ProjectCombobox } from "@/components/project-combobox"
@@ -22,8 +27,10 @@ import { api, ApiError } from "@/lib/api"
 import type { PaginatedEnvelope } from "@/lib/api"
 import {
   buildListQuery,
+  DEFAULT_LIST_SEARCH,
   parseListSearch,
   parseOptionalString,
+  parseSortDir,
   totalPagesFor,
 } from "@/lib/list-query"
 import { useAuth } from "@/lib/auth"
@@ -39,6 +46,12 @@ function parseInvoiceStatus(value: unknown): InvoiceListStatus | undefined {
     : undefined
 }
 
+function parseInvoiceSortBy(value: unknown): InvoiceSortBy | undefined {
+  return INVOICE_SORT_FIELDS.includes(value as InvoiceSortBy)
+    ? (value as InvoiceSortBy)
+    : undefined
+}
+
 export const Route = createFileRoute("/_app/invoices/")({
   validateSearch: (search: Record<string, unknown>) => {
     const base = parseListSearch(search)
@@ -46,20 +59,31 @@ export const Route = createFileRoute("/_app/invoices/")({
     const projectId = parseOptionalString(search.projectId)
     const from = parseOptionalString(search.from)
     const to = parseOptionalString(search.to)
+    const sortBy = parseInvoiceSortBy(search.sortBy)
+    const sortDir = parseSortDir(search.sortDir)
     return {
       ...base,
       ...(status ? { status } : {}),
       ...(projectId ? { projectId } : {}),
       ...(from ? { from } : {}),
       ...(to ? { to } : {}),
+      sortBy,
+      sortDir: sortBy ? (sortDir ?? defaultInvoiceSortDir(sortBy)) : undefined,
     }
   },
   component: InvoicesPage,
 })
 
+export const DEFAULT_INVOICE_LIST_SEARCH = {
+  ...DEFAULT_LIST_SEARCH,
+  sortBy: undefined,
+  sortDir: undefined,
+} as const
+
 function InvoicesPage() {
   const navigate = Route.useNavigate()
-  const { q, page, pageSize, status, projectId, from, to } = Route.useSearch()
+  const { q, page, pageSize, status, projectId, from, to, sortBy, sortDir } =
+    Route.useSearch()
   const { user } = useAuth()
   const canMutate = Boolean(
     user?.role && (AUDIT_ROLES as string[]).includes(user.role),
@@ -100,6 +124,8 @@ function InvoicesPage() {
         projectId,
         from,
         to,
+        sortBy,
+        sortDir,
       })
       const res = await api<PaginatedEnvelope<Invoice[]>>(`/invoices?${qs}`)
       setInvoices(res.data)
@@ -109,7 +135,7 @@ function InvoicesPage() {
     } finally {
       setLoading(false)
     }
-  }, [q, page, pageSize, status, projectId, from, to])
+  }, [q, page, pageSize, status, projectId, from, to, sortBy, sortDir])
 
   React.useEffect(() => {
     void load()
@@ -117,6 +143,27 @@ function InvoicesPage() {
 
   const totalPages = totalPagesFor(total, pageSize)
   const hasFilters = Boolean(q || status || projectId || from || to)
+
+  const toggleSort = (column: InvoiceSortBy) => {
+    void navigate({
+      search: (prev) => {
+        if (prev.sortBy !== column) {
+          return {
+            ...prev,
+            sortBy: column,
+            sortDir: defaultInvoiceSortDir(column),
+            page: 1,
+          }
+        }
+        return {
+          ...prev,
+          sortBy: column,
+          sortDir: prev.sortDir === "desc" ? "asc" : "desc",
+          page: 1,
+        }
+      },
+    })
+  }
 
   return (
     <div>
@@ -261,6 +308,9 @@ function InvoicesPage() {
             invoices={invoices}
             canMutate={canMutate}
             onEdit={setEditing}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={toggleSort}
           />
           <PaginationBar
             page={page}

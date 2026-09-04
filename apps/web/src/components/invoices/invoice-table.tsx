@@ -1,5 +1,11 @@
 import { Link } from "@tanstack/react-router"
-import { IconEye, IconPencil } from "@tabler/icons-react"
+import {
+  IconChevronDown,
+  IconChevronUp,
+  IconEye,
+  IconPencil,
+  IconSelector,
+} from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import {
   Table,
@@ -20,28 +26,62 @@ import { ClientLink, ProjectLink } from "@/components/resource-link"
 import { StatusBadge } from "@/components/health-badge"
 import { toDateKey } from "@/lib/dates"
 import { isInvoiceOverdue } from "@/lib/invoice-analytics"
+import type { SortDir } from "@/lib/list-query"
 import { formatNpr } from "@/lib/money"
 import type { Invoice } from "@/lib/types"
+
+export const INVOICE_SORT_FIELDS = ["invoiceNumber", "invoiceDate"] as const
+export type InvoiceSortBy = (typeof INVOICE_SORT_FIELDS)[number]
+
+export function defaultInvoiceSortDir(column: InvoiceSortBy): SortDir {
+  return column === "invoiceNumber" ? "asc" : "desc"
+}
 
 export function InvoiceTable({
   invoices,
   showProject = true,
   canMutate = false,
   onEdit,
+  sortBy,
+  sortDir,
+  onSort,
 }: {
   invoices: Invoice[]
   showProject?: boolean
   canMutate?: boolean
   onEdit?: (invoice: Invoice) => void
+  sortBy?: InvoiceSortBy
+  sortDir?: SortDir
+  onSort?: (column: InvoiceSortBy) => void
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border">
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Number</TableHead>
+            {onSort ? (
+              <SortableTableHead
+                label="Number"
+                column="invoiceNumber"
+                active={sortBy === "invoiceNumber"}
+                dir={sortDir}
+                onSort={onSort}
+              />
+            ) : (
+              <TableHead>Number</TableHead>
+            )}
             {showProject ? <TableHead>Project</TableHead> : null}
-            <TableHead>Date</TableHead>
+            {onSort ? (
+              <SortableTableHead
+                label="Date"
+                column="invoiceDate"
+                active={sortBy === "invoiceDate"}
+                dir={sortDir}
+                onSort={onSort}
+              />
+            ) : (
+              <TableHead>Date</TableHead>
+            )}
             <TableHead>Amount / total</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Payment date</TableHead>
@@ -139,5 +179,49 @@ export function InvoiceTable({
         </TableBody>
       </Table>
     </div>
+  )
+}
+
+function SortableTableHead({
+  label,
+  column,
+  active,
+  dir,
+  onSort,
+}: {
+  label: string
+  column: InvoiceSortBy
+  active: boolean
+  dir?: SortDir
+  onSort: (column: InvoiceSortBy) => void
+}) {
+  const sortState = active ? (dir === "asc" ? "ascending" : "descending") : "none"
+  const Icon = !active
+    ? IconSelector
+    : dir === "asc"
+      ? IconChevronUp
+      : IconChevronDown
+  return (
+    <TableHead aria-sort={sortState}>
+      <button
+        type="button"
+        className="inline-flex items-center gap-1 font-medium hover:text-foreground"
+        onClick={() => onSort(column)}
+        aria-label={
+          active
+            ? `Sort by ${label}, currently ${sortState}. Click to reverse.`
+            : `Sort by ${label}`
+        }
+      >
+        {label}
+        <Icon
+          className={
+            active
+              ? "size-3.5 text-foreground"
+              : "size-3.5 text-muted-foreground"
+          }
+        />
+      </button>
+    </TableHead>
   )
 }
