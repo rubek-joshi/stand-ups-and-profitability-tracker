@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@workspace/ui/components/dialog"
-import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import {
   Select,
@@ -33,6 +32,7 @@ import {
   TabsList,
   TabsTrigger,
 } from "@workspace/ui/components/tabs"
+import { DateInput } from "@/components/datetime-picker"
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
 import { StandupCalendar, utcIsoDate } from "@/components/standup/standup-calendar"
@@ -396,7 +396,7 @@ function StandupsPage() {
       </Tabs>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent initialFocus={false}>
           <DialogHeader>
             <DialogTitle>Create stand-up</DialogTitle>
           </DialogHeader>
@@ -464,14 +464,12 @@ function StandupsPage() {
                   <span className="text-xs text-muted-foreground">Today</span>
                 ) : null}
               </div>
-              <Input
+              <DateInput
                 id="standup-date"
-                type="date"
-                required
                 min={minDate}
                 max={maxDate}
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(next) => setDate(next ?? "")}
               />
               <p className="text-xs text-muted-foreground">
                 Within the last 7 days. One stand-up per day.
