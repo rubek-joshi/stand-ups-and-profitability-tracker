@@ -3,6 +3,7 @@ import {
   AmcStatus,
   AmcType,
   ClientStatus,
+  InvoiceStatus,
   PersonStatus,
   ProjectStatus,
 } from "@workspace/database";
@@ -80,6 +81,9 @@ export class DashboardService {
       recentStandups,
       recentAudit,
       profitTrend,
+      projectWriteOffs,
+      amcWriteOffRows,
+      invoices,
     ] = await Promise.all([
       this.profitabilityService.calculateMany(projectIds, {
         from: fromDate,
@@ -97,7 +101,10 @@ export class DashboardService {
       }),
       this.prismaService.amcRecord.findMany({
         where: { status: { not: AmcStatus.cancelled } },
-        include: { project: { include: { client: true } } },
+        include: {
+          project: { include: { client: true } },
+          writeOffs: true,
+        },
         orderBy: { endDate: "asc" },
       }),
       this.prismaService.client.count({
@@ -137,6 +144,43 @@ export class DashboardService {
           })
         : Promise.resolve([]),
       this.buildProfitTrend(projectIds, fromDate, toDate),
+      this.prismaService.writeOffRecord.findMany({
+        where: {
+          projectId: { not: null },
+          ...(fromDate || toDate
+            ? {
+                date: {
+                  ...(fromDate ? { gte: fromDate } : {}),
+                  ...(toDate ? { lte: toDate } : {}),
+                },
+              }
+            : {}),
+        },
+        select: { amountPaisa: true },
+      }),
+      this.prismaService.writeOffRecord.findMany({
+        where: {
+          amcId: { not: null },
+          ...(fromDate || toDate
+            ? {
+                date: {
+                  ...(fromDate ? { gte: fromDate } : {}),
+                  ...(toDate ? { lte: toDate } : {}),
+                },
+              }
+            : {}),
+        },
+        select: { amountPaisa: true },
+      }),
+      this.prismaService.invoice.findMany({
+        select: {
+          amountPaisa: true,
+          status: true,
+          amcId: true,
+          invoiceDate: true,
+          paymentDate: true,
+        },
+      }),
     ]);
 
     const byId = new Map(results.map((item) => [item.projectId, item]));
@@ -146,6 +190,7 @@ export class DashboardService {
     let profitLossSum = 0n;
     let contractedRevenueSum = 0n;
     let contractedProfitLossSum = 0n;
+    let totalOutstandingPaisa = 0n;
     const ranked = projects.map((project) => {
       const pl = byId.get(project.id)!;
       if (pl.profitLossPaisa > 0n) {
@@ -157,6 +202,7 @@ export class DashboardService {
       profitLossSum += pl.profitLossPaisa;
       contractedRevenueSum += pl.contractedRevenuePaisa;
       contractedProfitLossSum += pl.contractedProfitLossPaisa;
+      totalOutstandingPaisa += pl.outstandingPaisa;
       const categoryNames = project.projectCategories.map(
         (row) => row.category.name,
       );
@@ -213,10 +259,41 @@ export class DashboardService {
         item.status !== AmcStatus.cancelled &&
         item.status !== AmcStatus.paid_pending,
     );
-    const amcValue = activeAmcRecords.reduce(
-      (sum, item) => sum + (item.amcAmountPaisa ?? 0n),
-      0n,
-    );
+    const amcValue = activeAmcRecords.reduce((sum, item) => {
+      const written = item.writeOffs.reduce(
+        (woSum, wo) => woSum + wo.amountPaisa,
+        0n,
+      );
+      return sum + ((item.amcAmountPaisa ?? 0n) - written);
+    }, 0n);
+
+    const totalWrittenOffPaisa =
+      projectWriteOffs.reduce((sum, row) => sum + row.amountPaisa, 0n) +
+      amcWriteOffRows.reduce((sum, row) => sum + row.amountPaisa, 0n);
+
+    let invoiceBilledPaisa = 0n;
+    let invoicePaidPaisa = 0n;
+    let invoicePendingPaisa = 0n;
+    let invoiceAmcBilledPaisa = 0n;
+    let invoicePaidCount = 0;
+    let invoicePendingCount = 0;
+    for (const inv of invoices) {
+      const effectiveDate =
+        inv.status === InvoiceStatus.paid
+          ? (inv.paymentDate ?? inv.invoiceDate)
+          : inv.invoiceDate;
+      if (fromDate && effectiveDate < fromDate) continue;
+      if (toDate && effectiveDate > toDate) continue;
+      invoiceBilledPaisa += inv.amountPaisa;
+      if (inv.amcId) invoiceAmcBilledPaisa += inv.amountPaisa;
+      if (inv.status === InvoiceStatus.paid) {
+        invoicePaidPaisa += inv.amountPaisa;
+        invoicePaidCount += 1;
+      } else {
+        invoicePendingPaisa += inv.amountPaisa;
+        invoicePendingCount += 1;
+      }
+    }
 
     const computedMargin =
       revenueSum === 0n
@@ -299,6 +376,14 @@ export class DashboardService {
       totalStandups,
       amcValuePaisa: String(amcValue),
       activeAmcs: activeAmcRecords.length,
+      totalWrittenOffPaisa: String(totalWrittenOffPaisa),
+      totalOutstandingPaisa: String(totalOutstandingPaisa),
+      invoiceBilledPaisa: String(invoiceBilledPaisa),
+      invoicePaidPaisa: String(invoicePaidPaisa),
+      invoicePendingPaisa: String(invoicePendingPaisa),
+      invoiceAmcBilledPaisa: String(invoiceAmcBilledPaisa),
+      invoicePaidCount,
+      invoicePendingCount,
       top5Profitable: profitable,
       top5LossMaking: lossMaking,
       trendingOverBudget: ranked.filter((item) => item.isTrendingOverBudget),

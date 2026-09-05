@@ -98,14 +98,19 @@ export function InvoiceTable({
                 params={{ id: invoice.id }}
               >
                 <TableCell>
-                  <Link
-                    to="/invoices/$id"
-                    params={{ id: invoice.id }}
-                    className="font-medium hover:underline"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    {invoice.invoiceNumber}
-                  </Link>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <Link
+                      to="/invoices/$id"
+                      params={{ id: invoice.id }}
+                      className="font-medium hover:underline"
+                      onClick={(event) => event.stopPropagation()}
+                    >
+                      {invoice.invoiceNumber}
+                    </Link>
+                    {invoice.amcId ? (
+                      <Badge variant="secondary">AMC</Badge>
+                    ) : null}
+                  </div>
                 </TableCell>
                 {showProject ? (
                   <TableCell>

@@ -75,6 +75,8 @@ export type InvoiceStatus = "pending" | "paid"
 export type Invoice = {
   id: string
   projectId: string
+  clientId: string
+  amcId?: string | null
   invoiceNumber: string
   invoiceDate: string
   amountPaisa: string
@@ -86,6 +88,16 @@ export type Invoice = {
   notes: string | null
   createdAt: string
   updatedAt?: string
+  client?: { id: string; name: string }
+  amc?: {
+    id: string
+    type: string
+    startDate: string
+    endDate: string
+    amcAmountPaisa: string | null
+    isVatApplicable?: boolean
+    status?: string
+  } | null
   project?: {
     id: string
     name: string
@@ -95,6 +107,25 @@ export type Invoice = {
     budgetPaisa?: string
     client?: { id: string; name: string }
   }
+}
+
+export type WriteOffRecord = {
+  id: string
+  projectId: string | null
+  amcId: string | null
+  date: string
+  amountPaisa: string
+  notes: string | null
+  createdAt: string
+  project?: { id: string; name: string; clientId: string } | null
+  amc?: {
+    id: string
+    type: string
+    projectId: string
+    amcAmountPaisa: string | null
+    startDate: string
+    endDate: string
+  } | null
 }
 
 export type ProjectDashboard = {
@@ -133,6 +164,8 @@ export type ProjectProfitability = {
   marginPercent: number
   contractedProfitLossPaisa?: string
   contractedMarginPercent?: number
+  writtenOffPaisa?: string
+  outstandingPaisa?: string
   forecastProfitLossPaisa: string | null
   isTrendingOverBudget: boolean
 }
@@ -475,6 +508,14 @@ export type DashboardSummary = {
   totalStandups: number
   amcValuePaisa: string
   activeAmcs: number
+  totalWrittenOffPaisa?: string
+  totalOutstandingPaisa?: string
+  invoiceBilledPaisa?: string
+  invoicePaidPaisa?: string
+  invoicePendingPaisa?: string
+  invoiceAmcBilledPaisa?: string
+  invoicePaidCount?: number
+  invoicePendingCount?: number
   canViewAudit: boolean
   top5Profitable: Array<{
     id: string

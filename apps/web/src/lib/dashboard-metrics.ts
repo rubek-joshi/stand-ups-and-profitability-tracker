@@ -45,6 +45,14 @@ export type DashboardData = {
   unpaidVatPaisa: string
   amcValuePaisa: string
   activeAmcs: number
+  totalWrittenOffPaisa: string
+  totalOutstandingPaisa: string
+  invoiceBilledPaisa: string
+  invoicePaidPaisa: string
+  invoicePendingPaisa: string
+  invoiceAmcBilledPaisa: string
+  invoicePaidCount: number
+  invoicePendingCount: number
   totalStandups: number
   totalEmployees: number
   canViewAudit: boolean
@@ -183,6 +191,14 @@ export function buildDashboard(
     unpaidVatPaisa: summary.accumulatedVat?.unpaidPaisa ?? "0",
     amcValuePaisa: summary.amcValuePaisa,
     activeAmcs: summary.activeAmcs,
+    totalWrittenOffPaisa: summary.totalWrittenOffPaisa ?? "0",
+    totalOutstandingPaisa: summary.totalOutstandingPaisa ?? "0",
+    invoiceBilledPaisa: summary.invoiceBilledPaisa ?? "0",
+    invoicePaidPaisa: summary.invoicePaidPaisa ?? "0",
+    invoicePendingPaisa: summary.invoicePendingPaisa ?? "0",
+    invoiceAmcBilledPaisa: summary.invoiceAmcBilledPaisa ?? "0",
+    invoicePaidCount: summary.invoicePaidCount ?? 0,
+    invoicePendingCount: summary.invoicePendingCount ?? 0,
     totalStandups: summary.totalStandups,
     totalEmployees: summary.totalEmployees,
     canViewAudit: summary.canViewAudit,

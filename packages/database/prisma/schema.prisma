@@ -162,6 +162,8 @@ enum AuditAction {
   INVOICE_UPDATED
   INVOICE_MARKED_PAID
   INVOICE_DELETED
+  WRITE_OFF_CREATED
+  WRITE_OFF_DELETED
 }
 
 model User {
@@ -188,6 +190,7 @@ model User {
   coreMemberSalaryChanges CoreMemberSalaryEntry[]  @relation("CoreMemberSalaryChangedBy")
   vatClearances           VatClearance[]
   createdInvoices         Invoice[]                @relation("InvoiceCreator")
+  createdWriteOffs        WriteOffRecord[]         @relation("WriteOffCreator")
   dbSnapshots             DbSnapshot[]
   passkeys                UserPasskey[]
   standupPreferredGroup   EmployeeGroup?           @relation("StandupPreferredGroup", fields: [standupPreferredGroupId], references: [id], onDelete: SetNull)
@@ -271,6 +274,7 @@ model Client {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   projects       Project[]
+  invoices       Invoice[]
 
   @@map("clients")
 }
@@ -312,6 +316,7 @@ model Project {
   amcRecords            AmcRecord[]
   links                 ProjectLink[]
   invoices              Invoice[]
+  writeOffs             WriteOffRecord[]
 
   @@index([clientId])
   @@index([status])
@@ -378,6 +383,8 @@ model ProjectLink {
 model Invoice {
   id             String        @id @default(cuid())
   projectId      String
+  clientId       String
+  amcId          String?
   invoiceNumber  String        @unique
   invoiceDate    DateTime      @db.Date
   amountPaisa    BigInt
@@ -391,13 +398,38 @@ model Invoice {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy User?   @relation("InvoiceCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  project   Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  client    Client     @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  amc       AmcRecord? @relation(fields: [amcId], references: [id], onDelete: SetNull)
+  createdBy User?      @relation("InvoiceCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   @@index([projectId])
+  @@index([clientId])
+  @@index([amcId])
   @@index([status])
   @@index([invoiceDate])
   @@map("invoices")
+}
+
+model WriteOffRecord {
+  id          String   @id @default(cuid())
+  projectId   String?
+  amcId       String?
+  date        DateTime @db.Date
+  amountPaisa BigInt
+  notes       String?
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project   Project?   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  amc       AmcRecord? @relation(fields: [amcId], references: [id], onDelete: Cascade)
+  createdBy User?      @relation("WriteOffCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([amcId])
+  @@index([date])
+  @@map("write_off_records")
 }
 
 model ProjectExtension {
@@ -640,7 +672,9 @@ model AmcRecord {
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 
-  project Project @relation(fields: [projectId], references: [id])
+  project   Project          @relation(fields: [projectId], references: [id])
+  invoices  Invoice[]
+  writeOffs WriteOffRecord[]
 
   @@index([projectId])
   @@index([status])

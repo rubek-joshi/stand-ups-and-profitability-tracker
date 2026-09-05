@@ -42,7 +42,9 @@ export class AmcController {
   async findAll(
     @Query("q") q?: string,
     @Query("status") status?: string,
+    @Query("type") type?: string,
     @Query("clientId") clientId?: string,
+    @Query("projectId") projectId?: string,
     @Query("from") from?: string,
     @Query("to") to?: string,
     @Query("page") page?: string,
@@ -51,7 +53,9 @@ export class AmcController {
     return this.amcService.findAll({
       q,
       status,
+      type,
       clientId,
+      projectId,
       from,
       to,
       page,

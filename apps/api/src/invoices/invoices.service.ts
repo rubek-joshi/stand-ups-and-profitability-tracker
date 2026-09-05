@@ -4,7 +4,13 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AuditAction, InvoiceStatus, Prisma } from '@workspace/database';
+import {
+  AmcStatus,
+  AmcType,
+  AuditAction,
+  InvoiceStatus,
+  Prisma,
+} from '@workspace/database';
 import { AuditService } from '../audit/audit.service';
 import { ProfitabilityService } from '../profitability/profitability.service';
 import { parseIsoDate, toIsoDate } from '../_shared/utils/date.util';
@@ -24,33 +30,37 @@ import {
 
 const INVOICE_MONEY_FIELDS = ['amountPaisa', 'vatPaisa', 'totalPaisa'] as const;
 
-const INVOICE_SORT_FIELDS = {
-  invoiceNumber: 'invoiceNumber',
-  invoiceDate: 'invoiceDate',
-} as const;
-
-type InvoiceSortBy = keyof typeof INVOICE_SORT_FIELDS;
-type SortDir = 'asc' | 'desc';
-
-function resolveInvoiceOrder(
-  sortBy?: string,
-  sortDir?: string,
-): Prisma.InvoiceOrderByWithRelationInput[] {
-  const dir: SortDir = sortDir === 'asc' ? 'asc' : 'desc';
-  if (sortBy === 'invoiceNumber') {
-    return [{ invoiceNumber: dir }, { invoiceDate: 'desc' }];
-  }
-  if (sortBy === 'invoiceDate') {
-    return [{ invoiceDate: dir }, { createdAt: 'desc' }];
-  }
-  return [{ invoiceDate: 'desc' }, { createdAt: 'desc' }];
-}
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 const projectInclude = {
   client: { select: { id: true, name: true } },
 } as const;
 
-const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const amcInclude = {
+  select: {
+    id: true,
+    type: true,
+    startDate: true,
+    endDate: true,
+    amcAmountPaisa: true,
+    isVatApplicable: true,
+    status: true,
+  },
+} as const;
+
+const invoiceInclude = {
+  project: { include: projectInclude },
+  client: { select: { id: true, name: true } },
+  amc: amcInclude,
+} as const;
+
+type InvoiceParent = {
+  projectId: string;
+  clientId: string;
+  amcId: string | null;
+  isVatApplicable: boolean;
+  vatRateApplied: number;
+};
 
 function requireIsoDate(value: string, label: string): Date {
   const trimmed = value.trim();
@@ -64,6 +74,20 @@ function roundVatPaisa(amountPaisa: bigint, ratePercent: number): bigint {
   if (ratePercent <= 0) return 0n;
   const product = amountPaisa * BigInt(ratePercent);
   return (product + 50n) / 100n;
+}
+
+function resolveInvoiceOrder(
+  sortBy?: string,
+  sortDir?: string,
+): Prisma.InvoiceOrderByWithRelationInput[] {
+  const dir = sortDir === 'asc' ? 'asc' : 'desc';
+  if (sortBy === 'invoiceNumber') {
+    return [{ invoiceNumber: dir }, { invoiceDate: 'desc' }];
+  }
+  if (sortBy === 'invoiceDate') {
+    return [{ invoiceDate: dir }, { createdAt: 'desc' }];
+  }
+  return [{ invoiceDate: 'desc' }, { createdAt: 'desc' }];
 }
 
 @Injectable()
@@ -80,6 +104,7 @@ export class InvoicesService {
       status?: string;
       projectId?: string;
       clientId?: string;
+      amcId?: string;
       from?: string;
       to?: string;
       sortBy?: string;
@@ -91,6 +116,7 @@ export class InvoicesService {
     const q = filters.q?.trim();
     const projectId = filters.projectId?.trim();
     const clientId = filters.clientId?.trim();
+    const amcId = filters.amcId?.trim();
     const pagination = resolvePagination({
       page: filters.page,
       pageSize: filters.pageSize,
@@ -108,7 +134,8 @@ export class InvoicesService {
     const where: Prisma.InvoiceWhereInput = {
       ...(status ? { status } : {}),
       ...(projectId ? { projectId } : {}),
-      ...(clientId ? { project: { clientId } } : {}),
+      ...(clientId ? { clientId } : {}),
+      ...(amcId ? { amcId } : {}),
       ...(from || to
         ? {
             invoiceDate: {
@@ -125,7 +152,7 @@ export class InvoicesService {
     const [records, total] = await Promise.all([
       this.prismaService.invoice.findMany({
         where,
-        include: { project: { include: projectInclude } },
+        include: invoiceInclude,
         orderBy: resolveInvoiceOrder(filters.sortBy, filters.sortDir),
         ...(pagination ? { skip: pagination.skip, take: pagination.take } : {}),
       }),
@@ -142,7 +169,7 @@ export class InvoicesService {
   async findById(id: string) {
     const invoice = await this.prismaService.invoice.findUnique({
       where: { id },
-      include: { project: { include: projectInclude } },
+      include: invoiceInclude,
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
     return this.serialize(invoice);
@@ -162,37 +189,18 @@ export class InvoicesService {
   }
 
   async create(dto: CreateInvoiceDto, actorId: string) {
-    const project = await this.prismaService.project.findUnique({
-      where: { id: dto.projectId },
-      select: {
-        id: true,
-        name: true,
-        isVatApplicable: true,
-        vatRateApplied: true,
-      },
-    });
-    if (!project) throw new NotFoundException('Project not found');
-
+    const parent = await this.resolveParent(dto.projectId, dto.amcId);
     const invoiceNumber = dto.invoiceNumber.trim();
     if (!invoiceNumber) {
       throw new BadRequestException('Invoice number is required');
     }
 
     const invoiceDate = requireIsoDate(dto.invoiceDate, 'Invoice date');
-    let amountPaisa: bigint;
-    try {
-      amountPaisa = nprToPaisa(dto.amountNpr);
-    } catch {
-      throw new BadRequestException('Invalid amount');
-    }
-    if (amountPaisa <= 0n) {
-      throw new BadRequestException('Amount must be greater than zero');
-    }
-
+    const amountPaisa = this.parseAmount(dto.amountNpr);
     this.assertInvoiceDateNotFuture(invoiceDate);
     const { vatRateApplied, vatPaisa, totalPaisa } = this.vatFor(
       amountPaisa,
-      project,
+      parent,
     );
     const notes = dto.notes?.trim() || null;
 
@@ -208,7 +216,9 @@ export class InvoicesService {
 
     const created = await this.prismaService.invoice.create({
       data: {
-        projectId: project.id,
+        projectId: parent.projectId,
+        clientId: parent.clientId,
+        amcId: parent.amcId,
         invoiceNumber,
         invoiceDate,
         amountPaisa,
@@ -218,16 +228,18 @@ export class InvoicesService {
         notes,
         createdById: actorId,
       },
-      include: { project: { include: projectInclude } },
+      include: invoiceInclude,
     });
-    this.profitabilityService.clearCache(project.id);
+    this.profitabilityService.clearCache(parent.projectId);
     await this.auditService.write({
       actorId,
       action: AuditAction.INVOICE_CREATED,
       targetType: 'Invoice',
       targetId: created.id,
       metadata: {
-        projectId: project.id,
+        projectId: parent.projectId,
+        clientId: parent.clientId,
+        amcId: parent.amcId,
         invoiceNumber,
         amountPaisa: amountPaisa.toString(),
         vatPaisa: vatPaisa.toString(),
@@ -246,16 +258,7 @@ export class InvoicesService {
       throw new BadRequestException('Paid invoices cannot be edited');
     }
 
-    const project = await this.prismaService.project.findUnique({
-      where: { id: dto.projectId },
-      select: {
-        id: true,
-        isVatApplicable: true,
-        vatRateApplied: true,
-      },
-    });
-    if (!project) throw new NotFoundException('Project not found');
-
+    const parent = await this.resolveParent(dto.projectId, dto.amcId);
     const invoiceNumber = dto.invoiceNumber.trim();
     if (!invoiceNumber) {
       throw new BadRequestException('Invoice number is required');
@@ -263,16 +266,7 @@ export class InvoicesService {
 
     const invoiceDate = requireIsoDate(dto.invoiceDate, 'Invoice date');
     this.assertInvoiceDateNotFuture(invoiceDate);
-
-    let amountPaisa: bigint;
-    try {
-      amountPaisa = nprToPaisa(dto.amountNpr);
-    } catch {
-      throw new BadRequestException('Invalid amount');
-    }
-    if (amountPaisa <= 0n) {
-      throw new BadRequestException('Amount must be greater than zero');
-    }
+    const amountPaisa = this.parseAmount(dto.amountNpr);
 
     const duplicate = await this.prismaService.invoice.findFirst({
       where: { invoiceNumber, NOT: { id } },
@@ -286,14 +280,16 @@ export class InvoicesService {
 
     const { vatRateApplied, vatPaisa, totalPaisa } = this.vatFor(
       amountPaisa,
-      project,
+      parent,
     );
     const notes = dto.notes?.trim() || null;
 
     const updated = await this.prismaService.invoice.update({
       where: { id },
       data: {
-        projectId: project.id,
+        projectId: parent.projectId,
+        clientId: parent.clientId,
+        amcId: parent.amcId,
         invoiceNumber,
         invoiceDate,
         amountPaisa,
@@ -302,10 +298,10 @@ export class InvoicesService {
         vatRateApplied,
         notes,
       },
-      include: { project: { include: projectInclude } },
+      include: invoiceInclude,
     });
-    this.profitabilityService.clearCache(project.id);
-    if (invoice.projectId !== project.id) {
+    this.profitabilityService.clearCache(parent.projectId);
+    if (invoice.projectId !== parent.projectId) {
       this.profitabilityService.clearCache(invoice.projectId);
     }
     await this.auditService.write({
@@ -314,7 +310,9 @@ export class InvoicesService {
       targetType: 'Invoice',
       targetId: updated.id,
       metadata: {
-        projectId: project.id,
+        projectId: parent.projectId,
+        clientId: parent.clientId,
+        amcId: parent.amcId,
         invoiceNumber,
         amountPaisa: amountPaisa.toString(),
         vatPaisa: vatPaisa.toString(),
@@ -349,7 +347,7 @@ export class InvoicesService {
     const updated = await this.prismaService.invoice.update({
       where: { id },
       data: { status: InvoiceStatus.paid, paymentDate },
-      include: { project: { include: projectInclude } },
+      include: invoiceInclude,
     });
     this.profitabilityService.clearCache(invoice.projectId);
     await this.auditService.write({
@@ -380,11 +378,86 @@ export class InvoicesService {
       targetId: id,
       metadata: {
         projectId: invoice.projectId,
+        clientId: invoice.clientId,
+        amcId: invoice.amcId,
         invoiceNumber: invoice.invoiceNumber,
         status: invoice.status,
       },
     });
     return { id };
+  }
+
+  private async resolveParent(
+    projectId?: string,
+    amcId?: string,
+  ): Promise<InvoiceParent> {
+    const trimmedProjectId = projectId?.trim() || undefined;
+    const trimmedAmcId = amcId?.trim() || undefined;
+    if (Boolean(trimmedProjectId) === Boolean(trimmedAmcId)) {
+      throw new BadRequestException(
+        'Provide exactly one of projectId or amcId',
+      );
+    }
+
+    if (trimmedAmcId) {
+      const amc = await this.prismaService.amcRecord.findUnique({
+        where: { id: trimmedAmcId },
+        include: {
+          project: {
+            select: {
+              id: true,
+              clientId: true,
+              vatRateApplied: true,
+            },
+          },
+        },
+      });
+      if (!amc) throw new NotFoundException('AMC not found');
+      if (amc.type !== AmcType.paid) {
+        throw new BadRequestException('Only paid AMCs can be invoiced');
+      }
+      if (amc.status === AmcStatus.cancelled) {
+        throw new BadRequestException('Cancelled AMCs cannot be invoiced');
+      }
+      return {
+        projectId: amc.project.id,
+        clientId: amc.project.clientId,
+        amcId: amc.id,
+        isVatApplicable: amc.isVatApplicable,
+        vatRateApplied: amc.project.vatRateApplied,
+      };
+    }
+
+    const project = await this.prismaService.project.findUnique({
+      where: { id: trimmedProjectId! },
+      select: {
+        id: true,
+        clientId: true,
+        isVatApplicable: true,
+        vatRateApplied: true,
+      },
+    });
+    if (!project) throw new NotFoundException('Project not found');
+    return {
+      projectId: project.id,
+      clientId: project.clientId,
+      amcId: null,
+      isVatApplicable: project.isVatApplicable,
+      vatRateApplied: project.vatRateApplied,
+    };
+  }
+
+  private parseAmount(amountNpr: number): bigint {
+    let amountPaisa: bigint;
+    try {
+      amountPaisa = nprToPaisa(amountNpr);
+    } catch {
+      throw new BadRequestException('Invalid amount');
+    }
+    if (amountPaisa <= 0n) {
+      throw new BadRequestException('Amount must be greater than zero');
+    }
+    return amountPaisa;
   }
 
   private assertInvoiceDateNotFuture(invoiceDate: Date) {
@@ -395,9 +468,9 @@ export class InvoicesService {
 
   private vatFor(
     amountPaisa: bigint,
-    project: { isVatApplicable: boolean; vatRateApplied: number },
+    parent: { isVatApplicable: boolean; vatRateApplied: number },
   ) {
-    const vatRateApplied = project.isVatApplicable ? project.vatRateApplied : 0;
+    const vatRateApplied = parent.isVatApplicable ? parent.vatRateApplied : 0;
     const vatPaisa = roundVatPaisa(amountPaisa, vatRateApplied);
     return { vatRateApplied, vatPaisa, totalPaisa: amountPaisa + vatPaisa };
   }
@@ -412,10 +485,14 @@ export class InvoicesService {
   }
 
   private serialize(
-    invoice: Prisma.InvoiceGetPayload<{
-      include: { project: { include: typeof projectInclude } };
-    }>,
+    invoice: Prisma.InvoiceGetPayload<{ include: typeof invoiceInclude }>,
   ) {
-    return serializeMoneyFields(invoice, INVOICE_MONEY_FIELDS);
+    const withAmcMoney = invoice.amc
+      ? {
+          ...invoice,
+          amc: serializeMoneyFields(invoice.amc, ['amcAmountPaisa'] as const),
+        }
+      : invoice;
+    return serializeMoneyFields(withAmcMoney, INVOICE_MONEY_FIELDS);
   }
 }

@@ -132,7 +132,8 @@ function InvoiceDetailPage() {
 
   const current = invoice
   const overdue = isInvoiceOverdue(current)
-  const client = current.project?.client ?? project?.client
+  const client =
+    current.client ?? current.project?.client ?? project?.client
   const daysIssued = daysSinceInvoice(current.invoiceDate)
 
   const sorted = [...siblings].sort((a, b) =>
@@ -150,10 +151,12 @@ function InvoiceDetailPage() {
     0,
   )
   const budgetPaisa =
+    project?.profitability?.contractedRevenuePaisa ??
     project?.profitability?.revenuePaisa ??
     project?.budgetPaisa ??
     current.project?.budgetPaisa ??
     "0"
+  const writtenOffPaisa = project?.profitability?.writtenOffPaisa ?? "0"
   const budget = paisaNumber(budgetPaisa)
   const pctOfBudget = budget > 0 ? (thisAmount / budget) * 100 : 0
   const pctOfInvoiced = totalAmount > 0 ? (thisAmount / totalAmount) * 100 : 0
@@ -223,6 +226,7 @@ function InvoiceDetailPage() {
         }
         status={
           <>
+            {invoice.amcId ? <Badge variant="secondary">AMC</Badge> : null}
             <StatusBadge status={invoice.status} />
             {overdue ? (
               <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">
@@ -391,7 +395,7 @@ function InvoiceDetailPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 text-sm">
-              <StatRow label="Total budget" value={formatNpr(budgetPaisa)} />
+              <StatRow label="Written off" value={formatNpr(writtenOffPaisa)} />
               <StatRow
                 label="Total invoiced"
                 value={formatNpr(analytics.totalInvoicedPaisa)}

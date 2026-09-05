@@ -81,13 +81,13 @@ function SummaryCard({
 }) {
   return (
     <Card>
-      <CardContent className="p-4">
+      <CardContent className="px-4">
         <div className="text-sm text-muted-foreground">{label}</div>
-        <div className={`mt-1 text-xl font-semibold ${accent ?? ""}`}>
+        <div className={`mt-0.5 text-xl font-semibold ${accent ?? ""}`}>
           {value}
         </div>
         {sub ? (
-          <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>
+          <div className="text-xs text-muted-foreground">{sub}</div>
         ) : null}
       </CardContent>
     </Card>
@@ -178,7 +178,11 @@ export function ProjectInvoicesTab({
   }, [load])
 
   const analytics = computeInvoiceAnalytics(invoices)
-  const budgetPaisa = project.profitability?.revenuePaisa ?? project.budgetPaisa
+  const writtenOffPaisa = project.profitability?.writtenOffPaisa ?? "0"
+  const budgetPaisa =
+    project.profitability?.contractedRevenuePaisa ??
+    project.profitability?.revenuePaisa ??
+    project.budgetPaisa
   const budget = paisaNumber(budgetPaisa)
   const remainingToInvoice = budget - analytics.totalAmountPaisa
   const stale = isInvoiceListStale(invoices)
@@ -280,11 +284,6 @@ export function ProjectInvoicesTab({
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <SummaryCard
-          label="Total budget"
-          value={formatNpr(budgetPaisa)}
-          sub="excl. VAT"
-        />
-        <SummaryCard
           label="Total invoiced"
           value={formatNpr(analytics.totalInvoicedPaisa)}
           sub={`${invoices.length} invoice${invoices.length === 1 ? "" : "s"}`}
@@ -303,6 +302,16 @@ export function ProjectInvoicesTab({
               : "text-emerald-600 dark:text-emerald-400"
           }
           sub="invoiced − paid"
+        />
+        <SummaryCard
+          label="Written off"
+          value={formatNpr(writtenOffPaisa)}
+          accent={
+            paisaNumber(writtenOffPaisa) > 0
+              ? "text-amber-600 dark:text-amber-400"
+              : undefined
+          }
+          sub="excl. VAT"
         />
       </div>
 
@@ -370,6 +379,9 @@ export function ProjectInvoicesTab({
                                 {invoice.invoiceNumber}
                               </Link>
                             </CardTitle>
+                            {invoice.amcId ? (
+                              <Badge variant="secondary">AMC</Badge>
+                            ) : null}
                             <StatusBadge status={invoice.status} />
                             {overdue ? (
                               <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100 dark:bg-amber-950 dark:text-amber-200">
@@ -451,7 +463,7 @@ export function ProjectInvoicesTab({
                               </div>
                             ) : null}
                           </div>
-                          <div className="text-sm text-muted-foreground text-right">
+                          <div className="text-right text-sm text-muted-foreground">
                             <div>{toDateKey(invoice.invoiceDate)}</div>
                             {invoice.status === "paid" &&
                             invoice.paymentDate ? (
@@ -501,8 +513,13 @@ export function ProjectInvoicesTab({
                 label="Extensions"
                 value={formatNpr(project.profitability?.extensionsPaisa ?? "0")}
               />
+              <Row label="Written off" value={formatNpr(writtenOffPaisa)} />
               <div className="border-t pt-2">
-                <Row label="Total budget" value={formatNpr(budgetPaisa)} bold />
+                <Row
+                  label="Effective contracted"
+                  value={formatNpr(budgetPaisa)}
+                  bold
+                />
               </div>
               <Row
                 label="Remaining to invoice"
@@ -520,7 +537,7 @@ export function ProjectInvoicesTab({
           </Card>
           {analytics.lastPaid?.paymentDate ? (
             <Card>
-              <CardHeader className="pb-2">
+              <CardHeader>
                 <CardTitle className="text-sm font-medium">
                   Last payment
                 </CardTitle>

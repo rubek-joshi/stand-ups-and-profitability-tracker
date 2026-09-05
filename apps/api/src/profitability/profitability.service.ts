@@ -17,6 +17,8 @@ export type ProjectProfitability = {
   marginPercent: number;
   contractedProfitLossPaisa: bigint;
   contractedMarginPercent: number;
+  writtenOffPaisa: bigint;
+  outstandingPaisa: bigint;
   forecastProfitLossPaisa: bigint | null;
   isTrendingOverBudget: boolean;
 };
@@ -67,6 +69,7 @@ export class ProfitabilityService {
         where: { id: projectId },
         include: {
           extensions: true,
+          writeOffs: true,
           invoices: {
             where: { status: InvoiceStatus.paid },
           },
@@ -101,6 +104,11 @@ export class ProfitabilityService {
       0n,
     );
 
+    const writtenOffPaisa = project.writeOffs.reduce(
+      (sum, row) => sum + row.amountPaisa,
+      0n,
+    );
+
     const paidInvoices = project.invoices.filter((inv) => {
       const invDate = inv.paymentDate ?? inv.invoiceDate;
       if (options?.from && invDate < options.from) {
@@ -117,7 +125,8 @@ export class ProfitabilityService {
       0n,
     );
 
-    const contractedRevenuePaisa = project.budgetPaisa + extensionsPaisa;
+    const contractedRevenuePaisa =
+      project.budgetPaisa + extensionsPaisa - writtenOffPaisa;
 
     const cutoverDate = orgSettings?.standupTrackingStartDate ?? null;
     let employeeCostPaisa = 0n;
@@ -180,6 +189,8 @@ export class ProfitabilityService {
         ? 0
         : Number((contractedProfitLossPaisa * 10000n) / contractedRevenuePaisa) / 100;
 
+    const outstandingPaisa = contractedRevenuePaisa - realizedRevenuePaisa;
+
     const result: ProjectProfitability = {
       projectId,
       budgetPaisa: project.budgetPaisa,
@@ -194,6 +205,8 @@ export class ProfitabilityService {
       marginPercent,
       contractedProfitLossPaisa,
       contractedMarginPercent,
+      writtenOffPaisa,
+      outstandingPaisa,
       forecastProfitLossPaisa: null,
       isTrendingOverBudget: totalCostPaisa > contractedRevenuePaisa,
     };

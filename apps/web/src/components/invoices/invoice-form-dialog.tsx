@@ -11,6 +11,7 @@ import {
 import { Input } from "@workspace/ui/components/input"
 import { Label } from "@workspace/ui/components/label"
 import { Textarea } from "@workspace/ui/components/textarea"
+import { AmcCombobox } from "@/components/amc/amc-combobox"
 import { DateInput } from "@/components/datetime-picker"
 import { ProjectCombobox } from "@/components/project-combobox"
 import { api, ApiError } from "@/lib/api"
@@ -21,12 +22,26 @@ import { nptTodayIso } from "@/lib/standup-age"
 import { dateStringParser, isDateValid } from "@/lib/date-input"
 import type { Invoice, Project } from "@/lib/types"
 
+type BillingSource = "project" | "amc"
+
 type ProjectOption = Pick<
   Project,
   "id" | "name" | "isVatApplicable" | "vatRateApplied" | "budgetPaisa"
 > & {
   client?: { id: string; name: string }
   profitability?: Project["profitability"]
+}
+
+type ResolvedBilling = {
+  source: BillingSource
+  projectId: string
+  amcId?: string
+  label: string
+  clientName?: string
+  isVatApplicable: boolean
+  vatRateApplied: number
+  budgetPaisa: string | number
+  invoicedAmountPaisa: number
 }
 
 export function InvoiceFormDialog({
@@ -36,6 +51,7 @@ export function InvoiceFormDialog({
   budgetPaisa,
   invoicedAmountPaisa = 0,
   presetProjectId,
+  presetAmcId,
   invoice,
   clientId,
   onCreated,
@@ -47,19 +63,20 @@ export function InvoiceFormDialog({
   budgetPaisa?: string | number
   invoicedAmountPaisa?: number
   presetProjectId?: string
+  presetAmcId?: string
   invoice?: Invoice | null
   clientId?: string
   onCreated?: (created: Invoice) => void
   onUpdated?: (updated: Invoice) => void
 }) {
   const editing = Boolean(invoice)
-  const pickProject = !lockedProject
+  const pickParent = !lockedProject && !presetAmcId
+  const [source, setSource] = React.useState<BillingSource>(
+    presetAmcId || invoice?.amcId ? "amc" : "project",
+  )
   const [projectId, setProjectId] = React.useState(presetProjectId ?? "")
-  const [resolved, setResolved] = React.useState<{
-    project: ProjectOption
-    budgetPaisa: string | number
-    invoicedAmountPaisa: number
-  } | null>(null)
+  const [amcId, setAmcId] = React.useState(presetAmcId ?? "")
+  const [resolved, setResolved] = React.useState<ResolvedBilling | null>(null)
   const [invoiceNumber, setInvoiceNumber] = React.useState("")
   const [invoiceDate, setInvoiceDate] = React.useState(nptTodayIso)
   const [amount, setAmount] = React.useState("")
@@ -77,34 +94,93 @@ export function InvoiceFormDialog({
       setAmount(String(paisaToNpr(invoice.amountPaisa)))
       setNotes(invoice.notes ?? "")
       setProjectId(invoice.projectId)
+      setAmcId(invoice.amcId ?? "")
+      setSource(invoice.amcId ? "amc" : "project")
       return
     }
     setInvoiceDate(nptTodayIso())
     setAmount("")
     setNotes("")
     setProjectId(lockedProject?.id ?? presetProjectId ?? "")
+    setAmcId(presetAmcId ?? "")
+    setSource(presetAmcId ? "amc" : "project")
     void api<Envelope<{ nextNumber: string }>>("/invoices/next-number")
       .then((res) => setInvoiceNumber(res.data.nextNumber))
       .catch(() => setInvoiceNumber(""))
-  }, [open, invoice, lockedProject?.id, presetProjectId])
+  }, [open, invoice, lockedProject?.id, presetProjectId, presetAmcId])
 
   React.useEffect(() => {
     if (!open) return
+
+    if (source === "amc") {
+      const selectedAmcId = amcId || presetAmcId
+      if (!selectedAmcId) {
+        setResolved(null)
+        return
+      }
+      void (async () => {
+        try {
+          const [amcRes, invoicesRes] = await Promise.all([
+            api<
+              Envelope<{
+                id: string
+                projectId: string
+                isVatApplicable: boolean
+                amcAmountPaisa: string | null
+                project?: {
+                  id: string
+                  name: string
+                  vatRateApplied?: number
+                  client?: { id: string; name: string }
+                }
+              }>
+            >(`/amc/${selectedAmcId}`),
+            api<PaginatedEnvelope<Invoice[]>>(
+              `/invoices?amcId=${encodeURIComponent(selectedAmcId)}`,
+            ),
+          ])
+          const amc = amcRes.data
+          const others = invoicesRes.data.filter((row) => row.id !== invoice?.id)
+          setResolved({
+            source: "amc",
+            projectId: amc.projectId,
+            amcId: amc.id,
+            label: amc.project?.name ?? "AMC",
+            clientName: amc.project?.client?.name,
+            isVatApplicable: amc.isVatApplicable,
+            vatRateApplied: amc.project?.vatRateApplied ?? 13,
+            budgetPaisa: amc.amcAmountPaisa ?? "0",
+            invoicedAmountPaisa: others.reduce(
+              (sum, row) => sum + paisaNumber(row.amountPaisa),
+              0,
+            ),
+          })
+        } catch (err) {
+          setResolved(null)
+          setError(err instanceof ApiError ? err.message : "Failed to load AMC")
+        }
+      })()
+      return
+    }
+
     if (lockedProject) {
       setResolved({
-        project: {
-          ...lockedProject,
-          budgetPaisa: String(budgetPaisa ?? "0"),
-        },
+        source: "project",
+        projectId: lockedProject.id,
+        label: lockedProject.name,
+        isVatApplicable: lockedProject.isVatApplicable,
+        vatRateApplied: lockedProject.vatRateApplied ?? 13,
         budgetPaisa: budgetPaisa ?? "0",
         invoicedAmountPaisa,
       })
       return
     }
+
     if (!projectId) {
       setResolved(null)
       return
     }
+
     void (async () => {
       try {
         const [projectRes, invoicesRes] = await Promise.all([
@@ -114,10 +190,20 @@ export function InvoiceFormDialog({
           ),
         ])
         const project = projectRes.data
-        const others = invoicesRes.data.filter((row) => row.id !== invoice?.id)
+        const others = invoicesRes.data.filter(
+          (row) => row.id !== invoice?.id && !row.amcId,
+        )
         setResolved({
-          project,
-          budgetPaisa: project.profitability?.revenuePaisa ?? project.budgetPaisa,
+          source: "project",
+          projectId: project.id,
+          label: project.name,
+          clientName: project.client?.name,
+          isVatApplicable: project.isVatApplicable,
+          vatRateApplied: project.vatRateApplied ?? 13,
+          budgetPaisa:
+            project.profitability?.contractedRevenuePaisa ??
+            project.profitability?.revenuePaisa ??
+            project.budgetPaisa,
           invoicedAmountPaisa: others.reduce(
             (sum, row) => sum + paisaNumber(row.amountPaisa),
             0,
@@ -132,15 +218,17 @@ export function InvoiceFormDialog({
     })()
   }, [
     open,
+    source,
     lockedProject,
     lockedProject?.id,
     projectId,
+    amcId,
+    presetAmcId,
     budgetPaisa,
     invoicedAmountPaisa,
     invoice?.id,
   ])
 
-  const project = resolved?.project
   const amountNpr = (() => {
     try {
       return amount.trim() ? parseNprInput(amount) : 0
@@ -148,9 +236,11 @@ export function InvoiceFormDialog({
       return 0
     }
   })()
-  const vatRate = project?.isVatApplicable ? (project.vatRateApplied ?? 13) : 0
+  const vatRate = resolved?.isVatApplicable
+    ? (resolved.vatRateApplied ?? 13)
+    : 0
   const amountPaisa = nprToPaisa(amountNpr)
-  const vatPaisa = project?.isVatApplicable
+  const vatPaisa = resolved?.isVatApplicable
     ? Math.round((amountPaisa * vatRate) / 100)
     : 0
   const totalPaisa = amountPaisa + vatPaisa
@@ -163,8 +253,8 @@ export function InvoiceFormDialog({
   async function submit(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
-    if (!project) {
-      setError("Pick a project first")
+    if (!resolved) {
+      setError(source === "amc" ? "Pick a paid AMC first" : "Pick a project first")
       return
     }
     let parsed: number
@@ -188,7 +278,9 @@ export function InvoiceFormDialog({
     }
     setSaving(true)
     const body = {
-      projectId: project.id,
+      ...(resolved.source === "amc"
+        ? { amcId: resolved.amcId }
+        : { projectId: resolved.projectId }),
       invoiceNumber: invoiceNumber.trim(),
       invoiceDate: parsedInvoiceDate,
       amountNpr: parsed,
@@ -229,19 +321,73 @@ export function InvoiceFormDialog({
           <DialogTitle>{editing ? "Edit invoice" : "New invoice"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
-          {pickProject ? (
-            <div className="flex flex-col gap-2">
-              <Label>Project</Label>
-              <ProjectCombobox
-                value={projectId || undefined}
-                onValueChange={(id) => {
-                  setProjectId(id ?? "")
-                  setError(null)
-                }}
-                clientId={clientId}
-                placeholder="Search projects…"
-              />
+          {pickParent ? (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    ["project", "Project"],
+                    ["amc", "Paid AMC"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => {
+                      setSource(value)
+                      setResolved(null)
+                      setError(null)
+                      if (value === "project") setAmcId("")
+                      else setProjectId("")
+                    }}
+                    className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+                      source === value
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border bg-card text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              {source === "project" ? (
+                <div className="flex flex-col gap-2">
+                  <Label>Project</Label>
+                  <ProjectCombobox
+                    value={projectId || undefined}
+                    onValueChange={(id) => {
+                      setProjectId(id ?? "")
+                      setError(null)
+                    }}
+                    clientId={clientId}
+                    placeholder="Search projects…"
+                  />
+                </div>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  <Label>Paid AMC</Label>
+                  <AmcCombobox
+                    value={amcId || undefined}
+                    onValueChange={(id) => {
+                      setAmcId(id ?? "")
+                      setError(null)
+                    }}
+                    projectId={presetProjectId}
+                    clientId={clientId}
+                  />
+                </div>
+              )}
+            </>
+          ) : lockedProject && !presetAmcId ? (
+            <div className="rounded-lg border px-3 py-2 text-sm">
+              <div className="text-muted-foreground">Project</div>
+              <div className="font-medium">{lockedProject.name}</div>
             </div>
+          ) : null}
+          {resolved?.clientName ? (
+            <p className="text-xs text-muted-foreground">
+              Client: {resolved.clientName}
+            </p>
           ) : null}
           <div className="flex flex-col gap-2">
             <Label htmlFor="invoice-number">Invoice number</Label>
@@ -272,14 +418,16 @@ export function InvoiceFormDialog({
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
-          {project ? (
+          {resolved ? (
             <div className="flex flex-col gap-1 rounded-lg bg-muted p-3 text-sm">
               <div className="flex justify-between">
                 <span className="text-muted-foreground">
-                  VAT{project.isVatApplicable ? ` (${vatRate}%)` : ""}
+                  VAT{resolved.isVatApplicable ? ` (${vatRate}%)` : ""}
                 </span>
                 <span>
-                  {project.isVatApplicable ? formatNpr(vatPaisa) : "Not applicable"}
+                  {resolved.isVatApplicable
+                    ? formatNpr(vatPaisa)
+                    : "Not applicable"}
                 </span>
               </div>
               <div className="flex justify-between font-semibold">
@@ -288,10 +436,12 @@ export function InvoiceFormDialog({
               </div>
             </div>
           ) : null}
-          {project && budget > 0 ? (
+          {resolved && budget > 0 ? (
             <div className="flex flex-col gap-1 rounded-lg border p-3 text-sm">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">% of total budget</span>
+                <span className="text-muted-foreground">
+                  % of {resolved.source === "amc" ? "AMC value" : "budget"}
+                </span>
                 <span className="font-medium">{pctOfBudget.toFixed(1)}%</span>
               </div>
               <div className="flex justify-between">
@@ -303,7 +453,11 @@ export function InvoiceFormDialog({
               {overBudget ? (
                 <div className="mt-1 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-2 py-1.5 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
                   <IconAlertTriangle className="mt-0.5 size-4 shrink-0" />
-                  <span>This invoice exceeds the total budget. You can still add it.</span>
+                  <span>
+                    This invoice exceeds the{" "}
+                    {resolved.source === "amc" ? "AMC value" : "total budget"}.
+                    You can still add it.
+                  </span>
                 </div>
               ) : null}
             </div>
@@ -322,7 +476,7 @@ export function InvoiceFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={saving || !project}>
+            <Button type="submit" disabled={saving || !resolved}>
               {saving
                 ? editing
                   ? "Saving…"

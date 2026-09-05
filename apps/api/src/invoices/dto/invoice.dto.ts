@@ -6,12 +6,23 @@ import {
   IsString,
   MaxLength,
   Min,
+  ValidateIf,
 } from 'class-validator';
 
 export class CreateInvoiceDto {
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Bill a project directly. Exactly one of projectId or amcId.',
+  })
+  @ValidateIf((o: CreateInvoiceDto) => !o.amcId)
   @IsString()
-  projectId!: string;
+  projectId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Bill a paid AMC. Exactly one of projectId or amcId.',
+  })
+  @ValidateIf((o: CreateInvoiceDto) => !o.projectId)
+  @IsString()
+  amcId?: string;
 
   @ApiProperty({ example: 'INV-001' })
   @IsString()
@@ -35,9 +46,19 @@ export class CreateInvoiceDto {
 }
 
 export class UpdateInvoiceDto {
-  @ApiProperty()
+  @ApiPropertyOptional({
+    description: 'Bill a project directly. Exactly one of projectId or amcId.',
+  })
+  @ValidateIf((o: UpdateInvoiceDto) => !o.amcId)
   @IsString()
-  projectId!: string;
+  projectId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Bill a paid AMC. Exactly one of projectId or amcId.',
+  })
+  @ValidateIf((o: UpdateInvoiceDto) => !o.projectId)
+  @IsString()
+  amcId?: string;
 
   @ApiProperty({ example: 'INV-001' })
   @IsString()

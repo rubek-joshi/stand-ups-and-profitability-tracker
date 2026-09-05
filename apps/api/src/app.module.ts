@@ -27,6 +27,7 @@ import { SnapshotsModule } from "./snapshots/snapshots.module";
 import { StandupsModule } from "./standups/standups.module";
 import { UsersModule } from "./users/users.module";
 import { VatModule } from "./vat/vat.module";
+import { WriteOffsModule } from "./write-offs/write-offs.module";
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { VatModule } from "./vat/vat.module";
     AmcModule,
     VatModule,
     InvoicesModule,
+    WriteOffsModule,
     DashboardModule,
     SnapshotsModule,
     JobsModule,

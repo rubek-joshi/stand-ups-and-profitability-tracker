@@ -7,7 +7,6 @@ import {
   IconLock,
   IconLockOpen,
   IconPencil,
-  IconShieldCheck,
   IconTrash,
   IconUserMinus,
   IconUserPlus,
@@ -51,13 +50,6 @@ import {
   CardTitle,
 } from "@workspace/ui/components/card"
 import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@workspace/ui/components/empty"
-import {
   Tabs,
   TabsContent,
   TabsList,
@@ -80,11 +72,9 @@ import {
   TableHeader,
   TableRow,
 } from "@workspace/ui/components/table"
-import { AmcCard } from "@/components/amc/amc-card"
-import { CreateAmcDialog } from "@/components/amc/create-amc-dialog"
-import { DeclineAmcDialog } from "@/components/amc/decline-amc-dialog"
-import { EditAmcDialog } from "@/components/amc/edit-amc-dialog"
+import { ProjectAmcTab } from "@/components/amc/project-amc-tab"
 import { ProjectInvoicesTab } from "@/components/invoices/project-invoices-tab"
+import { ProjectWriteOffsPanel } from "@/components/write-offs/project-write-offs-panel"
 import {
   DEFAULT_PRESET_DAYS,
   rangeFromDays,
@@ -123,9 +113,16 @@ import type {
   Project,
   ProjectAssignment,
 } from "@/lib/types"
-import { parseListView } from "@/lib/view-pref"
+import { parseListView, getStoredView } from "@/lib/view-pref"
 
-const PROJECT_TABS = ["team", "standups", "extensions", "invoices", "amc", "labor"] as const
+const PROJECT_TABS = [
+  "team",
+  "standups",
+  "extensions",
+  "invoices",
+  "amc",
+  "labor",
+] as const
 
 type ProjectTab = (typeof PROJECT_TABS)[number]
 
@@ -282,10 +279,7 @@ function ProjectDetailPage() {
   const [closeOpen, setCloseOpen] = React.useState(false)
   const [closeDate, setCloseDate] = React.useState("")
   const [closing, setClosing] = React.useState(false)
-  const [amcCreateOpen, setAmcCreateOpen] = React.useState(false)
   const [extensionOpen, setExtensionOpen] = React.useState(false)
-  const [declineAmc, setDeclineAmc] = React.useState<AmcRecord | null>(null)
-  const [editAmc, setEditAmc] = React.useState<AmcRecord | null>(null)
   const [logPage, setLogPage] = React.useState(1)
   const [logPageSize, setLogPageSize] = React.useState<PageSize>(10)
   const [coreLogPage, setCoreLogPage] = React.useState(1)
@@ -419,7 +413,9 @@ function ProjectDetailPage() {
   )
   const wasAutoExtended = Boolean(project.autoExtended)
   const projectStartDay = String(project.startDate).slice(0, 10)
-  const projectEndDay = project.endDate ? String(project.endDate).slice(0, 10) : null
+  const projectEndDay = project.endDate
+    ? String(project.endDate).slice(0, 10)
+    : null
   const latestAssignmentEnd = maxIsoDate(
     ...assignments.employees.map((assignment) => assignment.unassignedAt),
     ...assignments.coreMembers.map((assignment) => assignment.unassignedAt)
@@ -586,7 +582,7 @@ function ProjectDetailPage() {
                         alert(
                           e instanceof ApiError
                             ? e.message
-                            : "Failed to re-open project",
+                            : "Failed to re-open project"
                         )
                       }
                     }}
@@ -628,7 +624,7 @@ function ProjectDetailPage() {
                         })
                       } catch (e) {
                         alert(
-                          e instanceof ApiError ? e.message : "Delete failed",
+                          e instanceof ApiError ? e.message : "Delete failed"
                         )
                       }
                     }}
@@ -662,18 +658,34 @@ function ProjectDetailPage() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
         <div className="min-w-0 space-y-6">
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
             <ProjectMetricCard
               label="Realized revenue"
               value={
                 profit
-                  ? formatNpr(profit.realizedRevenuePaisa ?? profit.revenuePaisa)
+                  ? formatNpr(
+                      profit.realizedRevenuePaisa ?? profit.revenuePaisa
+                    )
                   : formatNpr("0")
               }
               hint={
                 profit
-                  ? `Contracted: ${formatNpr(profit.contractedRevenuePaisa ?? profit.budgetPaisa)} (Base ${formatNpr(profit.budgetPaisa)} + ${formatNpr(profit.extensionsPaisa)} ext)`
+                  ? `Contracted: ${formatNpr(profit.contractedRevenuePaisa ?? profit.budgetPaisa)} (Base ${formatNpr(profit.budgetPaisa)} + ${formatNpr(profit.extensionsPaisa)} ext${
+                      profit.writtenOffPaisa &&
+                      Number(profit.writtenOffPaisa) > 0
+                        ? ` − ${formatNpr(profit.writtenOffPaisa)} written off`
+                        : ""
+                    })`
                   : "Paid invoice revenue"
+              }
+            />
+            <ProjectMetricCard
+              label="Outstanding"
+              value={formatNpr(profit?.outstandingPaisa ?? "0")}
+              hint={
+                profit?.writtenOffPaisa && Number(profit.writtenOffPaisa) > 0
+                  ? `Written off ${formatNpr(profit.writtenOffPaisa)}`
+                  : "Contracted − realized − write-offs"
               }
             />
             <ProjectMetricCard
@@ -723,10 +735,19 @@ function ProjectDetailPage() {
           <Tabs
             value={tab}
             onValueChange={(value) => {
+              const nextTab = parseProjectTab(value)
+              const storedView =
+                nextTab === "amc"
+                  ? getStoredView("pt_project_amc_view")
+                  : nextTab === "invoices"
+                    ? getStoredView("pt_project_invoices_view")
+                    : undefined
               void navigate({
                 search: (prev) => ({
                   ...prev,
-                  tab: parseProjectTab(value),
+                  tab: nextTab,
+                  page: 1,
+                  view: storedView === "table" ? "table" : undefined,
                 }),
               })
             }}
@@ -1839,134 +1860,34 @@ function ProjectDetailPage() {
             </TabsContent>
 
             <TabsContent value="amc" className="mt-4 space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-medium text-muted-foreground">
-                  Maintenance contracts
-                </h2>
-                {project.status === "closed" ||
-                project.status === "under_amc" ? (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => setAmcCreateOpen(true)}
-                  >
-                    New AMC
-                  </Button>
-                ) : null}
-              </div>
-              {project.status !== "closed" && project.status !== "under_amc" ? (
-                <Empty className="min-h-64 border bg-card">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <IconLock />
-                    </EmptyMedia>
-                    <EmptyTitle>AMC unavailable</EmptyTitle>
-                    <EmptyDescription>
-                      Close the project before setting AMC.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              ) : amcs.length === 0 ? (
-                <Empty className="min-h-64 border bg-card">
-                  <EmptyHeader>
-                    <EmptyMedia variant="icon">
-                      <IconShieldCheck />
-                    </EmptyMedia>
-                    <EmptyTitle>No AMC records</EmptyTitle>
-                    <EmptyDescription>
-                      No maintenance contracts for this project yet.
-                    </EmptyDescription>
-                  </EmptyHeader>
-                </Empty>
-              ) : (
-                <div className="grid gap-4 md:grid-cols-2">
-                  {amcs.map((amc) => (
-                    <AmcCard
-                      key={amc.id}
-                      amc={{
-                        ...amc,
-                        projectName: project.name,
-                        clientName: project.client?.name,
-                      }}
-                      onRenew={async (record) => {
-                        await api(`/amc/${record.id}/renewal-decision`, {
-                          method: "POST",
-                          body: { decision: "renewed" },
-                        })
-                        setAmcCreateOpen(true)
-                        await load()
-                      }}
-                      onDecline={(record) => {
-                        setDeclineAmc({
-                          ...record,
-                          projectName: project.name,
-                          clientName: project.client?.name,
-                        })
-                      }}
-                      onEdit={(record) => {
-                        setEditAmc({
-                          ...record,
-                          projectName: project.name,
-                          clientName: project.client?.name,
-                        })
-                      }}
-                      canDelete={canDeleteAmc}
-                      onDelete={async (record) => {
-                        const ok = await confirm({
-                          title: "Delete AMC permanently?",
-                          description:
-                            "This cannot be undone. Prefer decline/cancel when the contract simply ended.",
-                          confirmLabel: "Delete",
-                          destructive: true,
-                        })
-                        if (!ok) return
-                        try {
-                          await api(`/amc/${record.id}`, { method: "DELETE" })
-                          await load()
-                        } catch (e) {
-                          alert(
-                            e instanceof ApiError
-                              ? e.message
-                              : "Failed to delete AMC"
-                          )
-                        }
-                      }}
-                    />
-                  ))}
-                </div>
-              )}
-              <CreateAmcDialog
-                open={amcCreateOpen}
-                onOpenChange={setAmcCreateOpen}
-                presetProjectId={id}
-                lockProject
-                onCreated={() => void load()}
-              />
-              <EditAmcDialog
-                amc={editAmc}
-                open={Boolean(editAmc)}
-                onOpenChange={(open) => {
-                  if (!open) setEditAmc(null)
-                }}
-                onUpdated={() => void load()}
-              />
-              <DeclineAmcDialog
-                amc={declineAmc}
-                open={Boolean(declineAmc)}
-                onOpenChange={(open) => {
-                  if (!open) setDeclineAmc(null)
-                }}
-                onConfirm={async (remark) => {
-                  if (!declineAmc) return
-                  await api(`/amc/${declineAmc.id}/renewal-decision`, {
-                    method: "POST",
-                    body: {
-                      decision: "declined",
-                      ...(remark ? { remark } : {}),
-                    },
+              <ProjectAmcTab
+                project={project}
+                amcs={amcs}
+                canManage={canManage}
+                canDeleteAmc={canDeleteAmc}
+                page={page}
+                pageSize={pageSize}
+                view={view}
+                onReload={load}
+                onPageChange={(nextPage) => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, page: nextPage }),
                   })
-                  setDeclineAmc(null)
-                  await load()
+                }}
+                onPageSizeChange={(size) => {
+                  void navigate({
+                    search: (prev) => ({ ...prev, pageSize: size, page: 1 }),
+                  })
+                }}
+                onViewChange={(next) => {
+                  void navigate({
+                    search: (prev) => ({
+                      ...prev,
+                      view: next === "card" ? undefined : next,
+                    }),
+                    replace: true,
+                    resetScroll: false,
+                  })
                 }}
               />
             </TabsContent>
@@ -2014,7 +1935,7 @@ function ProjectDetailPage() {
           </Tabs>
         </div>
 
-        <aside className="lg:sticky lg:top-4">
+        <aside className="space-y-4 lg:sticky lg:top-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between gap-2">
               <CardTitle className="text-base">Project details</CardTitle>
@@ -2077,7 +1998,7 @@ function ProjectDetailPage() {
                 }
               />
               <Detail
-                label="Total incl. VAT"
+                label="Total invoiced incl. VAT"
                 value={
                   profit
                     ? formatNpr(
@@ -2144,6 +2065,19 @@ function ProjectDetailPage() {
               </div>
             </CardContent>
           </Card>
+
+          <ProjectWriteOffsPanel
+            projectId={id}
+            canMutate={canManage}
+            maxAmountPaisa={
+              profit
+                ? Number(profit.budgetPaisa) +
+                  Number(profit.extensionsPaisa) -
+                  Number(profit.writtenOffPaisa ?? 0)
+                : undefined
+            }
+            onChanged={() => void load()}
+          />
         </aside>
       </div>
       {dialog}
@@ -2174,7 +2108,7 @@ function ProjectDetailPage() {
                 alert(
                   err instanceof ApiError
                     ? err.message
-                    : "Failed to close project",
+                    : "Failed to close project"
                 )
               } finally {
                 setClosing(false)

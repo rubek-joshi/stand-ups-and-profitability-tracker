@@ -194,6 +194,8 @@ export class ProjectsService {
         totalCostPaisa: String(profitability.totalCostPaisa),
         profitLossPaisa: String(profitability.profitLossPaisa),
         contractedProfitLossPaisa: String(profitability.contractedProfitLossPaisa),
+        writtenOffPaisa: String(profitability.writtenOffPaisa),
+        outstandingPaisa: String(profitability.outstandingPaisa),
         forecastProfitLossPaisa:
           profitability.forecastProfitLossPaisa === null
             ? null

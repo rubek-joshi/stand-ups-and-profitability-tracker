@@ -37,6 +37,7 @@ export class InvoicesController {
     @Query('status') status?: string,
     @Query('projectId') projectId?: string,
     @Query('clientId') clientId?: string,
+    @Query('amcId') amcId?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('sortBy') sortBy?: string,
@@ -49,6 +50,7 @@ export class InvoicesController {
       status,
       projectId,
       clientId,
+      amcId,
       from,
       to,
       sortBy,
@@ -74,7 +76,7 @@ export class InvoicesController {
 
   @Post()
   @RequirePermission('invoices', '*')
-  @ApiOperation({ summary: 'Create an invoice on a project' })
+  @ApiOperation({ summary: 'Create an invoice on a project or paid AMC' })
   async create(@Body() dto: CreateInvoiceDto, @CurrentUser() user: AuthUser) {
     return this.invoicesService.create(dto, user.id);
   }

@@ -43,7 +43,9 @@ export class AmcService {
   async findAll(filters: {
     q?: string;
     status?: string;
+    type?: string;
     clientId?: string;
+    projectId?: string;
     from?: string;
     to?: string;
     page?: string;
@@ -51,6 +53,7 @@ export class AmcService {
   } = {}) {
     const q = filters.q?.trim();
     const clientId = filters.clientId?.trim();
+    const projectId = filters.projectId?.trim();
     const pagination = resolvePagination({
       page: filters.page,
       pageSize: filters.pageSize,
@@ -62,8 +65,18 @@ export class AmcService {
       throw new BadRequestException("`to` must be on or after `from`");
     }
 
+    let typeFilter: AmcType | undefined;
+    if (filters.type?.trim()) {
+      if (filters.type !== AmcType.paid && filters.type !== AmcType.complimentary) {
+        throw new BadRequestException("type must be paid or complimentary");
+      }
+      typeFilter = filters.type;
+    }
+
     const where = {
       ...(filters.status ? { status: filters.status as AmcStatus } : {}),
+      ...(typeFilter ? { type: typeFilter } : {}),
+      ...(projectId ? { projectId } : {}),
       ...(clientId ? { project: { clientId } } : {}),
       ...(from || to
         ? {

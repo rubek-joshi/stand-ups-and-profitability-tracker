@@ -5,11 +5,13 @@ import {
   IconArrowUpRight,
   IconCalendarClock,
   IconCheck,
+  IconFileInvoice,
   IconMessages,
   IconPercentage,
   IconReceipt,
   IconFileText,
   IconShieldCheck,
+  IconTrendingDown,
   IconTrendingUp,
   IconUsers,
   IconWallet,
@@ -268,6 +270,62 @@ const allCardDefs: CardDef[] = [
         value={formatNpr(d.unpaidVatPaisa)}
         tone="warning"
         delta="Outstanding balance"
+      />
+    ),
+  },
+  {
+    id: "written-off",
+    title: "Total written off",
+    defaultWidth: "sm",
+    render: (d) => {
+      const contracted = Number(d.contractedRevenuePaisa ?? "0")
+      const written = Number(d.totalWrittenOffPaisa)
+      const share =
+        contracted > 0 ? ((written / contracted) * 100).toFixed(1) : null
+      return (
+        <Stat
+          icon={<IconTrendingDown className="size-4" />}
+          label="Written off"
+          value={formatNpr(d.totalWrittenOffPaisa)}
+          tone="negative"
+          delta={
+            share
+              ? `${share}% of contracted revenue`
+              : "Bad debt across projects & AMCs"
+          }
+        />
+      )
+    },
+  },
+  {
+    id: "outstanding",
+    title: "Total outstanding",
+    defaultWidth: "sm",
+    render: (d) => (
+      <Stat
+        icon={<IconWallet className="size-4" />}
+        label="Outstanding"
+        value={formatNpr(d.totalOutstandingPaisa)}
+        tone="warning"
+        delta="Contracted − realized − write-offs"
+      />
+    ),
+  },
+  {
+    id: "invoices",
+    title: "Invoices",
+    defaultWidth: "sm",
+    render: (d) => (
+      <Stat
+        icon={<IconFileInvoice className="size-4" />}
+        label="Paid (ex-VAT)"
+        value={formatNpr(d.invoicePaidPaisa)}
+        tone="positive"
+        delta={`${d.invoicePendingCount} pending · ${formatNpr(d.invoicePendingPaisa)}${
+          Number(d.invoiceAmcBilledPaisa) > 0
+            ? ` · AMC: ${formatNpr(d.invoiceAmcBilledPaisa)} billed`
+            : ""
+        }`}
       />
     ),
   },

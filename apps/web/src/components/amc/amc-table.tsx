@@ -1,4 +1,12 @@
-import { IconCheck, IconEye, IconPencil, IconTrash, IconX } from "@tabler/icons-react"
+import {
+  IconCheck,
+  IconEye,
+  IconFileInvoice,
+  IconPencil,
+  IconReceiptOff,
+  IconTrash,
+  IconX,
+} from "@tabler/icons-react"
 import { Badge } from "@workspace/ui/components/badge"
 import {
   Table,
@@ -33,14 +41,22 @@ export function AmcTable({
   onDecline,
   onEdit,
   onDelete,
+  onInvoice,
+  onWriteOff,
+  canWriteOff,
   canDelete = false,
+  hideProject = false,
 }: {
   items: AmcRecord[]
   onRenew?: (amc: AmcRecord) => void
   onDecline?: (amc: AmcRecord) => void
   onEdit?: (amc: AmcRecord) => void
   onDelete?: (amc: AmcRecord) => void
+  onInvoice?: (amc: AmcRecord) => void
+  onWriteOff?: (amc: AmcRecord) => void
+  canWriteOff?: (amc: AmcRecord) => boolean
   canDelete?: boolean
+  hideProject?: boolean
 }) {
   const today = new Date()
 
@@ -49,7 +65,7 @@ export function AmcTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Project</TableHead>
+            {hideProject ? null : <TableHead>Project</TableHead>}
             <TableHead>Type</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Period</TableHead>
@@ -86,22 +102,26 @@ export function AmcTable({
                 to="/projects/$id"
                 params={{ id: amc.projectId }}
               >
-                <TableCell>
-                  <div className="min-w-0">
-                    <ProjectLink id={amc.projectId}>
-                      {amc.projectName ?? "Project"}
-                    </ProjectLink>
-                    {amc.clientId ? (
-                      <div className="text-xs text-muted-foreground">
-                        <ClientLink id={amc.clientId}>{amc.clientName ?? "—"}</ClientLink>
-                      </div>
-                    ) : (
-                      <div className="text-xs text-muted-foreground">
-                        {amc.clientName ?? "—"}
-                      </div>
-                    )}
-                  </div>
-                </TableCell>
+                {hideProject ? null : (
+                  <TableCell>
+                    <div className="min-w-0">
+                      <ProjectLink id={amc.projectId}>
+                        {amc.projectName ?? "Project"}
+                      </ProjectLink>
+                      {amc.clientId ? (
+                        <div className="text-xs text-muted-foreground">
+                          <ClientLink id={amc.clientId}>
+                            {amc.clientName ?? "—"}
+                          </ClientLink>
+                        </div>
+                      ) : (
+                        <div className="text-xs text-muted-foreground">
+                          {amc.clientName ?? "—"}
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                )}
                 <TableCell>
                   <Badge variant={amc.type === "paid" ? "default" : "secondary"}>
                     {amc.type === "paid" ? "Paid" : "Complimentary"}
@@ -148,6 +168,27 @@ export function AmcTable({
                   {canEdit ? (
                     <TableActionButton label="Edit" onClick={() => onEdit?.(amc)}>
                       <IconPencil className="size-3.5" />
+                    </TableActionButton>
+                  ) : null}
+                  {onInvoice &&
+                  amc.type === "paid" &&
+                  amc.status !== "cancelled" ? (
+                    <TableActionButton
+                      label="Invoice"
+                      onClick={() => onInvoice(amc)}
+                    >
+                      <IconFileInvoice className="size-3.5" />
+                    </TableActionButton>
+                  ) : null}
+                  {onWriteOff &&
+                  amc.type === "paid" &&
+                  amc.status !== "cancelled" ? (
+                    <TableActionButton
+                      label="Write off"
+                      disabled={canWriteOff ? !canWriteOff(amc) : false}
+                      onClick={() => onWriteOff(amc)}
+                    >
+                      <IconReceiptOff className="size-3.5" />
                     </TableActionButton>
                   ) : null}
                   {showDelete ? (
