@@ -358,6 +358,7 @@ export function ProjectInvoicesTab({
                   showProject={false}
                   canMutate={canMutate}
                   onEdit={setEditing}
+                  onMarkPaid={setPaying}
                   sortBy={sortBy}
                   sortDir={sortDir}
                   onSort={toggleSort}
@@ -418,14 +419,12 @@ export function ProjectInvoicesTab({
                                     className="min-w-40"
                                   >
                                     <DropdownMenuGroup>
-                                      {invoice.status === "pending" ? (
-                                        <DropdownMenuItem
-                                          onClick={() => setEditing(invoice)}
-                                        >
-                                          <IconPencil />
-                                          Edit
-                                        </DropdownMenuItem>
-                                      ) : null}
+                                      <DropdownMenuItem
+                                        onClick={() => setEditing(invoice)}
+                                      >
+                                        <IconPencil />
+                                        Edit
+                                      </DropdownMenuItem>
                                       <DropdownMenuItem
                                         variant="destructive"
                                         onClick={() =>

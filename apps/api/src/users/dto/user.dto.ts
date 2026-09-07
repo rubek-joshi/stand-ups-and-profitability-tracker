@@ -15,7 +15,6 @@ import {
 export const USER_ROLES = [
   "super_admin",
   "admin",
-  "manager",
   "standup_taker",
 ] as const;
 export type UserRole = (typeof USER_ROLES)[number];

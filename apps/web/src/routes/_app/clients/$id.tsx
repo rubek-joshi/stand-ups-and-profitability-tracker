@@ -52,6 +52,7 @@ import {
 import { DatePicker } from "@/components/datetime-picker"
 import { InvoiceFormDialog } from "@/components/invoices/invoice-form-dialog"
 import { InvoiceTable } from "@/components/invoices/invoice-table"
+import { MarkPaidDialog } from "@/components/invoices/mark-paid-dialog"
 import { ListViewToggle } from "@/components/list-view-toggle"
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
@@ -165,6 +166,7 @@ function ClientDetailPage() {
   const [createOpen, setCreateOpen] = React.useState(false)
   const [invoiceFormOpen, setInvoiceFormOpen] = React.useState(false)
   const [editingInvoice, setEditingInvoice] = React.useState<Invoice | null>(null)
+  const [payingInvoice, setPayingInvoice] = React.useState<Invoice | null>(null)
   const [invoices, setInvoices] = React.useState<Invoice[]>([])
   const [invoiceTotal, setInvoiceTotal] = React.useState(0)
   const [invoicesLoading, setInvoicesLoading] = React.useState(false)
@@ -710,6 +712,7 @@ function ClientDetailPage() {
                     invoices={invoices}
                     canMutate={canMutateInvoices}
                     onEdit={setEditingInvoice}
+                    onMarkPaid={setPayingInvoice}
                   />
                   <PaginationBar
                     page={page}
@@ -800,6 +803,31 @@ function ClientDetailPage() {
         invoice={editingInvoice}
         clientId={id}
         onUpdated={() => void loadInvoices()}
+      />
+      <MarkPaidDialog
+        invoice={payingInvoice}
+        onClose={() => setPayingInvoice(null)}
+        onConfirm={async (paymentDate) => {
+          if (!payingInvoice) return
+          try {
+            await api<Envelope<Invoice>>(
+              `/invoices/${payingInvoice.id}/mark-paid`,
+              {
+                method: "POST",
+                body: { paymentDate },
+              },
+            )
+            setPayingInvoice(null)
+            await loadInvoices()
+          } catch (err) {
+            alert(
+              err instanceof ApiError
+                ? err.message
+                : "Failed to mark invoice paid",
+            )
+            throw err
+          }
+        }}
       />
       <Dialog
         open={Boolean(peopleModal)}

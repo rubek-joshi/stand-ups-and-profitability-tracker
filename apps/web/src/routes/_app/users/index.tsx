@@ -72,7 +72,7 @@ function UsersPage() {
     name: "",
     email: "",
     password: "",
-    role: "manager" as UserRole,
+    role: "admin" as UserRole,
     mustChangePassword: true,
   })
   const { confirm, dialog } = useConfirmDialog()
@@ -127,7 +127,7 @@ function UsersPage() {
                 name: "",
                 email: "",
                 password: "",
-                role: "manager",
+                role: "admin",
                 mustChangePassword: true,
               })
               setCreateOpen(true)
@@ -362,7 +362,7 @@ function UsersPage() {
               <Select
                 value={createForm.role}
                 onValueChange={(v) =>
-                  setCreateForm((f) => ({ ...f, role: (v as UserRole) ?? "manager" }))
+                  setCreateForm((f) => ({ ...f, role: (v as UserRole) ?? "admin" }))
                 }
                 items={ROLE_ITEMS}
               >

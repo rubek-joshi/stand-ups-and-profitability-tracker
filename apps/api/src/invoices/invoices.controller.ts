@@ -83,7 +83,9 @@ export class InvoicesController {
 
   @Patch(':id')
   @RequirePermission('invoices', '*')
-  @ApiOperation({ summary: 'Update a pending invoice' })
+  @ApiOperation({
+    summary: 'Update an invoice (including paid; recalculates VAT and P&L cache)',
+  })
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateInvoiceDto,

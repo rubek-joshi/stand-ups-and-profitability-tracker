@@ -254,9 +254,6 @@ export class InvoicesService {
       where: { id },
     });
     if (!invoice) throw new NotFoundException('Invoice not found');
-    if (invoice.status === InvoiceStatus.paid) {
-      throw new BadRequestException('Paid invoices cannot be edited');
-    }
 
     const parent = await this.resolveParent(dto.projectId, dto.amcId);
     const invoiceNumber = dto.invoiceNumber.trim();
@@ -267,6 +264,16 @@ export class InvoicesService {
     const invoiceDate = requireIsoDate(dto.invoiceDate, 'Invoice date');
     this.assertInvoiceDateNotFuture(invoiceDate);
     const amountPaisa = this.parseAmount(dto.amountNpr);
+
+    if (invoice.status === InvoiceStatus.paid && invoice.paymentDate) {
+      const paymentDay = toIsoDate(invoice.paymentDate);
+      const invoiceDay = toIsoDate(invoiceDate);
+      if (invoiceDay > paymentDay) {
+        throw new BadRequestException(
+          'Invoice date cannot be after the payment date on a paid invoice',
+        );
+      }
+    }
 
     const duplicate = await this.prismaService.invoice.findFirst({
       where: { invoiceNumber, NOT: { id } },
@@ -314,9 +321,15 @@ export class InvoicesService {
         clientId: parent.clientId,
         amcId: parent.amcId,
         invoiceNumber,
+        status: invoice.status,
         amountPaisa: amountPaisa.toString(),
         vatPaisa: vatPaisa.toString(),
         totalPaisa: totalPaisa.toString(),
+        previousAmountPaisa: invoice.amountPaisa.toString(),
+        previousVatPaisa: invoice.vatPaisa.toString(),
+        previousTotalPaisa: invoice.totalPaisa.toString(),
+        previousProjectId: invoice.projectId,
+        previousAmcId: invoice.amcId,
       },
     });
     return this.serialize(updated);

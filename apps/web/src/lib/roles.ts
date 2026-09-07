@@ -3,7 +3,6 @@ import type { UserRole } from "@/lib/types"
 export const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: "Super admin",
   admin: "Admin",
-  manager: "Manager",
   standup_taker: "Stand-up taker",
 }
 

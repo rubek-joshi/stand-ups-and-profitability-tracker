@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router"
 import {
   IconChevronDown,
   IconChevronUp,
+  IconCircleCheck,
   IconEye,
   IconPencil,
   IconSelector,
@@ -42,6 +43,7 @@ export function InvoiceTable({
   showProject = true,
   canMutate = false,
   onEdit,
+  onMarkPaid,
   sortBy,
   sortDir,
   onSort,
@@ -50,6 +52,7 @@ export function InvoiceTable({
   showProject?: boolean
   canMutate?: boolean
   onEdit?: (invoice: Invoice) => void
+  onMarkPaid?: (invoice: Invoice) => void
   sortBy?: InvoiceSortBy
   sortDir?: SortDir
   onSort?: (column: InvoiceSortBy) => void
@@ -169,7 +172,17 @@ export function InvoiceTable({
                   >
                     <IconEye className="size-3.5" />
                   </TableActionLink>
-                  {canMutate && invoice.status === "pending" && onEdit ? (
+                  {canMutate &&
+                  invoice.status === "pending" &&
+                  onMarkPaid ? (
+                    <TableActionButton
+                      label="Mark paid"
+                      onClick={() => onMarkPaid(invoice)}
+                    >
+                      <IconCircleCheck className="size-3.5" />
+                    </TableActionButton>
+                  ) : null}
+                  {canMutate && onEdit ? (
                     <TableActionButton
                       label="Edit"
                       onClick={() => onEdit(invoice)}

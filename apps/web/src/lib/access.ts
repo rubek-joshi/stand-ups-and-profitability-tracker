@@ -1,6 +1,6 @@
 import type { UserRole } from "@/lib/types"
 
-export const STAFF_ROLES: UserRole[] = ["super_admin", "admin", "manager"]
+export const STAFF_ROLES: UserRole[] = ["super_admin", "admin"]
 export const AUDIT_ROLES: UserRole[] = ["super_admin", "admin"]
 export const SETTINGS_ROLES: UserRole[] = ["super_admin"]
 

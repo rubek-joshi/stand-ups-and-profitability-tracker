@@ -105,7 +105,7 @@ function UserDetailPage() {
   const [editForm, setEditForm] = React.useState({
     name: "",
     email: "",
-    role: "manager" as UserRole,
+    role: "admin" as UserRole,
   })
   const [passwordForm, setPasswordForm] = React.useState({
     password: "",
@@ -419,7 +419,7 @@ function UserDetailPage() {
                     setEditForm({
                       name: user.name,
                       email: user.email,
-                      role: (user.role as UserRole) || "manager",
+                      role: (user.role as UserRole) || "admin",
                     })
                     setEditing(true)
                   }}
@@ -481,7 +481,7 @@ function UserDetailPage() {
                     <Select
                       value={editForm.role}
                       onValueChange={(v) =>
-                        setEditForm((f) => ({ ...f, role: (v as UserRole) ?? "manager" }))
+                        setEditForm((f) => ({ ...f, role: (v as UserRole) ?? "admin" }))
                       }
                       items={ROLE_ITEMS}
                       disabled={isSelf}

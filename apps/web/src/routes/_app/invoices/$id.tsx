@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router"
 import {
   IconAlertTriangle,
   IconCircleCheck,
+  IconDotsVertical,
   IconPencil,
   IconTrash,
 } from "@tabler/icons-react"
@@ -12,7 +13,20 @@ import {
 } from "@workspace/ui/components/alert"
 import { Badge } from "@workspace/ui/components/badge"
 import { Button } from "@workspace/ui/components/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@workspace/ui/components/card"
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@workspace/ui/components/card"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@workspace/ui/components/dropdown-menu"
 import { Separator } from "@workspace/ui/components/separator"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { StatusBadge } from "@/components/health-badge"
@@ -20,6 +34,7 @@ import { InvoiceFormDialog } from "@/components/invoices/invoice-form-dialog"
 import { MarkPaidDialog } from "@/components/invoices/mark-paid-dialog"
 import { PageHeader } from "@/components/page-header"
 import { ClientLink, ProjectLink } from "@/components/resource-link"
+import { TableActionButton } from "@/components/table-row-actions"
 import { ErrorState, LoadingState } from "@/components/ui-states"
 import { AUDIT_ROLES } from "@/lib/access"
 import { api, ApiError } from "@/lib/api"
@@ -237,28 +252,36 @@ function InvoiceDetailPage() {
         }
         actions={
           canMutate ? (
-            <>
-              {invoice.status === "pending" ? (
-                <>
-                  <Button variant="outline" onClick={() => setEditing(true)}>
-                    <IconPencil className="size-4" />
-                    Edit
-                  </Button>
-                  <Button variant="outline" onClick={() => setPaying(true)}>
-                    <IconCircleCheck className="size-4" />
-                    Mark paid
-                  </Button>
-                </>
-              ) : null}
-              <Button
-                variant="ghost"
-                className="text-destructive hover:text-destructive"
-                onClick={() => void deleteInvoice()}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label="Invoice actions"
+                  />
+                }
               >
-                <IconTrash className="size-4" />
-                Delete
-              </Button>
-            </>
+                <IconDotsVertical />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="min-w-40">
+                <DropdownMenuGroup>
+                  {invoice.status === "pending" ? (
+                    <DropdownMenuItem onClick={() => setPaying(true)}>
+                      <IconCircleCheck />
+                      Mark paid
+                    </DropdownMenuItem>
+                  ) : null}
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onClick={() => void deleteInvoice()}
+                  >
+                    <IconTrash />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null
         }
       />
@@ -280,6 +303,17 @@ function InvoiceDetailPage() {
               <CardTitle className="text-sm font-medium text-muted-foreground">
                 Invoice Details
               </CardTitle>
+              {canMutate ? (
+                <CardAction>
+                  <TableActionButton
+                    label="Edit"
+                    size="icon-sm"
+                    onClick={() => setEditing(true)}
+                  >
+                    <IconPencil className="size-3.5" />
+                  </TableActionButton>
+                </CardAction>
+              ) : null}
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
               <div className="flex flex-col gap-3">

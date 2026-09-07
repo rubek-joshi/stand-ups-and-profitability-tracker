@@ -249,6 +249,15 @@ export function InvoiceFormDialog({
   const remainingAfter = budget - invoiced - amountPaisa
   const pctOfBudget = budget > 0 ? (amountPaisa / budget) * 100 : 0
   const overBudget = budget > 0 && invoiced + amountPaisa > budget
+  const editingPaid = Boolean(invoice?.status === "paid")
+  const invoiceDateMax = (() => {
+    const today = nptTodayIso()
+    if (editingPaid && invoice?.paymentDate) {
+      const paymentDay = String(invoice.paymentDate).slice(0, 10)
+      return paymentDay < today ? paymentDay : today
+    }
+    return today
+  })()
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -271,9 +280,17 @@ export function InvoiceFormDialog({
     const parsedInvoiceDate = dateStringParser(invoiceDate)
     if (
       !parsedInvoiceDate ||
-      !isDateValid({ date: parsedInvoiceDate, maxDate: nptTodayIso() })
+      !isDateValid({ date: parsedInvoiceDate, maxDate: invoiceDateMax })
     ) {
       setError("Enter a valid invoice date")
+      return
+    }
+    if (
+      editingPaid &&
+      invoice?.paymentDate &&
+      parsedInvoiceDate > String(invoice.paymentDate).slice(0, 10)
+    ) {
+      setError("Invoice date cannot be after the payment date")
       return
     }
     setSaving(true)
@@ -319,6 +336,12 @@ export function InvoiceFormDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{editing ? "Edit invoice" : "New invoice"}</DialogTitle>
+          {editingPaid ? (
+            <p className="text-sm text-muted-foreground">
+              Paid status and payment date stay the same. Amount changes update
+              realized revenue.
+            </p>
+          ) : null}
         </DialogHeader>
         <form onSubmit={(event) => void submit(event)} className="flex flex-col gap-4">
           {pickParent ? (
@@ -405,8 +428,13 @@ export function InvoiceFormDialog({
               id="invoice-date"
               value={invoiceDate}
               onChange={(next) => setInvoiceDate(next ?? "")}
-              max={nptTodayIso()}
+              max={invoiceDateMax}
             />
+            {editingPaid && invoice?.paymentDate ? (
+              <p className="text-xs text-muted-foreground">
+                Paid on {String(invoice.paymentDate).slice(0, 10)}
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-col gap-2">
             <Label htmlFor="invoice-amount">Amount (NPR, ex-VAT)</Label>

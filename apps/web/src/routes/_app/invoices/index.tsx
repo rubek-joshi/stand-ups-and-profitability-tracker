@@ -18,13 +18,14 @@ import {
   InvoiceTable,
   type InvoiceSortBy,
 } from "@/components/invoices/invoice-table"
+import { MarkPaidDialog } from "@/components/invoices/mark-paid-dialog"
 import { PageHeader } from "@/components/page-header"
 import { PaginationBar } from "@/components/pagination-bar"
 import { ProjectCombobox } from "@/components/project-combobox"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import { AUDIT_ROLES } from "@/lib/access"
 import { api, ApiError } from "@/lib/api"
-import type { PaginatedEnvelope } from "@/lib/api"
+import type { Envelope, PaginatedEnvelope } from "@/lib/api"
 import {
   buildListQuery,
   DEFAULT_LIST_SEARCH,
@@ -94,6 +95,7 @@ function InvoicesPage() {
   const [error, setError] = React.useState<string | null>(null)
   const [formOpen, setFormOpen] = React.useState(false)
   const [editing, setEditing] = React.useState<Invoice | null>(null)
+  const [paying, setPaying] = React.useState<Invoice | null>(null)
   const [searchInput, setSearchInput] = React.useState(q ?? "")
 
   React.useEffect(() => {
@@ -308,6 +310,7 @@ function InvoicesPage() {
             invoices={invoices}
             canMutate={canMutate}
             onEdit={setEditing}
+            onMarkPaid={setPaying}
             sortBy={sortBy}
             sortDir={sortDir}
             onSort={toggleSort}
@@ -344,6 +347,28 @@ function InvoicesPage() {
         }}
         invoice={editing}
         onUpdated={() => void load()}
+      />
+      <MarkPaidDialog
+        invoice={paying}
+        onClose={() => setPaying(null)}
+        onConfirm={async (paymentDate) => {
+          if (!paying) return
+          try {
+            await api<Envelope<Invoice>>(`/invoices/${paying.id}/mark-paid`, {
+              method: "POST",
+              body: { paymentDate },
+            })
+            setPaying(null)
+            await load()
+          } catch (err) {
+            alert(
+              err instanceof ApiError
+                ? err.message
+                : "Failed to mark invoice paid",
+            )
+            throw err
+          }
+        }}
       />
     </div>
   )
