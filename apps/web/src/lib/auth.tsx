@@ -12,6 +12,7 @@ export type AuthUser = {
   standupScopePreference?: "ask" | "everyone" | "group"
   standupLayoutPreference?: "card" | "table"
   standupProjectAccentPreference?: "off" | "muted" | "on"
+  colorPickerPreference?: "classic" | "blossom"
   standupPreferredGroupId?: string | null
   standupPreferredGroup?: { id: string; name: string } | null
   standupEmployeeOrder?: string[]

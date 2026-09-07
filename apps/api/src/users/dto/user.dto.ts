@@ -127,6 +127,11 @@ export class UpdateMyPreferencesDto {
   @IsIn(["off", "muted", "on"])
   standupProjectAccentPreference?: "off" | "muted" | "on";
 
+  @ApiPropertyOptional({ enum: ["classic", "blossom"] })
+  @IsOptional()
+  @IsIn(["classic", "blossom"])
+  colorPickerPreference?: "classic" | "blossom";
+
   @ApiPropertyOptional({
     nullable: true,
     description: "Required when preference is group; null clears preferred group",

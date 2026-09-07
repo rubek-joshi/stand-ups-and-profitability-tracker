@@ -33,6 +33,7 @@ import { api, ApiError, type PaginatedEnvelope } from "@/lib/api"
 import { useAuth } from "@/lib/auth"
 import { useTheme } from "@/lib/theme"
 import type {
+  ColorPickerPreference,
   EmployeeGroup,
   StandupLayoutPreference,
   StandupProjectAccentPreference,
@@ -84,6 +85,23 @@ const ACCENT_OPTIONS: Array<{
   { id: "on", label: "On", hint: "Full colors" },
 ]
 
+const COLOR_PICKER_OPTIONS: Array<{
+  id: ColorPickerPreference
+  label: string
+  hint: string
+}> = [
+  {
+    id: "classic",
+    label: "Classic",
+    hint: "Area + hue / alpha with hex, rgb, hsl",
+  },
+  {
+    id: "blossom",
+    label: "Chrome",
+    hint: "Chrome-style picker with hex, rgba, hsla",
+  },
+]
+
 function ProfilePage() {
   const { user, refreshUser } = useAuth()
   const { theme, setTheme } = useTheme()
@@ -96,10 +114,13 @@ function ProfilePage() {
     React.useState<StandupLayoutPreference>("card")
   const [accentPreference, setAccentPreference] =
     React.useState<StandupProjectAccentPreference>("muted")
+  const [colorPickerPreference, setColorPickerPreference] =
+    React.useState<ColorPickerPreference>("classic")
   const [groupId, setGroupId] = React.useState("")
   const [loadingGroups, setLoadingGroups] = React.useState(true)
   const [savingName, setSavingName] = React.useState(false)
   const [saving, setSaving] = React.useState(false)
+  const [savingColorPicker, setSavingColorPicker] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [savedMsg, setSavedMsg] = React.useState<string | null>(null)
   const [passwordOpen, setPasswordOpen] = React.useState(false)
@@ -110,6 +131,7 @@ function ProfilePage() {
     setPreference(user.standupScopePreference ?? "ask")
     setLayoutPreference(user.standupLayoutPreference ?? "card")
     setAccentPreference(user.standupProjectAccentPreference ?? "muted")
+    setColorPickerPreference(user.colorPickerPreference ?? "classic")
     setGroupId(user.standupPreferredGroupId ?? "")
   }, [user, editingName])
 
@@ -427,58 +449,105 @@ function ProfilePage() {
               <CardTitle className="text-base">Appearance</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-2">
-                <button
-                  type="button"
-                  onClick={() => setTheme("system")}
-                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
-                    theme === "system"
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-muted"
-                  }`}
-                >
-                  <IconDeviceDesktop className="size-5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">System</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Match your device setting
-                    </p>
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setTheme("system")}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
+                      theme === "system"
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-muted"
+                    }`}
+                  >
+                    <IconDeviceDesktop className="size-5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">System</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Match your device setting
+                      </p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTheme("light")}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
+                      theme === "light"
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-muted"
+                    }`}
+                  >
+                    <IconSun className="size-5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Light</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Bright background for daytime use
+                      </p>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTheme("dark")}
+                    className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
+                      theme === "dark"
+                        ? "border-primary bg-primary/10"
+                        : "border-border hover:bg-muted"
+                    }`}
+                  >
+                    <IconMoon className="size-5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Dark</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Dimmer UI for low-light environments
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                <div className="grid gap-2 border-t pt-4">
+                  <Label>Project theme color picker</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {COLOR_PICKER_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        disabled={savingColorPicker}
+                        onClick={() => {
+                          if (opt.id === colorPickerPreference) return
+                          void (async () => {
+                            setSavingColorPicker(true)
+                            try {
+                              await api("/auth/me", {
+                                method: "PATCH",
+                                body: { colorPickerPreference: opt.id },
+                              })
+                              setColorPickerPreference(opt.id)
+                              await refreshUser()
+                            } catch (err) {
+                              alert(
+                                err instanceof ApiError
+                                  ? err.message
+                                  : "Failed to save color picker preference",
+                              )
+                            } finally {
+                              setSavingColorPicker(false)
+                            }
+                          })()
+                        }}
+                        className={`rounded-lg border px-3 py-2.5 text-left text-sm transition-colors ${
+                          colorPickerPreference === opt.id
+                            ? "border-primary bg-primary/10 font-medium"
+                            : "border-border hover:bg-muted"
+                        }`}
+                      >
+                        <span className="block">{opt.label}</span>
+                        <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                          {opt.hint}
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("light")}
-                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
-                    theme === "light"
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-muted"
-                  }`}
-                >
-                  <IconSun className="size-5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Light</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Bright background for daytime use
-                    </p>
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("dark")}
-                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 text-left transition-colors ${
-                    theme === "dark"
-                      ? "border-primary bg-primary/10"
-                      : "border-border hover:bg-muted"
-                  }`}
-                >
-                  <IconMoon className="size-5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Dark</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      Dimmer UI for low-light environments
-                    </p>
-                  </div>
-                </button>
+                </div>
               </div>
             </CardContent>
           </Card>

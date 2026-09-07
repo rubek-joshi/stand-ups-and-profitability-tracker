@@ -22,7 +22,7 @@ import { Switch } from "@workspace/ui/components/switch"
 import { useConfirmDialog } from "@/components/confirm-dialog"
 import { DateInput } from "@/components/datetime-picker"
 import { PageHeader } from "@/components/page-header"
-import { ProjectThemeColorField } from "@/components/project-theme-color-field"
+import { ProjectThemeColorField, normalizeThemeColorForSave } from "@/components/project-theme-color-field"
 import { DEFAULT_PROJECT_THEME_COLOR } from "@/components/standup/entry-draft"
 import { TableActionButton } from "@/components/table-row-actions"
 import { ErrorState, LoadingState } from "@/components/ui-states"
@@ -149,9 +149,7 @@ function ProjectEditPage() {
                     body: {
                       name: edit.name.trim(),
                       categoryIds: edit.categoryIds,
-                      themeColor: /^#[0-9A-Fa-f]{6}$/i.test(edit.themeColor)
-                        ? edit.themeColor.toUpperCase()
-                        : DEFAULT_PROJECT_THEME_COLOR,
+                      themeColor: normalizeThemeColorForSave(edit.themeColor),
                       budgetNpr: parseNprInput(edit.budgetNpr),
                       startDate: edit.startDate,
                       endDate: edit.isIndefinite ? null : edit.endDate.trim() || null,

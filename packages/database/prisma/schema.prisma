@@ -76,6 +76,11 @@ enum StandupProjectAccentPreference {
   on
 }
 
+enum ColorPickerPreference {
+  classic
+  blossom
+}
+
 enum StandupTaskState {
   open
   done
@@ -177,6 +182,7 @@ model User {
   standupScopePreference   StandupScopePreference   @default(ask)
   standupLayoutPreference  StandupLayoutPreference  @default(card)
   standupProjectAccentPreference StandupProjectAccentPreference @default(muted)
+  colorPickerPreference    ColorPickerPreference    @default(classic)
   standupPreferredGroupId  String?
   standupEmployeeOrder     String[]                 @default([])
   createdAt                DateTime                 @default(now())

@@ -22,7 +22,7 @@ import { Switch } from "@workspace/ui/components/switch"
 import { api, ApiError, type Envelope } from "@/lib/api"
 import { parseNprInput } from "@/lib/money"
 import type { Category, Client, Project } from "@/lib/types"
-import { ProjectThemeColorField } from "@/components/project-theme-color-field"
+import { ProjectThemeColorField, normalizeThemeColorForSave } from "@/components/project-theme-color-field"
 import { DEFAULT_PROJECT_THEME_COLOR } from "@/components/standup/entry-draft"
 
 type CreateProjectForm = {
@@ -146,9 +146,7 @@ export function CreateProjectDialog({
                   startDate: form.startDate,
                   endDate: form.isIndefinite ? undefined : form.endDate.trim() || undefined,
                   isVatApplicable: form.isVatApplicable,
-                  themeColor: /^#[0-9A-Fa-f]{6}$/i.test(form.themeColor)
-                    ? form.themeColor.toUpperCase()
-                    : DEFAULT_PROJECT_THEME_COLOR,
+                  themeColor: normalizeThemeColorForSave(form.themeColor),
                 },
               })
               onOpenChange(false)

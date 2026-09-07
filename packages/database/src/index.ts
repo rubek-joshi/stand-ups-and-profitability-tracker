@@ -45,6 +45,7 @@ export {
   StandupScopePreference,
   StandupLayoutPreference,
   StandupProjectAccentPreference,
+  ColorPickerPreference,
   StandupTaskState,
   AuditAction,
 } from "./generated/prisma/client";

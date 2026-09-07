@@ -300,6 +300,7 @@ export class UsersService {
       standupScopePreference?: "ask" | "everyone" | "group";
       standupLayoutPreference?: "card" | "table";
       standupProjectAccentPreference?: "off" | "muted" | "on";
+      colorPickerPreference?: "classic" | "blossom";
       standupPreferredGroupId?: string | null;
       standupEmployeeOrder?: string[];
     },
@@ -345,6 +346,9 @@ export class UsersService {
                 dto.standupProjectAccentPreference,
             }
           : {}),
+        ...(dto.colorPickerPreference
+          ? { colorPickerPreference: dto.colorPickerPreference }
+          : {}),
         ...(dto.standupEmployeeOrder !== undefined
           ? { standupEmployeeOrder: dto.standupEmployeeOrder }
           : {}),
@@ -388,6 +392,7 @@ export class UsersService {
       standupScopePreference: user.standupScopePreference,
       standupLayoutPreference: user.standupLayoutPreference,
       standupProjectAccentPreference: user.standupProjectAccentPreference,
+      colorPickerPreference: user.colorPickerPreference,
       standupPreferredGroupId: user.standupPreferredGroupId,
       standupPreferredGroup: user.standupPreferredGroup ?? null,
       standupEmployeeOrder: user.standupEmployeeOrder ?? [],

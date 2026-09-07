@@ -3,6 +3,7 @@ import {
   StandupLayoutPreference,
   StandupProjectAccentPreference,
   StandupScopePreference,
+  ColorPickerPreference,
 } from "@workspace/database";
 
 export class UserResponseDto {
@@ -35,6 +36,9 @@ export class UserResponseDto {
 
   @ApiProperty({ enum: StandupProjectAccentPreference })
   standupProjectAccentPreference!: StandupProjectAccentPreference;
+
+  @ApiProperty({ enum: ColorPickerPreference })
+  colorPickerPreference!: ColorPickerPreference;
 
   @ApiPropertyOptional({ nullable: true, type: String })
   standupPreferredGroupId!: string | null;

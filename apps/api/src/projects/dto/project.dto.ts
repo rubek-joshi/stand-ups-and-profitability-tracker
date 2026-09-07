@@ -38,7 +38,7 @@ export class CreateProjectDto {
 
   @ApiPropertyOptional({
     example: DEFAULT_PROJECT_THEME_COLOR,
-    description: "Hex accent color (#RRGGBB) used in stand-ups",
+    description: "Accent color (#RRGGBB or #RRGGBBAA) used in stand-ups",
   })
   @IsOptional()
   @IsHexColor()
@@ -80,7 +80,7 @@ export class UpdateProjectDto {
 
   @ApiPropertyOptional({
     example: DEFAULT_PROJECT_THEME_COLOR,
-    description: "Hex accent color (#RRGGBB) used in stand-ups",
+    description: "Accent color (#RRGGBB or #RRGGBBAA) used in stand-ups",
   })
   @IsOptional()
   @IsHexColor()
