@@ -603,6 +603,8 @@ function StandupDetailPage() {
   const entriesMapRef = React.useRef<Y.Map<string> | null>(null)
   const draftsRef = React.useRef(drafts)
   draftsRef.current = drafts
+  const peersRef = React.useRef(peers)
+  peersRef.current = peers
   const draftsReadyRef = React.useRef(false)
   const collabStateAppliedRef = React.useRef(false)
   const yjsHydratedFromServerRef = React.useRef(false)
@@ -617,7 +619,39 @@ function StandupDetailPage() {
     }
     if (yjsHydratedFromServerRef.current) return
     if (Object.keys(draftsToWrite).length === 0) return
-    syncDraftsToYjs(map, draftsToWrite)
+    // When others are already in the room, the shared doc may contain live
+    // drafts newer than Postgres. Only seed missing keys; then pull Yjs into
+    // React so this client sees peer work instead of wiping it with DB state.
+    const hasLivePeers = peersRef.current.length > 1
+    if (hasLivePeers) {
+      const missing: Record<string, EntryDraft> = {}
+      for (const [entryId, draft] of Object.entries(draftsToWrite)) {
+        if (!map.has(entryId)) missing[entryId] = draft
+      }
+      if (Object.keys(missing).length > 0) {
+        syncDraftsToYjs(map, missing)
+      }
+      const mergedDrafts = { ...draftsToWrite }
+      let changed = false
+      for (const [entryId, raw] of map.entries()) {
+        if (typeof raw !== "string" || !mergedDrafts[entryId]) continue
+        const merged = parseCollabEntry(raw, mergedDrafts[entryId]!)
+        if (
+          serializeCollabEntry(merged) ===
+          serializeCollabEntry(mergedDrafts[entryId]!)
+        ) {
+          continue
+        }
+        mergedDrafts[entryId] = merged
+        changed = true
+      }
+      if (changed) {
+        draftsRef.current = mergedDrafts
+        setDrafts(mergedDrafts)
+      }
+    } else {
+      syncDraftsToYjs(map, draftsToWrite)
+    }
     yjsHydratedFromServerRef.current = true
   }
   const visibleEntriesRef = React.useRef<StandupEntry[]>([])
@@ -731,6 +765,7 @@ function StandupDetailPage() {
     yjsHydratedFromServerRef.current = false
     const session = connectStandupCollab(id, (nextPeers) => {
       collabStateAppliedRef.current = true
+      peersRef.current = nextPeers
       setPeers(nextPeers)
       setCollabConnected(true)
       hydrateYjsFromDraftsRef.current()
@@ -845,11 +880,24 @@ function StandupDetailPage() {
         setStandup(res.data)
         setStandupMiscNotes(res.data.miscellaneousNotes ?? "")
         setBaselineStandupMiscNotes(res.data.miscellaneousNotes ?? "")
-        const nextDrafts = draftsFromStandup(res.data.entries)
+        // Only fold saved entries back from the DB. Replacing the full draft map
+        // (and broadcasting it over Yjs) would wipe peers' unsaved work — e.g.
+        // group-scoped saves only persist some employees but the response still
+        // contains every entry as stored in Postgres.
+        const savedEntryIds = new Set(entries.map((entry) => entry.id))
+        const serverDrafts = draftsFromStandup(res.data.entries)
+        const nextDrafts = { ...draftsRef.current }
+        const savedDrafts: Record<string, EntryDraft> = {}
+        for (const entryId of savedEntryIds) {
+          const serverDraft = serverDrafts[entryId]
+          if (!serverDraft) continue
+          nextDrafts[entryId] = serverDraft
+          savedDrafts[entryId] = serverDraft
+        }
         draftsRef.current = nextDrafts
         setDrafts(nextDrafts)
         setBaseline(serializeDrafts(nextDrafts))
-        syncDraftsToYjs(entriesMapRef.current, nextDrafts)
+        syncDraftsToYjs(entriesMapRef.current, savedDrafts)
         setMissingAssignments([])
         setResolutionChoices({})
         setMissingAssignmentOpen(false)
