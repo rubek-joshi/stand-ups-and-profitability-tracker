@@ -314,7 +314,7 @@ export class StandupsService {
     const data = standups.map((standup) => ({
       date: toIsoDate(standup.date),
       standupId: standup.id,
-      miscellaneousNotes: projectId ? null : standup.miscellaneousNotes,
+      miscellaneousNotes: standup.miscellaneousNotes,
       records: standup.entries.map((entry) => ({
         id: entry.id,
         employee: entry.employee,
@@ -869,18 +869,14 @@ export class StandupsService {
     await this.rederiveAttendanceForEmployees(standup.id, allEmployeeIds);
     this.profitabilityService.clearCache();
 
-    const systemUser = await this.prismaService.user.findFirst({
-      where: { isActive: true },
-      orderBy: { createdAt: "asc" },
-      select: { id: true },
-    });
-    if (systemUser) {
+    // Only attribute the stand-up to System when someone was actually marked absent.
+    if (emptyIds.length > 0) {
       await this.prismaService.standup.update({
         where: { id: standup.id },
-        data: { updatedById: systemUser.id },
+        data: { updatedById: null },
       });
       await this.auditService.write({
-        actorId: systemUser.id,
+        actorId: null,
         action: AuditAction.STANDUP_AUTO_ABSENTED,
         targetType: "Standup",
         targetId: standup.id,

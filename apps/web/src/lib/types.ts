@@ -362,8 +362,10 @@ export type Standup = {
   miscellaneousNotes?: string | null
   createdAt?: string
   updatedAt?: string
+  createdById?: string
+  updatedById?: string | null
   createdBy?: { id: string; name: string; email: string }
-  updatedBy?: { id: string; name: string; email: string }
+  updatedBy?: { id: string; name: string; email: string } | null
   _count?: { entries: number }
   stats?: {
     working: number

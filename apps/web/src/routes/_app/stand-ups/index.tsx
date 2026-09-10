@@ -311,7 +311,10 @@ function StandupsPage() {
                           {s.stats?.projectCount ?? "—"}
                         </TableCell>
                         <TableCell>
-                          {s.updatedBy?.name ?? s.createdBy?.name ?? "—"}
+                          {s.updatedBy?.name ??
+                            (s.updatedById == null
+                              ? "System"
+                              : (s.createdBy?.name ?? "—"))}
                         </TableCell>
                         <TableActionsCell>
                           <TableActionLink

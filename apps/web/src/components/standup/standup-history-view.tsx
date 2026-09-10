@@ -37,6 +37,7 @@ import {
   rangeFromDays,
 } from "@/components/dashboard/date-range-bar"
 import { isWorking } from "@/components/standup/entry-draft"
+import { MarkdownPreview } from "@/components/standup/markdown-preview"
 import { api, ApiError, type Envelope, type PaginatedEnvelope } from "@/lib/api"
 import {
   parseLocalIsoDate,
@@ -314,18 +315,22 @@ function HistoryDayCard({
       </header>
 
       <CollapsibleContent>
-        {!projectId && day.miscellaneousNotes?.trim() ? (
+        {day.miscellaneousNotes?.trim() ? (
           <div className="border-t bg-muted/20 px-4 py-3 sm:px-5">
             <div className="mb-1 flex items-center gap-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
               <IconNotes className="size-3.5" />
               <span>Stand-up miscellaneous notes</span>
             </div>
-            <p className="whitespace-pre-wrap text-sm text-foreground">
-              <HighlightText
-                text={day.miscellaneousNotes}
-                query={highlightQuery}
-              />
-            </p>
+            {highlightQuery.trim() ? (
+              <p className="whitespace-pre-wrap text-sm text-foreground">
+                <HighlightText
+                  text={day.miscellaneousNotes}
+                  query={highlightQuery}
+                />
+              </p>
+            ) : (
+              <MarkdownPreview markdown={day.miscellaneousNotes} />
+            )}
           </div>
         ) : null}
         <ul className="divide-y border-t px-4 sm:px-5">

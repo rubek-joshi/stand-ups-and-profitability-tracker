@@ -577,7 +577,8 @@ model Standup {
   id                 String    @id @default(cuid())
   date               DateTime  @db.Date
   createdById        String
-  updatedById        String
+  /// Null when the last write was a system job (e.g. auto-absent).
+  updatedById        String?
   employeeGroupId    String?
   yjsState           Bytes?
   miscellaneousNotes String?
@@ -585,7 +586,7 @@ model Standup {
   updatedAt          DateTime  @updatedAt
 
   createdBy     User              @relation("StandupCreator", fields: [createdById], references: [id])
-  updatedBy     User              @relation("StandupUpdater", fields: [updatedById], references: [id])
+  updatedBy     User?             @relation("StandupUpdater", fields: [updatedById], references: [id])
   employeeGroup EmployeeGroup?    @relation(fields: [employeeGroupId], references: [id], onDelete: Restrict)
   entries       StandupEntry[]
   attendance    AttendanceRecord[]

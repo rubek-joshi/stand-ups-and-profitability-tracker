@@ -111,8 +111,10 @@ const ACTIONS = [
   "PROJECT_EXTENDED",
   "PROJECT_UPDATED",
   "SETTINGS_UPDATED",
+  "STANDUP_AUTO_ABSENTED",
   "STANDUP_COMPLETED",
   "STANDUP_CREATED",
+  "STANDUP_DELETED",
   "STANDUP_OVERRIDE_GRANTED",
   "STANDUP_REOPENED",
   "STANDUP_UPDATED",
@@ -351,7 +353,7 @@ function AuditPage() {
                         {log.action}
                       </TableCell>
                       <TableCell>
-                        {log.actor?.name ?? log.actor?.email ?? "—"}
+                        {log.actor?.name ?? log.actor?.email ?? "System"}
                       </TableCell>
                       <TableCell className="text-sm">
                         {entityId ? (
@@ -384,7 +386,7 @@ function AuditPage() {
                         {log.action}
                       </TableCell>
                       <TableCell>
-                        {log.actor?.name ?? log.actor?.email ?? "—"}
+                        {log.actor?.name ?? log.actor?.email ?? "System"}
                       </TableCell>
                       <TableCell className="text-sm">
                         {entityId ? (
