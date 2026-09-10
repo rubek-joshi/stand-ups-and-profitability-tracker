@@ -531,6 +531,10 @@ function StandupDetailPage() {
   const [standupMiscNotes, setStandupMiscNotes] = React.useState("")
   const [baselineStandupMiscNotes, setBaselineStandupMiscNotes] =
     React.useState("")
+  const standupMiscNotesRef = React.useRef(standupMiscNotes)
+  standupMiscNotesRef.current = standupMiscNotes
+  const baselineStandupMiscNotesRef = React.useRef(baselineStandupMiscNotes)
+  baselineStandupMiscNotesRef.current = baselineStandupMiscNotes
   const [showOverallNotes, setShowOverallNotes] = React.useState(false)
   const [projects, setProjects] = React.useState<Project[]>([])
   const [drafts, setDrafts] = React.useState<Record<string, EntryDraft>>({})
@@ -842,8 +846,10 @@ function StandupDetailPage() {
         currentDrafts,
         scopeEmployeeIds
       )
-      if (entries.length === 0) return true
-      if (!options?.assignmentResolutions) {
+      const notesDirty =
+        standupMiscNotesRef.current !== baselineStandupMiscNotesRef.current
+      if (entries.length === 0 && !notesDirty) return true
+      if (entries.length > 0 && !options?.assignmentResolutions) {
         const pendingAssignments = getMissingAssignmentsFromStandup(
           standup,
           currentDrafts,
@@ -873,7 +879,7 @@ function StandupDetailPage() {
           method: "PATCH",
           body: {
             entries,
-            miscellaneousNotes: standupMiscNotes,
+            miscellaneousNotes: standupMiscNotesRef.current,
             assignmentResolutions: options?.assignmentResolutions,
           },
         })

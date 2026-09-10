@@ -612,7 +612,7 @@ export class StandupsService {
     dto: BatchUpdateStandupEntriesDto,
     actorId: string,
   ) {
-    if (!dto.entries?.length) {
+    if (!dto.entries?.length && dto.miscellaneousNotes === undefined) {
       throw new BadRequestException("At least one entry is required");
     }
     const standup = await this.findOne(standupId);
@@ -622,11 +622,12 @@ export class StandupsService {
       );
     }
 
+    const entriesToValidate = dto.entries ?? [];
     const assignmentFixes = await this.findMissingAllocationAssignments(
       standup,
-      dto.entries,
+      entriesToValidate,
     );
-    let entriesToSave = dto.entries;
+    let entriesToSave = entriesToValidate;
     if (assignmentFixes.length > 0) {
       if (!dto.assignmentResolutions?.length) {
         throw new BadRequestException({
@@ -650,7 +651,7 @@ export class StandupsService {
         dto.assignmentResolutions,
       );
       entriesToSave = this.applyRemoveAllocationsToEntries(
-        dto.entries,
+        entriesToValidate,
         dto.assignmentResolutions,
         assignmentFixes,
       );
@@ -790,8 +791,8 @@ export class StandupsService {
       targetType: "Standup",
       targetId: standupId,
       metadata: {
-        entryIds: dto.entries.map((item) => item.id),
-        count: dto.entries.length,
+        entryIds: entriesToSave.map((item) => item.id),
+        count: entriesToSave.length,
         assignmentResolutions: dto.assignmentResolutions ?? [],
       },
     });
