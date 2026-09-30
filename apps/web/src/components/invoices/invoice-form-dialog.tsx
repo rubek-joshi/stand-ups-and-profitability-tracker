@@ -250,14 +250,7 @@ export function InvoiceFormDialog({
   const pctOfBudget = budget > 0 ? (amountPaisa / budget) * 100 : 0
   const overBudget = budget > 0 && invoiced + amountPaisa > budget
   const editingPaid = Boolean(invoice?.status === "paid")
-  const invoiceDateMax = (() => {
-    const today = nptTodayIso()
-    if (editingPaid && invoice?.paymentDate) {
-      const paymentDay = String(invoice.paymentDate).slice(0, 10)
-      return paymentDay < today ? paymentDay : today
-    }
-    return today
-  })()
+  const invoiceDateMax = nptTodayIso()
 
   async function submit(event: React.FormEvent) {
     event.preventDefault()
@@ -283,14 +276,6 @@ export function InvoiceFormDialog({
       !isDateValid({ date: parsedInvoiceDate, maxDate: invoiceDateMax })
     ) {
       setError("Enter a valid invoice date")
-      return
-    }
-    if (
-      editingPaid &&
-      invoice?.paymentDate &&
-      parsedInvoiceDate > String(invoice.paymentDate).slice(0, 10)
-    ) {
-      setError("Invoice date cannot be after the payment date")
       return
     }
     setSaving(true)

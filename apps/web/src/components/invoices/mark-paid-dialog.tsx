@@ -37,8 +37,6 @@ export function MarkPaidDialog({
     }
   }, [invoice])
 
-  const invoiceDay = invoice ? String(invoice.invoiceDate).slice(0, 10) : ""
-
   return (
     <AlertDialog
       open={Boolean(invoice)}
@@ -58,7 +56,6 @@ export function MarkPaidDialog({
           <DateInput
             id="payment-date"
             value={date}
-            min={invoiceDay || undefined}
             max={nptTodayIso()}
             disabled={busy}
             onChange={(next) => {
@@ -83,7 +80,6 @@ export function MarkPaidDialog({
                 !parsed ||
                 !isDateValid({
                   date: parsed,
-                  minDate: invoiceDay || undefined,
                   maxDate: nptTodayIso(),
                 })
               ) {

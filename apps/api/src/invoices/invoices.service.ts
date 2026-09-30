@@ -265,16 +265,6 @@ export class InvoicesService {
     this.assertInvoiceDateNotFuture(invoiceDate);
     const amountPaisa = this.parseAmount(dto.amountNpr);
 
-    if (invoice.status === InvoiceStatus.paid && invoice.paymentDate) {
-      const paymentDay = toIsoDate(invoice.paymentDate);
-      const invoiceDay = toIsoDate(invoiceDate);
-      if (invoiceDay > paymentDay) {
-        throw new BadRequestException(
-          'Invoice date cannot be after the payment date on a paid invoice',
-        );
-      }
-    }
-
     const duplicate = await this.prismaService.invoice.findFirst({
       where: { invoiceNumber, NOT: { id } },
       select: { id: true },
@@ -345,14 +335,8 @@ export class InvoicesService {
     }
 
     const paymentDate = requireIsoDate(dto.paymentDate, 'Payment date');
-    const invoiceDay = toIsoDate(invoice.invoiceDate);
     const paymentDay = toIsoDate(paymentDate);
     const today = nptTodayIso();
-    if (paymentDay < invoiceDay) {
-      throw new BadRequestException(
-        'Payment date cannot be before the invoice date',
-      );
-    }
     if (paymentDay > today) {
       throw new BadRequestException('Payment date cannot be in the future');
     }
