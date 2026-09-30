@@ -1045,45 +1045,16 @@ export class StandupsService {
   }
 
   /**
-   * Copy `tomorrow` / `progress` tasks from the most recent prior stand-up
-   * (not strictly yesterday). Gaps with no stand-up — weekends, public
-   * holidays, or any skipped day — are skipped so Monday can pick up Friday
-   * unless Sat/Sun (or a holiday) had its own stand-up in between.
+   * Copy `tomorrow` / `progress` tasks into empty new entries from each
+   * employee's most recent prior stand-up entry that still has those tasks.
+   * Skips calendar gaps with no stand-up (weekends/holidays) and intermediate
+   * absent / empty days so return-from-leave still picks up unfinished work.
    */
   private async carryForwardTasksFromPreviousStandup(
     standupId: string,
     date: Date,
     employeeIds?: string[],
   ) {
-    const previous = await this.prismaService.standup.findFirst({
-      where: { date: { lt: date } },
-      orderBy: { date: "desc" },
-      include: {
-        entries: {
-          where: employeeIds?.length
-            ? { employeeId: { in: employeeIds } }
-            : undefined,
-          include: {
-            allocations: {
-              include: {
-                tasks: {
-                  where: {
-                    state: {
-                      in: [StandupTaskState.tomorrow, StandupTaskState.progress],
-                    },
-                  },
-                  orderBy: { sortOrder: "asc" },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-    if (!previous?.entries.length) {
-      return;
-    }
-
     const newEntries = await this.prismaService.standupEntry.findMany({
       where: {
         standupId,
@@ -1093,14 +1064,67 @@ export class StandupsService {
       },
       include: { allocations: true },
     });
+    const needsCarry = newEntries.filter(
+      (entry) => entry.allocations.length === 0,
+    );
+    if (!needsCarry.length) {
+      return;
+    }
 
-    for (const entry of newEntries) {
-      if (entry.allocations.length > 0) {
-        continue;
+    const targetEmployeeIds = needsCarry.map((entry) => entry.employeeId);
+    const priorWithCarryableTasks =
+      await this.prismaService.standupEntry.findMany({
+        where: {
+          employeeId: { in: targetEmployeeIds },
+          standup: { date: { lt: date } },
+          attendanceStatus: { not: AttendanceStatus.absent },
+          allocations: {
+            some: {
+              tasks: {
+                some: {
+                  state: {
+                    in: [
+                      StandupTaskState.tomorrow,
+                      StandupTaskState.progress,
+                    ],
+                  },
+                },
+              },
+            },
+          },
+        },
+        include: {
+          allocations: {
+            include: {
+              tasks: {
+                where: {
+                  state: {
+                    in: [
+                      StandupTaskState.tomorrow,
+                      StandupTaskState.progress,
+                    ],
+                  },
+                },
+                orderBy: { sortOrder: "asc" },
+              },
+            },
+          },
+        },
+        orderBy: { standup: { date: "desc" } },
+      });
+
+    const latestByEmployee = new Map<
+      string,
+      (typeof priorWithCarryableTasks)[number]
+    >();
+    for (const prior of priorWithCarryableTasks) {
+      if (!latestByEmployee.has(prior.employeeId)) {
+        latestByEmployee.set(prior.employeeId, prior);
       }
-      const previousEntry = previous.entries.find(
-        (item) => item.employeeId === entry.employeeId,
-      );
+    }
+
+    for (const entry of needsCarry) {
+      const previousEntry = latestByEmployee.get(entry.employeeId);
       if (!previousEntry) {
         continue;
       }
