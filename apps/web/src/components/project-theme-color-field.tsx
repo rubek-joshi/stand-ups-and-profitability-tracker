@@ -2,6 +2,7 @@ import * as React from "react"
 import {
   ChromePicker,
   hexToHsl,
+  lightnessToSliderValue,
   type BlossomColorPickerValue,
 } from "@dayflow/blossom-color-picker-react"
 import "@dayflow/blossom-color-picker/styles.css"
@@ -94,7 +95,9 @@ function hexToChromeValue(hex: string): BlossomColorPickerValue {
   const hsl = hexToHsl(rgb)
   return {
     hue: hsl.h,
-    saturation: Math.max(0, Math.min(100, 100 - hsl.l)),
+    // Blossom stores lightness as an inverted slider position; use its own
+    // conversion so the petal/slider state tracks the hex we were given.
+    saturation: lightnessToSliderValue(hsl.l),
     lightness: hsl.l,
     originalSaturation: hsl.s,
     alpha,
@@ -117,6 +120,40 @@ function chromeColorToHex(
     .padStart(2, "0")
     .toUpperCase()
   return `${base}${aa}`
+}
+
+/** Parse a chrome HEX field value (#RGB / #RRGGBB / #RRGGBBAA, # optional). */
+function parseChromeHexInput(raw: string): string | null {
+  const trimmed = raw.trim()
+  if (!trimmed) return null
+  const withHash = trimmed.startsWith("#") ? trimmed : `#${trimmed}`
+  const upper = withHash.toUpperCase()
+  if (/^#[0-9A-F]{3}$/.test(upper)) {
+    const [, r, g, b] = upper
+    return `#${r}${r}${g}${g}${b}${b}`
+  }
+  return normalizeHex(upper)
+}
+
+function isChromeHexInput(el: EventTarget | null): el is HTMLInputElement {
+  return (
+    el instanceof HTMLInputElement &&
+    el.classList.contains("bcp-chrome-input") &&
+    el
+      .closest(".bcp-chrome-input-group")
+      ?.querySelector(".bcp-chrome-label")
+      ?.textContent?.trim() === "HEX"
+  )
+}
+
+/** The chrome picker rebuilds its inputs on every value change, so look the
+ * HEX field up on demand rather than holding a reference to it. */
+function findChromeHexInput(host: HTMLElement): HTMLInputElement | null {
+  const inputs = host.querySelectorAll<HTMLInputElement>(".bcp-chrome-input")
+  for (const input of inputs) {
+    if (isChromeHexInput(input)) return input
+  }
+  return null
 }
 
 function ClassicThemeColorPicker({
@@ -277,11 +314,98 @@ function ChromeThemeColorPicker({
     hexToChromeValue(colorValue)
   )
   const [display, setDisplay] = React.useState(colorValue)
+  const colorValueRef = React.useRef(colorValue)
+  colorValueRef.current = colorValue
+  const onChangeRef = React.useRef(onChange)
+  onChangeRef.current = onChange
+
+  const commitHex = React.useCallback((raw: string) => {
+    const parsed = parseChromeHexInput(raw)
+    if (!parsed) return false
+    const current = normalizeHex(colorValueRef.current)
+    // Keep existing alpha when the field only supplies #RRGGBB.
+    const withAlpha =
+      parsed.length === 7 && current && current.length === 9
+        ? `${parsed}${current.slice(7)}`
+        : parsed
+    if (withAlpha === current) return true
+    setValue(hexToChromeValue(withAlpha))
+    setDisplay(withAlpha)
+    onChangeRef.current(withAlpha)
+    return true
+  }, [])
 
   React.useEffect(() => {
     setValue(hexToChromeValue(colorValue))
     setDisplay(colorValue)
   }, [colorValue])
+
+  // Blossom's ChromePicker syncs a typed/pasted hex into its own petal state
+  // but never calls onChange for it, so the field value never updates. Commit
+  // the HEX box ourselves on Enter, on blur, and when the core circle is
+  // clicked. A callback ref is required because the popover content mounts
+  // lazily — an effect would run before the picker DOM exists.
+  const detachHostRef = React.useRef<(() => void) | null>(null)
+
+  const attachPickerHost = React.useCallback(
+    (host: HTMLDivElement | null) => {
+      detachHostRef.current?.()
+      detachHostRef.current = null
+      if (!host) return
+
+      const onKeyDown = (event: KeyboardEvent) => {
+        if (event.key !== "Enter") return
+        if (!isChromeHexInput(event.target)) return
+        event.preventDefault()
+        event.stopPropagation()
+        commitHex(event.target.value)
+      }
+      const onFocusOut = (event: FocusEvent) => {
+        if (!isChromeHexInput(event.target)) return
+        commitHex(event.target.value)
+      }
+      const onClick = (event: MouseEvent) => {
+        const target = event.target as HTMLElement | null
+        if (!target?.closest(".bcp-core, .bcp-chrome-preview-swatch")) return
+        const hexInput = findChromeHexInput(host)
+        if (hexInput) commitHex(hexInput.value)
+      }
+
+      host.addEventListener("keydown", onKeyDown)
+      host.addEventListener("focusout", onFocusOut)
+      host.addEventListener("click", onClick)
+      detachHostRef.current = () => {
+        host.removeEventListener("keydown", onKeyDown)
+        host.removeEventListener("focusout", onFocusOut)
+        host.removeEventListener("click", onClick)
+      }
+    },
+    [commitHex]
+  )
+
+  React.useEffect(() => () => detachHostRef.current?.(), [])
+
+  const handlePickerChange = React.useCallback(
+    (next: {
+      hex?: string
+      alpha: number
+      hue: number
+      saturation: number
+      lightness?: number
+      originalSaturation?: number
+      layer: "inner" | "outer"
+    }) => {
+      setValue(next)
+      const stored = chromeColorToHex(
+        next.hex,
+        next.alpha,
+        colorValueRef.current
+      )
+      setDisplay(stored)
+      onChangeRef.current(stored)
+    },
+    []
+  )
 
   return (
     <Popover>
@@ -307,7 +431,10 @@ function ChromeThemeColorPicker({
         sideOffset={8}
         className="w-auto border-0 bg-transparent p-0 shadow-none ring-0"
       >
-        <div className="overflow-x-auto rounded-xl border border-border bg-popover p-3 shadow-md">
+        <div
+          ref={attachPickerHost}
+          className="overflow-x-auto rounded-xl border border-border bg-popover p-3 shadow-md"
+        >
           <ChromePicker
             colors={colorPalette}
             value={value}
@@ -318,12 +445,7 @@ function ChromeThemeColorPicker({
             petalSize={28}
             sliderWidth={14}
             adaptivePositioning={false}
-            onChange={(next) => {
-              setValue(next)
-              const stored = chromeColorToHex(next.hex, next.alpha, colorValue)
-              setDisplay(stored)
-              onChange(stored)
-            }}
+            onChange={handlePickerChange}
           />
         </div>
       </PopoverContent>
