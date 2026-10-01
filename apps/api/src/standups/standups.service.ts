@@ -1045,16 +1045,47 @@ export class StandupsService {
   }
 
   /**
-   * Copy `tomorrow` / `progress` tasks into empty new entries from each
-   * employee's most recent prior stand-up entry that still has those tasks.
-   * Skips calendar gaps with no stand-up (weekends/holidays) and intermediate
-   * absent / empty days so return-from-leave still picks up unfinished work.
+   * Copy `tomorrow` / `progress` tasks from the most recent prior stand-up
+   * (not strictly yesterday). Gaps with no stand-up — weekends, public
+   * holidays, or any skipped day — are skipped so Monday can pick up Friday
+   * unless Sat/Sun (or a holiday) had its own stand-up in between.
+   * If an employee was absent on that prior stand-up, fall back to their
+   * most recent present entry so unfinished work still carries after leave.
    */
   private async carryForwardTasksFromPreviousStandup(
     standupId: string,
     date: Date,
     employeeIds?: string[],
   ) {
+    const previous = await this.prismaService.standup.findFirst({
+      where: { date: { lt: date } },
+      orderBy: { date: "desc" },
+      include: {
+        entries: {
+          where: employeeIds?.length
+            ? { employeeId: { in: employeeIds } }
+            : undefined,
+          include: {
+            allocations: {
+              include: {
+                tasks: {
+                  where: {
+                    state: {
+                      in: [StandupTaskState.tomorrow, StandupTaskState.progress],
+                    },
+                  },
+                  orderBy: { sortOrder: "asc" },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    if (!previous?.entries.length) {
+      return;
+    }
+
     const newEntries = await this.prismaService.standupEntry.findMany({
       where: {
         standupId,
@@ -1064,34 +1095,29 @@ export class StandupsService {
       },
       include: { allocations: true },
     });
-    const needsCarry = newEntries.filter(
-      (entry) => entry.allocations.length === 0,
-    );
-    if (!needsCarry.length) {
-      return;
-    }
 
-    const targetEmployeeIds = needsCarry.map((entry) => entry.employeeId);
-    const priorWithCarryableTasks =
-      await this.prismaService.standupEntry.findMany({
+    const absentEmployeeIds = newEntries
+      .filter((entry) => entry.allocations.length === 0)
+      .map((entry) => {
+        const previousEntry = previous.entries.find(
+          (item) => item.employeeId === entry.employeeId,
+        );
+        return previousEntry?.attendanceStatus === AttendanceStatus.absent
+          ? entry.employeeId
+          : null;
+      })
+      .filter((id): id is string => Boolean(id));
+
+    const lastPresentByEmployee = new Map<
+      string,
+      (typeof previous.entries)[number]
+    >();
+    if (absentEmployeeIds.length > 0) {
+      const presentPriors = await this.prismaService.standupEntry.findMany({
         where: {
-          employeeId: { in: targetEmployeeIds },
-          standup: { date: { lt: date } },
+          employeeId: { in: absentEmployeeIds },
+          standup: { date: { lt: previous.date } },
           attendanceStatus: { not: AttendanceStatus.absent },
-          allocations: {
-            some: {
-              tasks: {
-                some: {
-                  state: {
-                    in: [
-                      StandupTaskState.tomorrow,
-                      StandupTaskState.progress,
-                    ],
-                  },
-                },
-              },
-            },
-          },
         },
         include: {
           allocations: {
@@ -1099,10 +1125,7 @@ export class StandupsService {
               tasks: {
                 where: {
                   state: {
-                    in: [
-                      StandupTaskState.tomorrow,
-                      StandupTaskState.progress,
-                    ],
+                    in: [StandupTaskState.tomorrow, StandupTaskState.progress],
                   },
                 },
                 orderBy: { sortOrder: "asc" },
@@ -1112,23 +1135,31 @@ export class StandupsService {
         },
         orderBy: { standup: { date: "desc" } },
       });
-
-    const latestByEmployee = new Map<
-      string,
-      (typeof priorWithCarryableTasks)[number]
-    >();
-    for (const prior of priorWithCarryableTasks) {
-      if (!latestByEmployee.has(prior.employeeId)) {
-        latestByEmployee.set(prior.employeeId, prior);
+      for (const prior of presentPriors) {
+        if (!lastPresentByEmployee.has(prior.employeeId)) {
+          lastPresentByEmployee.set(prior.employeeId, prior);
+        }
       }
     }
 
-    for (const entry of needsCarry) {
-      const previousEntry = latestByEmployee.get(entry.employeeId);
+    for (const entry of newEntries) {
+      if (entry.allocations.length > 0) {
+        continue;
+      }
+      const previousEntry = previous.entries.find(
+        (item) => item.employeeId === entry.employeeId,
+      );
       if (!previousEntry) {
         continue;
       }
-      const toCarry = previousEntry.allocations.filter(
+      const sourceEntry =
+        previousEntry.attendanceStatus === AttendanceStatus.absent
+          ? lastPresentByEmployee.get(entry.employeeId)
+          : previousEntry;
+      if (!sourceEntry) {
+        continue;
+      }
+      const toCarry = sourceEntry.allocations.filter(
         (allocation) => allocation.tasks.length > 0,
       );
       if (!toCarry.length) {
