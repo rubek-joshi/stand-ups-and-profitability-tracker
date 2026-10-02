@@ -11,10 +11,11 @@ import {
   InvoiceStatus,
   Prisma,
 } from '@workspace/database';
+import { Readable } from 'node:stream';
 import { AuditService } from '../audit/audit.service';
 import { ProfitabilityService } from '../profitability/profitability.service';
 import { parseIsoDate, toIsoDate } from '../_shared/utils/date.util';
-import { nprToPaisa } from '../_shared/utils/money.util';
+import { nprToPaisa, paisaToString } from '../_shared/utils/money.util';
 import {
   paginatedResult,
   resolvePagination,
@@ -29,6 +30,40 @@ import {
 } from './dto/invoice.dto';
 
 const INVOICE_MONEY_FIELDS = ['amountPaisa', 'vatPaisa', 'totalPaisa'] as const;
+
+const EXPORT_BATCH_SIZE = 500;
+
+/** Max chars for a project (or client) name segment in the export filename. */
+const EXPORT_NAME_SEGMENT_MAX = 40;
+
+/** Soft cap for the full basename (excluding `.csv`) so downloads stay portable. */
+const EXPORT_FILENAME_BASE_MAX = 120;
+
+const EXPORT_CSV_HEADERS = [
+  'id',
+  'invoiceNumber',
+  'invoiceDate',
+  'status',
+  'paymentDate',
+  'amountNpr',
+  'vatNpr',
+  'totalNpr',
+  'vatRateApplied',
+  'projectId',
+  'projectName',
+  'clientId',
+  'clientName',
+  'amcId',
+  'amcType',
+  'amcStatus',
+  'amcStartDate',
+  'amcEndDate',
+  'amcAmountNpr',
+  'notes',
+  'createdById',
+  'createdAt',
+  'updatedAt',
+] as const;
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -53,6 +88,22 @@ const invoiceInclude = {
   client: { select: { id: true, name: true } },
   amc: amcInclude,
 } as const;
+
+type InvoiceListFilters = {
+  q?: string;
+  status?: string;
+  projectId?: string;
+  clientId?: string;
+  amcId?: string;
+  from?: string;
+  to?: string;
+  sortBy?: string;
+  sortDir?: string;
+};
+
+type InvoiceExportRow = Prisma.InvoiceGetPayload<{
+  include: typeof invoiceInclude;
+}>;
 
 type InvoiceParent = {
   projectId: string;
@@ -82,12 +133,64 @@ function resolveInvoiceOrder(
 ): Prisma.InvoiceOrderByWithRelationInput[] {
   const dir = sortDir === 'asc' ? 'asc' : 'desc';
   if (sortBy === 'invoiceNumber') {
-    return [{ invoiceNumber: dir }, { invoiceDate: 'desc' }];
+    return [{ invoiceNumber: dir }, { invoiceDate: 'desc' }, { id: 'asc' }];
   }
   if (sortBy === 'invoiceDate') {
-    return [{ invoiceDate: dir }, { createdAt: 'desc' }];
+    return [{ invoiceDate: dir }, { createdAt: 'desc' }, { id: 'asc' }];
   }
-  return [{ invoiceDate: 'desc' }, { createdAt: 'desc' }];
+  return [{ invoiceDate: 'desc' }, { createdAt: 'desc' }, { id: 'asc' }];
+}
+
+function csvCell(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  const text = String(value);
+  if (/[",\n\r]/.test(text)) {
+    return `"${text.replace(/"/g, '""')}"`;
+  }
+  return text;
+}
+
+function slugifyFileSegment(value: string, maxLen: number): string {
+  const slug = value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (!slug) return '';
+  if (slug.length <= maxLen) return slug;
+  return slug.slice(0, maxLen).replace(/-+$/, '');
+}
+
+function formatInvoiceCsvRow(invoice: InvoiceExportRow): string {
+  return [
+    invoice.id,
+    invoice.invoiceNumber,
+    toIsoDate(invoice.invoiceDate),
+    invoice.status,
+    invoice.paymentDate ? toIsoDate(invoice.paymentDate) : '',
+    paisaToString(invoice.amountPaisa),
+    paisaToString(invoice.vatPaisa),
+    paisaToString(invoice.totalPaisa),
+    invoice.vatRateApplied,
+    invoice.projectId,
+    invoice.project.name,
+    invoice.clientId,
+    invoice.client.name,
+    invoice.amcId ?? '',
+    invoice.amc?.type ?? '',
+    invoice.amc?.status ?? '',
+    invoice.amc ? toIsoDate(invoice.amc.startDate) : '',
+    invoice.amc ? toIsoDate(invoice.amc.endDate) : '',
+    invoice.amc?.amcAmountPaisa != null
+      ? paisaToString(invoice.amc.amcAmountPaisa)
+      : '',
+    invoice.notes ?? '',
+    invoice.createdById ?? '',
+    invoice.createdAt.toISOString(),
+    invoice.updatedAt.toISOString(),
+  ]
+    .map(csvCell)
+    .join(',');
 }
 
 @Injectable()
@@ -99,56 +202,16 @@ export class InvoicesService {
   ) {}
 
   async findAll(
-    filters: {
-      q?: string;
-      status?: string;
-      projectId?: string;
-      clientId?: string;
-      amcId?: string;
-      from?: string;
-      to?: string;
-      sortBy?: string;
-      sortDir?: string;
+    filters: InvoiceListFilters & {
       page?: string;
       pageSize?: string;
     } = {},
   ) {
-    const q = filters.q?.trim();
-    const projectId = filters.projectId?.trim();
-    const clientId = filters.clientId?.trim();
-    const amcId = filters.amcId?.trim();
     const pagination = resolvePagination({
       page: filters.page,
       pageSize: filters.pageSize,
     });
-
-    const status = this.parseStatus(filters.status);
-    const from = filters.from
-      ? requireIsoDate(filters.from, '`from`')
-      : undefined;
-    const to = filters.to ? requireIsoDate(filters.to, '`to`') : undefined;
-    if (from && to && to.getTime() < from.getTime()) {
-      throw new BadRequestException('`to` must be on or after `from`');
-    }
-
-    const where: Prisma.InvoiceWhereInput = {
-      ...(status ? { status } : {}),
-      ...(projectId ? { projectId } : {}),
-      ...(clientId ? { clientId } : {}),
-      ...(amcId ? { amcId } : {}),
-      ...(from || to
-        ? {
-            invoiceDate: {
-              ...(from ? { gte: from } : {}),
-              ...(to ? { lte: to } : {}),
-            },
-          }
-        : {}),
-      ...(q
-        ? { invoiceNumber: { contains: q, mode: 'insensitive' as const } }
-        : {}),
-    };
-
+    const where = this.buildWhere(filters);
     const [records, total] = await Promise.all([
       this.prismaService.invoice.findMany({
         where,
@@ -164,6 +227,45 @@ export class InvoicesService {
       total,
       pagination,
     );
+  }
+
+  /**
+   * Stream a CSV of all invoices matching the given filters (no page/pageSize).
+   * Uses cursor-based batches so large result sets stay memory-safe.
+   */
+  async exportCsv(filters: InvoiceListFilters = {}): Promise<{
+    stream: Readable;
+    fileName: string;
+  }> {
+    const where = this.buildWhere(filters);
+    const orderBy = resolveInvoiceOrder(filters.sortBy, filters.sortDir);
+    const fileName = await this.buildExportFileName(filters);
+    const self = this;
+    async function* generateRows(): AsyncGenerator<string> {
+      yield `${EXPORT_CSV_HEADERS.join(',')}\n`;
+      let cursorId: string | undefined;
+      for (;;) {
+        const batch = await self.prismaService.invoice.findMany({
+          where,
+          include: invoiceInclude,
+          orderBy,
+          take: EXPORT_BATCH_SIZE,
+          ...(cursorId
+            ? { cursor: { id: cursorId }, skip: 1 }
+            : {}),
+        });
+        if (batch.length === 0) break;
+        for (const invoice of batch) {
+          yield `${formatInvoiceCsvRow(invoice)}\n`;
+        }
+        cursorId = batch[batch.length - 1]?.id;
+        if (batch.length < EXPORT_BATCH_SIZE) break;
+      }
+    }
+    return {
+      stream: Readable.from(generateRows()),
+      fileName,
+    };
   }
 
   async findById(id: string) {
@@ -470,6 +572,94 @@ export class InvoicesService {
     const vatRateApplied = parent.isVatApplicable ? parent.vatRateApplied : 0;
     const vatPaisa = roundVatPaisa(amountPaisa, vatRateApplied);
     return { vatRateApplied, vatPaisa, totalPaisa: amountPaisa + vatPaisa };
+  }
+
+  private buildWhere(filters: InvoiceListFilters): Prisma.InvoiceWhereInput {
+    const q = filters.q?.trim();
+    const projectId = filters.projectId?.trim();
+    const clientId = filters.clientId?.trim();
+    const amcId = filters.amcId?.trim();
+    const status = this.parseStatus(filters.status);
+    const from = filters.from
+      ? requireIsoDate(filters.from, '`from`')
+      : undefined;
+    const to = filters.to ? requireIsoDate(filters.to, '`to`') : undefined;
+    if (from && to && to.getTime() < from.getTime()) {
+      throw new BadRequestException('`to` must be on or after `from`');
+    }
+    return {
+      ...(status ? { status } : {}),
+      ...(projectId ? { projectId } : {}),
+      ...(clientId ? { clientId } : {}),
+      ...(amcId ? { amcId } : {}),
+      ...(from || to
+        ? {
+            invoiceDate: {
+              ...(from ? { gte: from } : {}),
+              ...(to ? { lte: to } : {}),
+            },
+          }
+        : {}),
+      ...(q
+        ? { invoiceNumber: { contains: q, mode: 'insensitive' as const } }
+        : {}),
+    };
+  }
+
+  private async buildExportFileName(
+    filters: InvoiceListFilters,
+  ): Promise<string> {
+    const parts: string[] = [];
+    const q = filters.q?.trim();
+    if (q) {
+      const segment = slugifyFileSegment(q, 30);
+      if (segment) parts.push(`q-${segment}`);
+    }
+    const statusRaw = filters.status?.trim();
+    if (statusRaw === 'unpaid' || statusRaw === InvoiceStatus.pending) {
+      parts.push('unpaid');
+    } else if (statusRaw === InvoiceStatus.paid) {
+      parts.push('paid');
+    }
+    const projectId = filters.projectId?.trim();
+    if (projectId) {
+      const project = await this.prismaService.project.findUnique({
+        where: { id: projectId },
+        select: { name: true },
+      });
+      const segment = slugifyFileSegment(
+        project?.name ?? projectId,
+        EXPORT_NAME_SEGMENT_MAX,
+      );
+      if (segment) parts.push(segment);
+    }
+    const clientId = filters.clientId?.trim();
+    if (clientId) {
+      const client = await this.prismaService.client.findUnique({
+        where: { id: clientId },
+        select: { name: true },
+      });
+      const segment = slugifyFileSegment(
+        client?.name ?? clientId,
+        EXPORT_NAME_SEGMENT_MAX,
+      );
+      if (segment) parts.push(`client-${segment}`);
+    }
+    const amcId = filters.amcId?.trim();
+    if (amcId) {
+      const segment = slugifyFileSegment(amcId, 12);
+      if (segment) parts.push(`amc-${segment}`);
+    }
+    const from = filters.from?.trim();
+    if (from && ISO_DATE.test(from)) parts.push(`from-${from}`);
+    const to = filters.to?.trim();
+    if (to && ISO_DATE.test(to)) parts.push(`to-${to}`);
+    if (parts.length === 0) return 'invoices.csv';
+    let base = `invoices-${parts.join('-')}`;
+    if (base.length > EXPORT_FILENAME_BASE_MAX) {
+      base = base.slice(0, EXPORT_FILENAME_BASE_MAX).replace(/-+$/, '');
+    }
+    return `${base}.csv`;
   }
 
   private parseStatus(value?: string): InvoiceStatus | undefined {

@@ -1,6 +1,6 @@
 import * as React from "react"
 import { createFileRoute } from "@tanstack/react-router"
-import { IconSearch } from "@tabler/icons-react"
+import { IconDownload, IconSearch } from "@tabler/icons-react"
 import { Button } from "@workspace/ui/components/button"
 import { Input } from "@workspace/ui/components/input"
 import {
@@ -10,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@workspace/ui/components/select"
+import { Spinner } from "@workspace/ui/components/spinner"
 import { DatePicker } from "@/components/datetime-picker"
 import { InvoiceFormDialog } from "@/components/invoices/invoice-form-dialog"
 import {
@@ -24,7 +25,12 @@ import { PaginationBar } from "@/components/pagination-bar"
 import { ProjectCombobox } from "@/components/project-combobox"
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui-states"
 import { AUDIT_ROLES } from "@/lib/access"
-import { api, ApiError } from "@/lib/api"
+import {
+  api,
+  ApiError,
+  downloadFile,
+  triggerBrowserDownload,
+} from "@/lib/api"
 import type { Envelope, PaginatedEnvelope } from "@/lib/api"
 import {
   buildListQuery,
@@ -97,6 +103,7 @@ function InvoicesPage() {
   const [editing, setEditing] = React.useState<Invoice | null>(null)
   const [paying, setPaying] = React.useState<Invoice | null>(null)
   const [searchInput, setSearchInput] = React.useState(q ?? "")
+  const [exporting, setExporting] = React.useState(false)
 
   React.useEffect(() => {
     setSearchInput(q ?? "")
@@ -165,6 +172,29 @@ function InvoicesPage() {
         }
       },
     })
+  }
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const qs = buildListQuery({
+        q,
+        status: status || undefined,
+        projectId,
+        from,
+        to,
+        sortBy,
+        sortDir,
+      })
+      const { blob, fileName } = await downloadFile(
+        `/invoices/export${qs ? `?${qs}` : ""}`,
+      )
+      triggerBrowserDownload(blob, fileName)
+    } catch (err) {
+      alert(err instanceof ApiError ? err.message : "Failed to export invoices")
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -294,6 +324,19 @@ function InvoicesPage() {
               Clear filters
             </Button>
           ) : null}
+          <Button
+            className="ml-auto"
+            variant="outline"
+            disabled={exporting}
+            onClick={() => void handleExport()}
+          >
+            {exporting ? (
+              <Spinner data-icon="inline-start" />
+            ) : (
+              <IconDownload data-icon="inline-start" />
+            )}
+            Export
+          </Button>
         </div>
       </div>
 

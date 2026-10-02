@@ -3,13 +3,15 @@ import {
   Controller,
   Delete,
   Get,
+  Header,
   Param,
   Patch,
   Post,
   Query,
+  StreamableFile,
   UseGuards,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiProduces, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from '../_shared/decorators/current-user.decorator';
 import { AuthUser } from '../auth/types/auth-user.type';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -57,6 +59,42 @@ export class InvoicesController {
       sortDir,
       page,
       pageSize,
+    });
+  }
+
+  @Get('export')
+  @RequirePermission('invoices', 'read')
+  @Header('Content-Type', 'text/csv; charset=utf-8')
+  @ApiProduces('text/csv')
+  @ApiOperation({
+    summary:
+      'Export all invoices matching filters as CSV (cursor-batched; ignores page/pageSize)',
+  })
+  async export(
+    @Query('q') q?: string,
+    @Query('status') status?: string,
+    @Query('projectId') projectId?: string,
+    @Query('clientId') clientId?: string,
+    @Query('amcId') amcId?: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('sortBy') sortBy?: string,
+    @Query('sortDir') sortDir?: string,
+  ) {
+    const { stream, fileName } = await this.invoicesService.exportCsv({
+      q,
+      status,
+      projectId,
+      clientId,
+      amcId,
+      from,
+      to,
+      sortBy,
+      sortDir,
+    });
+    return new StreamableFile(stream, {
+      type: 'text/csv; charset=utf-8',
+      disposition: `attachment; filename="${fileName}"`,
     });
   }
 
