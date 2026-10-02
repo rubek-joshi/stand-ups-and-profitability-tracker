@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { DiscoveryModule } from "@nestjs/core";
+import { createObserveModule } from "@nestjs/observe";
 import { Rfc9457Module } from "@camcima/nestjs-rfc9457";
 import { resolve } from "node:path";
 import { AmcModule } from "./amc/amc.module.js";
@@ -19,7 +20,6 @@ import { HealthModule } from "./health/health.module.js";
 import { InvoicesModule } from "./invoices/invoices.module.js";
 import { JobsModule } from "./jobs/jobs.module.js";
 import { MailModule } from "./mail/mail.module.js";
-import { ObserveModule } from "./observe.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { ProfitabilityModule } from "./profitability/profitability.module.js";
 import { ProjectsModule } from "./projects/projects.module.js";
@@ -30,6 +30,8 @@ import { StandupsModule } from "./standups/standups.module.js";
 import { UsersModule } from "./users/users.module.js";
 import { VatModule } from "./vat/vat.module.js";
 import { WriteOffsModule } from "./write-offs/write-offs.module.js";
+
+export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
 @Module({
   imports: [
