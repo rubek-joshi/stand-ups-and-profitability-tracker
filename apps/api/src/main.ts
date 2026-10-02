@@ -1,15 +1,19 @@
+import "./load-env.js";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { applyProblemDetailResponses } from "@camcima/nestjs-rfc9457/swagger";
 import { AppModule } from "./app.module.js";
 import { configureHttp } from "./configure-http.js";
+import { ObserveInstrument } from "./observe.js";
 import { enableBigIntJson } from "./_shared/utils/bigint-json.js";
 
 enableBigIntJson();
 
 async function bootstrap(): Promise<void> {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    instrument: ObserveInstrument,
+  });
   const configService = app.get(ConfigService);
 
   const corsOrigin = configService.get<string>(
@@ -38,7 +42,6 @@ async function bootstrap(): Promise<void> {
   await app.listen(port);
   console.log(`API listening on http://localhost:${port}`);
   console.log(`Swagger docs at http://localhost:${port}/docs`);
-
 }
 
 void bootstrap();

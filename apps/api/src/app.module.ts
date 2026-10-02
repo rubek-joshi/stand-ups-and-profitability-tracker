@@ -19,6 +19,7 @@ import { HealthModule } from "./health/health.module.js";
 import { InvoicesModule } from "./invoices/invoices.module.js";
 import { JobsModule } from "./jobs/jobs.module.js";
 import { MailModule } from "./mail/mail.module.js";
+import { ObserveModule } from "./observe.js";
 import { PrismaModule } from "./prisma/prisma.module.js";
 import { ProfitabilityModule } from "./profitability/profitability.module.js";
 import { ProjectsModule } from "./projects/projects.module.js";
@@ -32,6 +33,11 @@ import { WriteOffsModule } from "./write-offs/write-offs.module.js";
 
 @Module({
   imports: [
+    ObserveModule.forRoot({
+      appKey: process.env.OBSERVE_APP_KEY!,
+      appSecret: process.env.OBSERVE_APP_SECRET!,
+      serviceId: "tracker-production",
+    }),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: resolve(import.meta.dirname, "../../../.env"),
