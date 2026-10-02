@@ -4,14 +4,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { AmcType, AuditAction, Prisma } from '@workspace/database';
-import { AuditService } from '../audit/audit.service';
-import { ProfitabilityService } from '../profitability/profitability.service';
-import { parseIsoDate, toIsoDate } from '../_shared/utils/date.util';
-import { nprToPaisa } from '../_shared/utils/money.util';
-import { serializeMoneyFields } from '../_shared/utils/serialize-money.util';
-import { nptTodayIso } from '../_shared/utils/standup-age.util';
-import { PrismaService } from '../prisma/prisma.service';
-import { CreateWriteOffDto } from './dto/write-off.dto';
+import { AuditService } from '../audit/audit.service.js';
+import { ProfitabilityService } from '../profitability/profitability.service.js';
+import { parseIsoDate, toIsoDate } from '../_shared/utils/date.util.js';
+import { nprToPaisa } from '../_shared/utils/money.util.js';
+import { serializeMoneyFields } from '../_shared/utils/serialize-money.util.js';
+import { nptTodayIso } from '../_shared/utils/standup-age.util.js';
+import { PrismaService } from '../prisma/prisma.service.js';
+import { CreateWriteOffDto } from './dto/write-off.dto.js';
 
 const WRITE_OFF_MONEY_FIELDS = ['amountPaisa'] as const;
 

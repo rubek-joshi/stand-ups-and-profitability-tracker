@@ -11,24 +11,24 @@ import {
   Prisma,
   ProjectStatus,
 } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
+import { AuditService } from "../audit/audit.service.js";
 import {
   assignmentPeriodsOverlap,
   parseIsoDate,
   toIsoDate,
-} from "../_shared/utils/date.util";
-import { nptTodayIso } from "../_shared/utils/standup-age.util";
-import { nprToPaisa } from "../_shared/utils/money.util";
+} from "../_shared/utils/date.util.js";
+import { nptTodayIso } from "../_shared/utils/standup-age.util.js";
+import { nprToPaisa } from "../_shared/utils/money.util.js";
 import {
   serializeMoneyFields,
   serializeMoneyList,
-} from "../_shared/utils/serialize-money.util";
+} from "../_shared/utils/serialize-money.util.js";
 import {
   paginatedResult,
   resolvePagination,
-} from "../_shared/utils/pagination.util";
-import { PrismaService } from "../prisma/prisma.service";
-import { ProfitabilityService } from "../profitability/profitability.service";
+} from "../_shared/utils/pagination.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { ProfitabilityService } from "../profitability/profitability.service.js";
 import {
   AssignCoreMemberDto,
   AssignCoreMembersBulkDto,
@@ -43,7 +43,7 @@ import {
   UnassignEmployeeDto,
   UpdateProjectDto,
   UpdateProjectLinkDto,
-} from "./dto/project.dto";
+} from "./dto/project.dto.js";
 
 type AssignmentPeriod = {
   assignedAt: Date;

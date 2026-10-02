@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { AuditAction, type OrgSettings, type Prisma } from "@workspace/database";
-import { parseIsoDate } from "../_shared/utils/date.util";
-import { AuditService } from "../audit/audit.service";
-import { MailService } from "../mail/mail.service";
-import { PrismaService } from "../prisma/prisma.service";
-import { ProfitabilityService } from "../profitability/profitability.service";
-import { UpdateSettingsDto } from "./dto/update-settings.dto";
+import { parseIsoDate } from "../_shared/utils/date.util.js";
+import { AuditService } from "../audit/audit.service.js";
+import { MailService } from "../mail/mail.service.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { ProfitabilityService } from "../profitability/profitability.service.js";
+import { UpdateSettingsDto } from "./dto/update-settings.dto.js";
 
 export type OrgSettingsResponse = Omit<OrgSettings, "smtpPass"> & {
   smtpPassSet: boolean;

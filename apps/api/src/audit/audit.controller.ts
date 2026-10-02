@@ -1,10 +1,10 @@
 import { Controller, Get, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { AuditAction } from "@workspace/database";
-import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
-import { PoliciesGuard } from "../casbin/guards/policies.guard";
-import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { AuditService } from "./audit.service";
+import { RequirePermission } from "../casbin/decorators/require-permission.decorator.js";
+import { PoliciesGuard } from "../casbin/guards/policies.guard.js";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
+import { AuditService } from "./audit.service.js";
 
 @ApiTags("audit")
 @ApiBearerAuth()

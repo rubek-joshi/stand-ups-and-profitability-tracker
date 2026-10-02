@@ -5,9 +5,9 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import nodemailer, { Transporter } from "nodemailer";
-import { CasbinService } from "../casbin/casbin.service";
-import { PrismaService } from "../prisma/prisma.service";
-import { MAIL_RECIPIENT_ROLES } from "../users/dto/user.dto";
+import { CasbinService } from "../casbin/casbin.service.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { MAIL_RECIPIENT_ROLES } from "../users/dto/user.dto.js";
 
 export type SendMailPayload = {
   to: string;

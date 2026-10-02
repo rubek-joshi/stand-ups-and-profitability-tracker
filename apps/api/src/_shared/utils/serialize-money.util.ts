@@ -1,4 +1,4 @@
-import { serializePaisa } from "./money.util";
+import { serializePaisa } from "./money.util.js";
 
 type MoneyRecord = Record<string, unknown>;
 

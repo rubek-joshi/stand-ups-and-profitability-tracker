@@ -9,13 +9,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import { CurrentUser } from '../_shared/decorators/current-user.decorator';
-import { AuthUser } from '../auth/types/auth-user.type';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { RequirePermission } from '../casbin/decorators/require-permission.decorator';
-import { PoliciesGuard } from '../casbin/guards/policies.guard';
-import { CreateWriteOffDto } from './dto/write-off.dto';
-import { WriteOffsService } from './write-offs.service';
+import { CurrentUser } from '../_shared/decorators/current-user.decorator.js';
+import { AuthUser } from '../auth/types/auth-user.type.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RequirePermission } from '../casbin/decorators/require-permission.decorator.js';
+import { PoliciesGuard } from '../casbin/guards/policies.guard.js';
+import { CreateWriteOffDto } from './dto/write-off.dto.js';
+import { WriteOffsService } from './write-offs.service.js';
 
 @ApiTags('write-offs')
 @ApiBearerAuth()

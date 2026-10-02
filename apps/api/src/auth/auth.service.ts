@@ -4,10 +4,10 @@ import {
 } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import * as bcrypt from "bcrypt";
-import { UsersService } from "../users/users.service";
-import { ChangePasswordDto } from "../users/dto/user.dto";
-import { LoginDto } from "./dto/login.dto";
-import { LoginResponseDto } from "./dto/login-response.dto";
+import { UsersService } from "../users/users.service.js";
+import { ChangePasswordDto } from "../users/dto/user.dto.js";
+import { LoginDto } from "./dto/login.dto.js";
+import { LoginResponseDto } from "./dto/login-response.dto.js";
 
 @Injectable()
 export class AuthService {

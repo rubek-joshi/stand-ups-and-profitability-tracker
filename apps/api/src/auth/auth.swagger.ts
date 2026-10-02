@@ -1,7 +1,7 @@
 import { applyDecorators } from "@nestjs/common";
 import { ApiBearerAuth, ApiOkResponse, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { LoginResponseDto } from "./dto/login-response.dto";
-import { UserResponseDto } from "../users/dto/user-response.dto";
+import { LoginResponseDto } from "./dto/login-response.dto.js";
+import { UserResponseDto } from "../users/dto/user-response.dto.js";
 
 export function AuthControllerDocs() {
   return applyDecorators(ApiTags("auth"));

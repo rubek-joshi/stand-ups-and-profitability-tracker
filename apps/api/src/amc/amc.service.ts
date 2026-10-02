@@ -10,22 +10,22 @@ import {
   AuditAction,
   ProjectStatus,
 } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
-import { parseIsoDate } from "../_shared/utils/date.util";
-import { nprToPaisa } from "../_shared/utils/money.util";
+import { AuditService } from "../audit/audit.service.js";
+import { parseIsoDate } from "../_shared/utils/date.util.js";
+import { nprToPaisa } from "../_shared/utils/money.util.js";
 import {
   paginatedResult,
   resolvePagination,
-} from "../_shared/utils/pagination.util";
-import { serializeMoneyFields } from "../_shared/utils/serialize-money.util";
-import { PrismaService } from "../prisma/prisma.service";
+} from "../_shared/utils/pagination.util.js";
+import { serializeMoneyFields } from "../_shared/utils/serialize-money.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
 import {
   CancelAmcDto,
   CreateAmcDto,
   RenewalDecisionDto,
   SetAmcDto,
   UpdateAmcDto,
-} from "./dto/amc.dto";
+} from "./dto/amc.dto.js";
 
 const AMC_MONEY_FIELDS = ["amcAmountPaisa"] as const;
 

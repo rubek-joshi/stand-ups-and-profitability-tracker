@@ -5,11 +5,11 @@ import {
   AuditAction,
   ProjectStatus,
 } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
-import { PrismaService } from "../prisma/prisma.service";
-import { QueuesService } from "../queues/queues.service";
-import { StandupsService } from "../standups/standups.service";
-import { UsersService } from "../users/users.service";
+import { AuditService } from "../audit/audit.service.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { QueuesService } from "../queues/queues.service.js";
+import { StandupsService } from "../standups/standups.service.js";
+import { UsersService } from "../users/users.service.js";
 
 const AUTO_EXTEND_REASON =
   "Automatically extended — project was not closed by its end date";

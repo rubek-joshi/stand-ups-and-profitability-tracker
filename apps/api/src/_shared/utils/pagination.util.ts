@@ -1,4 +1,4 @@
-import type { PaginationMeta, PaginatedResult } from "../types/pagination.type";
+import type { PaginationMeta, PaginatedResult } from "../types/pagination.type.js";
 
 export type PaginationInput = {
   page?: number;

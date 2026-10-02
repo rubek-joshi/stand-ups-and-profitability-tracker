@@ -4,7 +4,6 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import {
-  AmcRenewalDecision,
   AmcStatus,
   AttendanceStatus,
   AttendanceType,
@@ -14,27 +13,27 @@ import {
   ProjectStatus,
   StandupTaskState,
 } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
+import { AuditService } from "../audit/audit.service.js";
 import {
   parseIsoDate,
   assignmentCoversDate,
   dayBefore,
   toIsoDate,
   toMonthKey,
-} from "../_shared/utils/date.util";
+} from "../_shared/utils/date.util.js";
 import {
   STANDUP_DELETABLE_DAYS,
   STANDUP_EDITABLE_DAYS,
   isStandupDeletable,
   isStandupEditable,
   nptYesterdayDate,
-} from "../_shared/utils/standup-age.util";
+} from "../_shared/utils/standup-age.util.js";
 import {
   paginatedResult,
   resolvePagination,
-} from "../_shared/utils/pagination.util";
-import { PrismaService } from "../prisma/prisma.service";
-import { ProfitabilityService } from "../profitability/profitability.service";
+} from "../_shared/utils/pagination.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { ProfitabilityService } from "../profitability/profitability.service.js";
 import {
   AssignmentResolutionItemDto,
   BatchUpdateStandupEntriesDto,
@@ -42,7 +41,7 @@ import {
   MissingAssignmentAction,
   StandupHistoryQueryDto,
   UpdateStandupEntryDto,
-} from "./dto/standup.dto";
+} from "./dto/standup.dto.js";
 
 type MissingAssignmentFix = {
   entryId: string;

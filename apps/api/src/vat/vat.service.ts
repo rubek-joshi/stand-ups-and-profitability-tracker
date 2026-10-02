@@ -3,15 +3,15 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { AmcStatus, AuditAction } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
-import { parseIsoDate, toIsoDate } from "../_shared/utils/date.util";
-import { nprToPaisa } from "../_shared/utils/money.util";
+import { AuditService } from "../audit/audit.service.js";
+import { parseIsoDate, toIsoDate } from "../_shared/utils/date.util.js";
+import { nprToPaisa } from "../_shared/utils/money.util.js";
 import {
   serializeMoneyFields,
   serializeMoneyList,
-} from "../_shared/utils/serialize-money.util";
-import { PrismaService } from "../prisma/prisma.service";
-import { MarkVatPaidDto } from "./dto/mark-vat-paid.dto";
+} from "../_shared/utils/serialize-money.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { MarkVatPaidDto } from "./dto/mark-vat-paid.dto.js";
 
 const CLEARANCE_FIELDS = ["amountPaisa"] as const;
 

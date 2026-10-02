@@ -2,7 +2,7 @@ import { Injectable, OnModuleInit } from "@nestjs/common";
 import { Enforcer, newEnforcer } from "casbin";
 import { PrismaAdapter } from "casbin-prisma-adapter";
 import { join } from "node:path";
-import { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service.js";
 
 @Injectable()
 export class CasbinService implements OnModuleInit {
@@ -12,7 +12,7 @@ export class CasbinService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     const adapter = await PrismaAdapter.newAdapter(this.prismaService);
-    const modelPath = join(__dirname, "model.conf");
+    const modelPath = join(import.meta.dirname, "model.conf");
     this.enforcer = await newEnforcer(modelPath, adapter);
     await this.enforcer.loadPolicy();
   }

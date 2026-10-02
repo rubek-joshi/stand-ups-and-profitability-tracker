@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
-import { QueuesModule } from "../queues/queues.module";
-import { CoreMembersController } from "./core-members.controller";
-import { CoreMembersService } from "./core-members.service";
+import { QueuesModule } from "../queues/queues.module.js";
+import { CoreMembersController } from "./core-members.controller.js";
+import { CoreMembersService } from "./core-members.service.js";
 
 @Module({
   imports: [QueuesModule],

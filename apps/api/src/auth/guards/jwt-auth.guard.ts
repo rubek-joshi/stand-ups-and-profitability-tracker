@@ -4,7 +4,7 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
-import { AuthUser } from "../types/auth-user.type";
+import { AuthUser } from "../types/auth-user.type.js";
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard("jwt") {

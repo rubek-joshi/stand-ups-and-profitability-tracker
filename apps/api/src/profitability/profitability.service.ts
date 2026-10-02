@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { AttendanceStatus, InvoiceStatus } from "@workspace/database";
-import { dayBefore, daysInMonth, toIsoDate } from "../_shared/utils/date.util";
-import { PrismaService } from "../prisma/prisma.service";
+import { dayBefore, daysInMonth, toIsoDate } from "../_shared/utils/date.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
 
 export type ProjectProfitability = {
   projectId: string;

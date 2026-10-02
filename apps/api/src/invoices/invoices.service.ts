@@ -12,22 +12,22 @@ import {
   Prisma,
 } from '@workspace/database';
 import { Readable } from 'node:stream';
-import { AuditService } from '../audit/audit.service';
-import { ProfitabilityService } from '../profitability/profitability.service';
-import { parseIsoDate, toIsoDate } from '../_shared/utils/date.util';
-import { nprToPaisa, paisaToString } from '../_shared/utils/money.util';
+import { AuditService } from '../audit/audit.service.js';
+import { ProfitabilityService } from '../profitability/profitability.service.js';
+import { parseIsoDate, toIsoDate } from '../_shared/utils/date.util.js';
+import { nprToPaisa, paisaToString } from '../_shared/utils/money.util.js';
 import {
   paginatedResult,
   resolvePagination,
-} from '../_shared/utils/pagination.util';
-import { serializeMoneyFields } from '../_shared/utils/serialize-money.util';
-import { nptTodayIso } from '../_shared/utils/standup-age.util';
-import { PrismaService } from '../prisma/prisma.service';
+} from '../_shared/utils/pagination.util.js';
+import { serializeMoneyFields } from '../_shared/utils/serialize-money.util.js';
+import { nptTodayIso } from '../_shared/utils/standup-age.util.js';
+import { PrismaService } from '../prisma/prisma.service.js';
 import {
   CreateInvoiceDto,
   MarkInvoicePaidDto,
   UpdateInvoiceDto,
-} from './dto/invoice.dto';
+} from './dto/invoice.dto.js';
 
 const INVOICE_MONEY_FIELDS = ['amountPaisa', 'vatPaisa', 'totalPaisa'] as const;
 
@@ -240,19 +240,17 @@ export class InvoicesService {
     const where = this.buildWhere(filters);
     const orderBy = resolveInvoiceOrder(filters.sortBy, filters.sortDir);
     const fileName = await this.buildExportFileName(filters);
-    const self = this;
+    const prisma = this.prismaService;
     async function* generateRows(): AsyncGenerator<string> {
-      yield `${EXPORT_CSV_HEADERS.join(',')}\n`;
+      yield `${EXPORT_CSV_HEADERS.join(",")}\n`;
       let cursorId: string | undefined;
       for (;;) {
-        const batch = await self.prismaService.invoice.findMany({
+        const batch = await prisma.invoice.findMany({
           where,
           include: invoiceInclude,
           orderBy,
           take: EXPORT_BATCH_SIZE,
-          ...(cursorId
-            ? { cursor: { id: cursorId }, skip: 1 }
-            : {}),
+          ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
         });
         if (batch.length === 0) break;
         for (const invoice of batch) {

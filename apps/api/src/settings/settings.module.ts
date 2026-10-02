@@ -1,8 +1,8 @@
 import { Module } from "@nestjs/common";
-import { MailModule } from "../mail/mail.module";
-import { ProfitabilityModule } from "../profitability/profitability.module";
-import { SettingsController } from "./settings.controller";
-import { SettingsService } from "./settings.service";
+import { MailModule } from "../mail/mail.module.js";
+import { ProfitabilityModule } from "../profitability/profitability.module.js";
+import { SettingsController } from "./settings.controller.js";
+import { SettingsService } from "./settings.service.js";
 
 @Module({
   imports: [MailModule, ProfitabilityModule],

@@ -1,4 +1,4 @@
-import { deviceNameFromHeaders } from "./device-name.util";
+import { deviceNameFromHeaders } from "./device-name.util.js";
 
 describe("deviceNameFromHeaders", () => {
   it("uses client hints when present", () => {

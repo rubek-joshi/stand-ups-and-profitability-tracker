@@ -16,10 +16,10 @@ import {
   type RegistrationResponseJSON,
 } from "@simplewebauthn/server";
 import { AuditAction } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
-import { PrismaService } from "../prisma/prisma.service";
-import { UsersService } from "../users/users.service";
-import { deviceNameFromHeaders } from "./device-name.util";
+import { AuditService } from "../audit/audit.service.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { UsersService } from "../users/users.service.js";
+import { deviceNameFromHeaders } from "./device-name.util.js";
 import type { IncomingHttpHeaders } from "node:http";
 
 const CHALLENGE_TTL_MS = 5 * 60 * 1000;

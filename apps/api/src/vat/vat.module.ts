@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
-import { VatController } from "./vat.controller";
-import { VatService } from "./vat.service";
+import { VatController } from "./vat.controller.js";
+import { VatService } from "./vat.service.js";
 
 @Module({
   controllers: [VatController],

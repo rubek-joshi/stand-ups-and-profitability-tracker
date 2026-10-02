@@ -1,6 +1,6 @@
 import { Global, Module } from "@nestjs/common";
-import { CasbinService } from "./casbin.service";
-import { PoliciesGuard } from "./guards/policies.guard";
+import { CasbinService } from "./casbin.service.js";
+import { PoliciesGuard } from "./guards/policies.guard.js";
 
 @Global()
 @Module({

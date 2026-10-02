@@ -9,19 +9,19 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { CurrentUser } from "../_shared/decorators/current-user.decorator";
-import { AuthUser } from "../auth/types/auth-user.type";
-import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
-import { PoliciesGuard } from "../casbin/guards/policies.guard";
+import { CurrentUser } from "../_shared/decorators/current-user.decorator.js";
+import { AuthUser } from "../auth/types/auth-user.type.js";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
+import { RequirePermission } from "../casbin/decorators/require-permission.decorator.js";
+import { PoliciesGuard } from "../casbin/guards/policies.guard.js";
 import {
   CreateCoreMemberDto,
   CreateCoreMemberSalaryDto,
   MarkCoreMemberLeftDto,
   UpdateCoreMemberDto,
   UpdateCoreMemberSalaryDto,
-} from "./dto/core-member.dto";
-import { CoreMembersService } from "./core-members.service";
+} from "./dto/core-member.dto.js";
+import { CoreMembersService } from "./core-members.service.js";
 
 @ApiTags("core-members")
 @ApiBearerAuth()
