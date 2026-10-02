@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
-import { ProfitabilityModule } from "../profitability/profitability.module";
-import { StandupsController } from "./standups.controller";
-import { StandupsService } from "./standups.service";
+import { ProfitabilityModule } from "../profitability/profitability.module.js";
+import { StandupsController } from "./standups.controller.js";
+import { StandupsService } from "./standups.service.js";
 
 @Module({
   imports: [ProfitabilityModule],

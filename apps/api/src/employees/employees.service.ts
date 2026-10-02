@@ -4,19 +4,19 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { AuditAction, PersonStatus } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
-import { parseIsoDate } from "../_shared/utils/date.util";
-import { nprToPaisa } from "../_shared/utils/money.util";
+import { AuditService } from "../audit/audit.service.js";
+import { parseIsoDate } from "../_shared/utils/date.util.js";
+import { nprToPaisa } from "../_shared/utils/money.util.js";
 import {
   serializeMoneyFields,
   serializeMoneyList,
-} from "../_shared/utils/serialize-money.util";
+} from "../_shared/utils/serialize-money.util.js";
 import {
   paginatedResult,
   resolvePagination,
-} from "../_shared/utils/pagination.util";
-import { PrismaService } from "../prisma/prisma.service";
-import { QueuesService } from "../queues/queues.service";
+} from "../_shared/utils/pagination.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { QueuesService } from "../queues/queues.service.js";
 import {
   CreateEmergencyContactDto,
   CreateEmployeeDto,
@@ -25,7 +25,7 @@ import {
   UpdateEmergencyContactDto,
   UpdateEmployeeDto,
   UpdateSalaryEntryDto,
-} from "./dto/employee.dto";
+} from "./dto/employee.dto.js";
 
 const SALARY_FIELDS = ["salaryPaisa"] as const;
 

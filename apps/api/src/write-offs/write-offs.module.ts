@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { ProfitabilityModule } from '../profitability/profitability.module';
-import { WriteOffsController } from './write-offs.controller';
-import { WriteOffsService } from './write-offs.service';
+import { ProfitabilityModule } from '../profitability/profitability.module.js';
+import { WriteOffsController } from './write-offs.controller.js';
+import { WriteOffsService } from './write-offs.service.js';
 
 @Module({
   imports: [ProfitabilityModule],

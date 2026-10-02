@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
-import { ProfitabilityModule } from "../profitability/profitability.module";
-import { ClientsController } from "./clients.controller";
-import { ClientsService } from "./clients.service";
+import { ProfitabilityModule } from "../profitability/profitability.module.js";
+import { ClientsController } from "./clients.controller.js";
+import { ClientsService } from "./clients.service.js";
 
 @Module({
   imports: [ProfitabilityModule],

@@ -1,12 +1,12 @@
 import { BullModule } from "@nestjs/bullmq";
 import { Module } from "@nestjs/common";
 import { ConfigModule, ConfigService } from "@nestjs/config";
-import { MailModule } from "../mail/mail.module";
-import { ProfitabilityModule } from "../profitability/profitability.module";
-import { MailProcessor } from "./mail.processor";
-import { MAIL_QUEUE, RECALCULATE_QUEUE } from "./queue.constants";
-import { QueuesService } from "./queues.service";
-import { RecalculateProcessor } from "./recalculate.processor";
+import { MailModule } from "../mail/mail.module.js";
+import { ProfitabilityModule } from "../profitability/profitability.module.js";
+import { MailProcessor } from "./mail.processor.js";
+import { MAIL_QUEUE, RECALCULATE_QUEUE } from "./queue.constants.js";
+import { QueuesService } from "./queues.service.js";
+import { RecalculateProcessor } from "./recalculate.processor.js";
 
 @Module({
   imports: [

@@ -3,8 +3,8 @@ import { AuditAction, Prisma } from "@workspace/database";
 import {
   paginatedResult,
   resolvePagination,
-} from "../_shared/utils/pagination.util";
-import { PrismaService } from "../prisma/prisma.service";
+} from "../_shared/utils/pagination.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
 
 export type WriteAuditInput = {
   actorId?: string | null;

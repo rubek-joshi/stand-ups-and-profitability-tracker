@@ -5,12 +5,12 @@ import {
   Injectable,
 } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { AuthUser } from "../../auth/types/auth-user.type";
-import { CasbinService } from "../casbin.service";
+import { AuthUser } from "../../auth/types/auth-user.type.js";
+import { CasbinService } from "../casbin.service.js";
 import {
   PERMISSION_KEY,
   PermissionMeta,
-} from "../decorators/require-permission.decorator";
+} from "../decorators/require-permission.decorator.js";
 
 @Injectable()
 export class PoliciesGuard implements CanActivate {

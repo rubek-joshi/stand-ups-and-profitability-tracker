@@ -1,12 +1,12 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { CurrentUser } from "../_shared/decorators/current-user.decorator";
-import { AuthUser } from "../auth/types/auth-user.type";
-import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
-import { PoliciesGuard } from "../casbin/guards/policies.guard";
-import { MarkVatPaidDto } from "./dto/mark-vat-paid.dto";
-import { VatService } from "./vat.service";
+import { CurrentUser } from "../_shared/decorators/current-user.decorator.js";
+import { AuthUser } from "../auth/types/auth-user.type.js";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
+import { RequirePermission } from "../casbin/decorators/require-permission.decorator.js";
+import { PoliciesGuard } from "../casbin/guards/policies.guard.js";
+import { MarkVatPaidDto } from "./dto/mark-vat-paid.dto.js";
+import { VatService } from "./vat.service.js";
 
 @ApiTags("vat")
 @ApiBearerAuth()

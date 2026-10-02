@@ -1,8 +1,8 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import { Job } from "bullmq";
-import { MailService, SendMailPayload } from "../mail/mail.service";
-import { MAIL_QUEUE } from "./queue.constants";
+import { MailService, SendMailPayload } from "../mail/mail.service.js";
+import { MAIL_QUEUE } from "./queue.constants.js";
 
 @Processor(MAIL_QUEUE)
 export class MailProcessor extends WorkerHost {

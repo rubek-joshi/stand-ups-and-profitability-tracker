@@ -10,18 +10,18 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { CurrentUser } from "../_shared/decorators/current-user.decorator";
-import { AuthUser } from "../auth/types/auth-user.type";
-import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
-import { PoliciesGuard } from "../casbin/guards/policies.guard";
+import { CurrentUser } from "../_shared/decorators/current-user.decorator.js";
+import { AuthUser } from "../auth/types/auth-user.type.js";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
+import { RequirePermission } from "../casbin/decorators/require-permission.decorator.js";
+import { PoliciesGuard } from "../casbin/guards/policies.guard.js";
 import {
   AddEmployeeGroupMemberDto,
   AddEmployeeGroupMembersBulkDto,
   CreateEmployeeGroupDto,
   UpdateEmployeeGroupDto,
-} from "./dto/employee-group.dto";
-import { EmployeeGroupsService } from "./employee-groups.service";
+} from "./dto/employee-group.dto.js";
+import { EmployeeGroupsService } from "./employee-groups.service.js";
 
 @ApiTags("employee-groups")
 @ApiBearerAuth()

@@ -1,25 +1,28 @@
 import { INestApplication } from "@nestjs/common";
 import { Test, TestingModule } from "@nestjs/testing";
 import request from "supertest";
-import { App } from "supertest/types";
-import { AppModule } from "../src/app.module";
-import { configureHttp } from "../src/configure-http";
+import { AppModule } from "../src/app.module.js";
+import { configureHttp } from "../src/configure-http.js";
 
 describe("AppController (e2e)", () => {
-  let app: INestApplication<App>;
+  let app: INestApplication;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
 
     app = moduleFixture.createNestApplication();
+    app.enableShutdownHooks();
     configureHttp(app);
     await app.init();
   });
 
-  afterEach(async () => {
+  afterAll(async () => {
+    if (!app) return;
     await app.close();
+    // Allow BullMQ/ioredis sockets to finish closing without unhandled rejections.
+    await new Promise((resolve) => setTimeout(resolve, 250));
   });
 
   it("/health (GET)", () => {

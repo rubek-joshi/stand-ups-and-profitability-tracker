@@ -4,10 +4,10 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { AuditAction } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
-import { serializeMoneyFields } from "../_shared/utils/serialize-money.util";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateCategoryDto, UpdateCategoryDto } from "./dto/category.dto";
+import { AuditService } from "../audit/audit.service.js";
+import { serializeMoneyFields } from "../_shared/utils/serialize-money.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { CreateCategoryDto, UpdateCategoryDto } from "./dto/category.dto.js";
 
 const PROJECT_MONEY_FIELDS = ["budgetPaisa"] as const;
 

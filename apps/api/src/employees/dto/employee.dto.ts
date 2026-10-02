@@ -10,7 +10,7 @@ import {
   Min,
   ValidateIf,
 } from "class-validator";
-import { IsNotFutureDate } from "../../_shared/validators/is-not-future-date.validator";
+import { IsNotFutureDate } from "../../_shared/validators/is-not-future-date.validator.js";
 
 export class CreateEmployeeDto {
   @ApiProperty()

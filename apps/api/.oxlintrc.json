@@ -1,0 +1,6 @@
+{
+  "categories": {
+    "correctness": "warn"
+  },
+  "ignorePatterns": ["dist/**", "coverage/**", "node_modules/**"]
+}

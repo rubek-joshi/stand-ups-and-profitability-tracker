@@ -1,6 +1,6 @@
 import { Module } from "@nestjs/common";
-import { EmployeeGroupsController } from "./employee-groups.controller";
-import { EmployeeGroupsService } from "./employee-groups.service";
+import { EmployeeGroupsController } from "./employee-groups.controller.js";
+import { EmployeeGroupsService } from "./employee-groups.service.js";
 
 @Module({
   controllers: [EmployeeGroupsController],

@@ -8,8 +8,8 @@ import { execFile } from "node:child_process";
 import { promises as fs } from "node:fs";
 import { resolve } from "node:path";
 import { promisify } from "node:util";
-import { AuditService } from "../audit/audit.service";
-import { PrismaService } from "../prisma/prisma.service";
+import { AuditService } from "../audit/audit.service.js";
+import { PrismaService } from "../prisma/prisma.service.js";
 
 const execFileAsync = promisify(execFile);
 const MAX_DUMP_BUFFER = 1024 * 1024 * 100;

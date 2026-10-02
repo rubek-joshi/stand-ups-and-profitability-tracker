@@ -1,11 +1,11 @@
 import { Processor, WorkerHost } from "@nestjs/bullmq";
 import { Logger } from "@nestjs/common";
 import { Job } from "bullmq";
-import { ProfitabilityService } from "../profitability/profitability.service";
+import { ProfitabilityService } from "../profitability/profitability.service.js";
 import {
   RECALCULATE_QUEUE,
   RecalculateJobPayload,
-} from "./queue.constants";
+} from "./queue.constants.js";
 
 @Processor(RECALCULATE_QUEUE)
 export class RecalculateProcessor extends WorkerHost {

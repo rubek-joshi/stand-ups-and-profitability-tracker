@@ -2,9 +2,9 @@ import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { applyProblemDetailResponses } from "@camcima/nestjs-rfc9457/swagger";
-import { AppModule } from "./app.module";
-import { configureHttp } from "./configure-http";
-import { enableBigIntJson } from "./_shared/utils/bigint-json";
+import { AppModule } from "./app.module.js";
+import { configureHttp } from "./configure-http.js";
+import { enableBigIntJson } from "./_shared/utils/bigint-json.js";
 
 enableBigIntJson();
 

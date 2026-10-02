@@ -6,21 +6,21 @@ import {
 } from "@nestjs/common";
 import { AuditAction, User } from "@workspace/database";
 import * as bcrypt from "bcrypt";
-import { AuditService } from "../audit/audit.service";
-import { CasbinService } from "../casbin/casbin.service";
+import { AuditService } from "../audit/audit.service.js";
+import { CasbinService } from "../casbin/casbin.service.js";
 import {
   paginatedResult,
   resolvePagination,
-} from "../_shared/utils/pagination.util";
-import { PrismaService } from "../prisma/prisma.service";
+} from "../_shared/utils/pagination.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
 import {
   CreateUserDto,
   MAIL_RECIPIENT_ROLES,
   SetUserPasswordDto,
   UpdateUserDto,
   USER_ROLES,
-} from "./dto/user.dto";
-import { UserResponseDto } from "./dto/user-response.dto";
+} from "./dto/user.dto.js";
+import { UserResponseDto } from "./dto/user-response.dto.js";
 
 const BCRYPT_ROUNDS = 12;
 

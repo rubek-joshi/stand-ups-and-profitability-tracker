@@ -4,16 +4,16 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { AuditAction, ClientStatus } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
-import { serializeMoneyFields } from "../_shared/utils/serialize-money.util";
+import { AuditService } from "../audit/audit.service.js";
+import { serializeMoneyFields } from "../_shared/utils/serialize-money.util.js";
 import {
   paginatedResult,
   resolvePagination,
-} from "../_shared/utils/pagination.util";
-import { ProfitabilityService } from "../profitability/profitability.service";
-import { PrismaService } from "../prisma/prisma.service";
-import { CreateClientDto } from "./dto/create-client.dto";
-import { UpdateClientDto } from "./dto/update-client.dto";
+} from "../_shared/utils/pagination.util.js";
+import { ProfitabilityService } from "../profitability/profitability.service.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { CreateClientDto } from "./dto/create-client.dto.js";
+import { UpdateClientDto } from "./dto/update-client.dto.js";
 
 const AMC_MONEY_FIELDS = ["amcAmountPaisa"] as const;
 const PROFIT_MONEY_FIELDS = [

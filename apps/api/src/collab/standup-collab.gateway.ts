@@ -12,7 +12,7 @@ import {
 } from "@nestjs/websockets";
 import { Server, Socket } from "socket.io";
 import * as Y from "yjs";
-import { PrismaService } from "../prisma/prisma.service";
+import { PrismaService } from "../prisma/prisma.service.js";
 
 type AuthedSocket = Socket & {
   data: {

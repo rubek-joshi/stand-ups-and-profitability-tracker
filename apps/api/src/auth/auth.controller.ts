@@ -11,28 +11,28 @@ import {
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation } from "@nestjs/swagger";
 import type { Request } from "express";
-import { CurrentUser } from "../_shared/decorators/current-user.decorator";
-import { UsersService } from "../users/users.service";
+import { CurrentUser } from "../_shared/decorators/current-user.decorator.js";
+import { UsersService } from "../users/users.service.js";
 import {
   ChangePasswordDto,
   UpdateMyPreferencesDto,
-} from "../users/dto/user.dto";
+} from "../users/dto/user.dto.js";
 import {
   AuthControllerDocs,
   ChangePasswordDocs,
   LoginDocs,
   MeDocs,
-} from "./auth.swagger";
-import { AuthService } from "./auth.service";
-import { PasskeysService } from "./passkeys.service";
-import { LoginDto } from "./dto/login.dto";
+} from "./auth.swagger.js";
+import { AuthService } from "./auth.service.js";
+import { PasskeysService } from "./passkeys.service.js";
+import { LoginDto } from "./dto/login.dto.js";
 import {
   PasskeyLoginOptionsDto,
   PasskeyVerifyDto,
   RenamePasskeyDto,
-} from "./dto/passkey.dto";
-import { JwtAuthGuard } from "./guards/jwt-auth.guard";
-import { AuthUser } from "./types/auth-user.type";
+} from "./dto/passkey.dto.js";
+import { JwtAuthGuard } from "./guards/jwt-auth.guard.js";
+import { AuthUser } from "./types/auth-user.type.js";
 
 @AuthControllerDocs()
 @Controller("auth")

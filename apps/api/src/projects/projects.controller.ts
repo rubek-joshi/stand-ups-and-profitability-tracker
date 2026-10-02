@@ -14,12 +14,12 @@ import {
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { ProjectStatus } from "@workspace/database";
-import { CurrentUser } from "../_shared/decorators/current-user.decorator";
-import { AuthUser } from "../auth/types/auth-user.type";
-import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { CasbinService } from "../casbin/casbin.service";
-import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
-import { PoliciesGuard } from "../casbin/guards/policies.guard";
+import { CurrentUser } from "../_shared/decorators/current-user.decorator.js";
+import { AuthUser } from "../auth/types/auth-user.type.js";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
+import { CasbinService } from "../casbin/casbin.service.js";
+import { RequirePermission } from "../casbin/decorators/require-permission.decorator.js";
+import { PoliciesGuard } from "../casbin/guards/policies.guard.js";
 import {
   AssignCoreMemberDto,
   AssignCoreMembersBulkDto,
@@ -33,9 +33,9 @@ import {
   UnassignEmployeeDto,
   UpdateProjectDto,
   UpdateProjectLinkDto,
-} from "./dto/project.dto";
-import { ProjectsService } from "./projects.service";
-import { StandupsService } from "../standups/standups.service";
+} from "./dto/project.dto.js";
+import { ProjectsService } from "./projects.service.js";
+import { StandupsService } from "../standups/standups.service.js";
 
 const OptionalJsonBody = createParamDecorator(
   (_data: unknown, ctx: ExecutionContext) => {

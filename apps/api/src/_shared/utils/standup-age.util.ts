@@ -1,4 +1,4 @@
-import { parseIsoDate, toIsoDate } from "./date.util";
+import { parseIsoDate, toIsoDate } from "./date.util.js";
 
 /** Hard-coded stand-up edit/delete windows (calendar days from stand-up date). */
 export const STANDUP_EDITABLE_DAYS = 7;

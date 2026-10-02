@@ -7,10 +7,10 @@ import {
   PersonStatus,
   ProjectStatus,
 } from "@workspace/database";
-import { parseIsoDate, toIsoDate } from "../_shared/utils/date.util";
-import { PrismaService } from "../prisma/prisma.service";
-import { ProfitabilityService } from "../profitability/profitability.service";
-import { VatService } from "../vat/vat.service";
+import { parseIsoDate, toIsoDate } from "../_shared/utils/date.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
+import { ProfitabilityService } from "../profitability/profitability.service.js";
+import { VatService } from "../vat/vat.service.js";
 
 type MonthBucket = {
   key: string;

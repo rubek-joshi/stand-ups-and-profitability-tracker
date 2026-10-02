@@ -5,18 +5,18 @@ import {
   NotFoundException,
 } from "@nestjs/common";
 import { AuditAction, PersonStatus } from "@workspace/database";
-import { AuditService } from "../audit/audit.service";
+import { AuditService } from "../audit/audit.service.js";
 import {
   paginatedResult,
   resolvePagination,
-} from "../_shared/utils/pagination.util";
-import { PrismaService } from "../prisma/prisma.service";
+} from "../_shared/utils/pagination.util.js";
+import { PrismaService } from "../prisma/prisma.service.js";
 import {
   AddEmployeeGroupMemberDto,
   AddEmployeeGroupMembersBulkDto,
   CreateEmployeeGroupDto,
   UpdateEmployeeGroupDto,
-} from "./dto/employee-group.dto";
+} from "./dto/employee-group.dto.js";
 
 @Injectable()
 export class EmployeeGroupsService {

@@ -11,20 +11,20 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
-import { CurrentUser } from "../_shared/decorators/current-user.decorator";
-import { AuthUser } from "../auth/types/auth-user.type";
-import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
-import { CasbinService } from "../casbin/casbin.service";
-import { RequirePermission } from "../casbin/decorators/require-permission.decorator";
-import { PoliciesGuard } from "../casbin/guards/policies.guard";
-import { AmcService } from "./amc.service";
+import { CurrentUser } from "../_shared/decorators/current-user.decorator.js";
+import { AuthUser } from "../auth/types/auth-user.type.js";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard.js";
+import { CasbinService } from "../casbin/casbin.service.js";
+import { RequirePermission } from "../casbin/decorators/require-permission.decorator.js";
+import { PoliciesGuard } from "../casbin/guards/policies.guard.js";
+import { AmcService } from "./amc.service.js";
 import {
   CancelAmcDto,
   CreateAmcDto,
   RenewalDecisionDto,
   SetAmcDto,
   UpdateAmcDto,
-} from "./dto/amc.dto";
+} from "./dto/amc.dto.js";
 
 @ApiTags("amc")
 @ApiBearerAuth()
