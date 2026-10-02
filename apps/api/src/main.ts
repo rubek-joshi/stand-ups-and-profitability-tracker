@@ -3,14 +3,19 @@ import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { applyProblemDetailResponses } from "@camcima/nestjs-rfc9457/swagger";
-import { AppModule } from "./app.module.js";
+import { AppModule, ObserveInstrument } from "./app.module.js";
 import { configureHttp } from "./configure-http.js";
-import { ObserveInstrument } from "./observe.js";
 import { enableBigIntJson } from "./_shared/utils/bigint-json.js";
 
 enableBigIntJson();
 
 async function bootstrap(): Promise<void> {
+  if (typeof ObserveInstrument?.instanceDecorator !== "function") {
+    throw new Error(
+      "ObserveInstrument.instanceDecorator is missing — NestFactory was not given a valid instrument hook from createObserveModule().",
+    );
+  }
+
   const app = await NestFactory.create(AppModule, {
     instrument: ObserveInstrument,
   });
