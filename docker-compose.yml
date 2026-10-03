@@ -4,7 +4,8 @@ services:
     container_name: profitability-tracker-postgres
     restart: unless-stopped
     ports:
-      - "${POSTGRES_PORT:-6432}:5432"
+      # Bind to loopback only — never expose DB on 0.0.0.0 in production.
+      - "127.0.0.1:${POSTGRES_PORT:-6432}:5432"
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
@@ -26,7 +27,8 @@ services:
     container_name: profitability-tracker-redis
     restart: unless-stopped
     ports:
-      - "${REDIS_PUBLISH_PORT:-6679}:6379"
+      # Bind to loopback only — never expose Redis on 0.0.0.0 in production.
+      - "127.0.0.1:${REDIS_PUBLISH_PORT:-6679}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
