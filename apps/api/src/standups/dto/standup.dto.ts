@@ -107,6 +107,14 @@ export class BatchUpdateStandupEntryItemDto extends UpdateStandupEntryDto {
   @IsString()
   @IsNotEmpty()
   id!: string;
+
+  @ApiPropertyOptional({
+    description:
+      "ISO timestamp of the entry when the client loaded it; rejects stale overwrites",
+  })
+  @IsOptional()
+  @IsDateString()
+  expectedUpdatedAt?: string;
 }
 
 export const MISSING_ASSIGNMENT_ACTIONS = [

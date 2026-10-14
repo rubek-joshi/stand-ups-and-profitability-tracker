@@ -379,6 +379,7 @@ export type StandupEntry = {
   id: string
   attendanceStatus: AttendanceStatus
   miscellaneousNotes: string | null
+  updatedAt?: string
   employee: {
     id: string
     name: string

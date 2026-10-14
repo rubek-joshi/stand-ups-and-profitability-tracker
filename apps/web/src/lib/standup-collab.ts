@@ -31,33 +31,69 @@ function fromBase64(b64: string): Uint8Array {
 export function connectStandupCollab(
   standupId: string,
   onPeers: (peers: CollabPeer[]) => void,
-  onAwareness?: (payload: {
-    userId: string
-    userName: string
-    awareness: Record<string, unknown>
-  }) => void,
+  options?: {
+    onAwareness?: (payload: {
+      userId: string
+      userName: string
+      awareness: Record<string, unknown>
+    }) => void
+    onConnectionChange?: (connected: boolean) => void
+  },
 ): StandupCollabSession {
   const token = getToken()
   const doc = new Y.Doc()
   const peers: CollabPeer[] = []
+  let disposed = false
 
   const socket = io(`${getApiBaseUrl()}/standup-collab`, {
     auth: { token },
     transports: ["websocket"],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 500,
+    reconnectionDelayMax: 5000,
   })
 
-  socket.on("connect", () => {
+  const publishLocalDiff = (serverUpdate: Uint8Array) => {
+    // After merging server state, push any local-only updates so peers/DB catch up.
+    const diff = Y.encodeStateAsUpdate(
+      doc,
+      Y.encodeStateVectorFromUpdate(serverUpdate),
+    )
+    if (diff.byteLength > 2 && socket.connected) {
+      socket.emit("yjs:update", { standupId, update: toBase64(diff) })
+    }
+  }
+
+  const joinRoom = () => {
+    if (disposed) return
     socket.emit(
       "standup:join",
       { standupId },
-      (res: { state: string; peers: CollabPeer[] }) => {
-        if (res?.state) {
-          Y.applyUpdate(doc, fromBase64(res.state), "remote")
+      (res: { state?: string; peers?: CollabPeer[] } | null) => {
+        if (disposed || !res) return
+        if (res.state) {
+          const update = fromBase64(res.state)
+          Y.applyUpdate(doc, update, "remote")
+          publishLocalDiff(update)
         }
-        peers.splice(0, peers.length, ...(res?.peers ?? []))
+        peers.splice(0, peers.length, ...(res.peers ?? []))
         onPeers([...peers])
+        options?.onConnectionChange?.(true)
       },
     )
+  }
+
+  socket.on("connect", () => {
+    joinRoom()
+  })
+
+  socket.on("disconnect", () => {
+    options?.onConnectionChange?.(false)
+  })
+
+  socket.on("connect_error", () => {
+    options?.onConnectionChange?.(false)
   })
 
   socket.on("yjs:update", (payload: { update: string }) => {
@@ -86,12 +122,13 @@ export function connectStandupCollab(
       userName: string
       awareness: Record<string, unknown>
     }) => {
-      onAwareness?.(payload)
+      options?.onAwareness?.(payload)
     },
   )
 
   doc.on("update", (update: Uint8Array, origin: unknown) => {
-    if (origin === "remote") return
+    if (origin === "remote" || disposed) return
+    if (!socket.connected) return
     socket.emit("yjs:update", { standupId, update: toBase64(update) })
   })
 
@@ -99,10 +136,14 @@ export function connectStandupCollab(
     doc,
     socket,
     disconnect: () => {
+      disposed = true
+      options?.onConnectionChange?.(false)
+      socket.removeAllListeners()
       socket.disconnect()
       doc.destroy()
     },
     setAwareness: (awareness) => {
+      if (!socket.connected) return
       socket.emit("awareness:update", { standupId, awareness })
     },
   }

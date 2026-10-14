@@ -102,18 +102,22 @@ export function buildEntriesPayload(
   entries: StandupEntry[] | undefined,
   drafts: Record<string, EntryDraft>,
   employeeIds?: Set<string> | null,
+  entryUpdatedAts?: Record<string, string> | null,
 ) {
   const scoped = (entries ?? []).filter((entry) =>
     employeeIds ? employeeIds.has(entry.employee.id) : true,
   )
   return scoped.map((entry) => {
     const d = drafts[entry.id]
+    const expectedUpdatedAt =
+      entryUpdatedAts?.[entry.id] ?? entry.updatedAt
     if (!d || d.attendanceStatus === "absent") {
       return {
         id: entry.id,
         attendanceStatus: (d?.attendanceStatus ?? entry.attendanceStatus) as AttendanceStatus,
         miscellaneousNotes: null,
         allocations: [],
+        ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}),
       }
     }
     return {
@@ -141,6 +145,7 @@ export function buildEntriesPayload(
               sortOrder: taskIndex,
             })),
         })),
+      ...(expectedUpdatedAt ? { expectedUpdatedAt } : {}),
     }
   })
 }

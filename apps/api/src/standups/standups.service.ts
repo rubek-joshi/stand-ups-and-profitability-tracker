@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Injectable,
   NotFoundException,
 } from "@nestjs/common";
@@ -662,6 +663,20 @@ export class StandupsService {
       if (!entry) {
         throw new NotFoundException(`Standup entry ${item.id} not found`);
       }
+      if (item.expectedUpdatedAt) {
+        const expectedMs = Date.parse(item.expectedUpdatedAt);
+        if (
+          Number.isFinite(expectedMs) &&
+          entry.updatedAt.getTime() !== expectedMs
+        ) {
+          throw new ConflictException({
+            message:
+              "This stand-up entry was modified by someone else. Reload and try again.",
+            code: "ENTRY_CONFLICT",
+            entryId: item.id,
+          });
+        }
+      }
       const attendanceStatus = item.attendanceStatus ?? entry.attendanceStatus;
       if (attendanceStatus === AttendanceStatus.absent) {
         continue;
@@ -846,6 +861,13 @@ export class StandupsService {
     });
     if (!standup) {
       return { standupId: null, markedAbsent: 0 };
+    }
+
+    // Skip auto-absent when live collab drafts exist in yjsState — they may not
+    // have been saved to entry rows yet, and marking absent would destroy them
+    // on the next solo hydrate.
+    if (standup.yjsState && standup.yjsState.length > 0) {
+      return { standupId: standup.id, markedAbsent: 0 };
     }
 
     const emptyIds = standup.entries

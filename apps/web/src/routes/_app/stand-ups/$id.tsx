@@ -109,6 +109,19 @@ import {
   parseStandupViewScopeSearch,
   resolveStandupActiveGroupId,
 } from "@/lib/standup-view-scope"
+import {
+  ENTRIES_MAP_KEY,
+  META_MAP_KEY,
+  collectEntryUpdatedAts,
+  mergeYjsEntriesIntoDrafts,
+  readMetaNotes,
+  seedMetaNotesIfMissing,
+  seedMissingEntriesIntoYjs,
+  serializeEntryFingerprint,
+  writeEntryToYjs,
+  writeEntryUpdatedAt,
+  writeMetaNotes,
+} from "@/lib/standup-yjs-entry"
 import type {
   AssignmentResolution,
   EmployeeGroup,
@@ -469,59 +482,6 @@ function getMissingAssignmentsFromStandup(
   return result
 }
 
-function serializeCollabEntry(draft: EntryDraft): string {
-  return JSON.stringify({
-    miscellaneousNotes: draft.miscellaneousNotes,
-    attendanceStatus: draft.attendanceStatus,
-    allocations: draft.allocations,
-  })
-}
-
-function syncDraftsToYjs(
-  map: Y.Map<string> | null,
-  drafts: Record<string, EntryDraft>
-) {
-  if (!map) return
-  const apply = () => {
-    for (const [entryId, draft] of Object.entries(drafts)) {
-      const serialized = serializeCollabEntry(draft)
-      if (map.get(entryId) !== serialized) {
-        map.set(entryId, serialized)
-      }
-    }
-  }
-  const doc = map.doc
-  if (doc) {
-    doc.transact(apply, "hydrate-from-server")
-  } else {
-    apply()
-  }
-}
-
-function parseCollabEntry(raw: string, fallback: EntryDraft): EntryDraft {
-  try {
-    const parsed = JSON.parse(raw) as Partial<EntryDraft>
-    return {
-      attendanceStatus: parsed.attendanceStatus ?? fallback.attendanceStatus,
-      miscellaneousNotes:
-        typeof parsed.miscellaneousNotes === "string"
-          ? parsed.miscellaneousNotes
-          : fallback.miscellaneousNotes,
-      allocations: Array.isArray(parsed.allocations)
-        ? parsed.allocations.map((a) => ({
-            projectId: a.projectId,
-            percentage: a.percentage,
-            isNonBillable: a.isNonBillable,
-            locked: Boolean(a.locked),
-            tasks: Array.isArray(a.tasks) ? a.tasks : [],
-          }))
-        : fallback.allocations,
-    }
-  } catch {
-    return fallback
-  }
-}
-
 function StandupDetailPage() {
   const { id } = Route.useParams()
   const { viewScope, groupId: viewGroupId } = Route.useSearch()
@@ -604,7 +564,9 @@ function StandupDetailPage() {
     title: string
     description: string
   } | null>(null)
-  const entriesMapRef = React.useRef<Y.Map<string> | null>(null)
+  const entriesMapRef = React.useRef<Y.Map<unknown> | null>(null)
+  const collabDocRef = React.useRef<Y.Doc | null>(null)
+  const entryUpdatedAtRef = React.useRef<Record<string, string>>({})
   const draftsRef = React.useRef(drafts)
   draftsRef.current = drafts
   const peersRef = React.useRef(peers)
@@ -617,44 +579,34 @@ function StandupDetailPage() {
   )
   hydrateYjsFromDraftsRef.current = (incoming) => {
     const map = entriesMapRef.current
+    const doc = collabDocRef.current
     const draftsToWrite = incoming ?? draftsRef.current
-    if (!map || !collabStateAppliedRef.current || !draftsReadyRef.current) {
+    if (!map || !doc || !collabStateAppliedRef.current || !draftsReadyRef.current) {
       return
     }
     if (yjsHydratedFromServerRef.current) return
     if (Object.keys(draftsToWrite).length === 0) return
-    // When others are already in the room, the shared doc may contain live
-    // drafts newer than Postgres. Only seed missing keys; then pull Yjs into
-    // React so this client sees peer work instead of wiping it with DB state.
-    const hasLivePeers = peersRef.current.length > 1
-    if (hasLivePeers) {
-      const missing: Record<string, EntryDraft> = {}
-      for (const [entryId, draft] of Object.entries(draftsToWrite)) {
-        if (!map.has(entryId)) missing[entryId] = draft
-      }
-      if (Object.keys(missing).length > 0) {
-        syncDraftsToYjs(map, missing)
-      }
-      const mergedDrafts = { ...draftsToWrite }
-      let changed = false
-      for (const [entryId, raw] of map.entries()) {
-        if (typeof raw !== "string" || !mergedDrafts[entryId]) continue
-        const merged = parseCollabEntry(raw, mergedDrafts[entryId]!)
-        if (
-          serializeCollabEntry(merged) ===
-          serializeCollabEntry(mergedDrafts[entryId]!)
-        ) {
-          continue
-        }
-        mergedDrafts[entryId] = merged
-        changed = true
-      }
-      if (changed) {
-        draftsRef.current = mergedDrafts
-        setDrafts(mergedDrafts)
-      }
-    } else {
-      syncDraftsToYjs(map, draftsToWrite)
+    // Never replace existing Yjs content with Postgres — that destroys unsaved
+    // collab drafts when the next person opens alone. Only seed missing keys,
+    // then pull Yjs into React.
+    seedMissingEntriesIntoYjs(map, draftsToWrite)
+    seedMetaNotesIfMissing(doc, standupMiscNotesRef.current)
+    const { drafts: mergedDrafts, changed } = mergeYjsEntriesIntoDrafts(
+      map,
+      draftsToWrite,
+    )
+    if (changed) {
+      draftsRef.current = mergedDrafts
+      setDrafts(mergedDrafts)
+    }
+    const liveNotes = readMetaNotes(doc)
+    if (typeof liveNotes === "string" && liveNotes !== standupMiscNotesRef.current) {
+      standupMiscNotesRef.current = liveNotes
+      setStandupMiscNotes(liveNotes)
+    }
+    entryUpdatedAtRef.current = {
+      ...entryUpdatedAtRef.current,
+      ...collectEntryUpdatedAts(map),
     }
     yjsHydratedFromServerRef.current = true
   }
@@ -698,6 +650,11 @@ function StandupDetailPage() {
       const next = applyAssignedProjectDefaults(fromServer, s.data, p.data)
       draftsRef.current = next
       draftsReadyRef.current = true
+      entryUpdatedAtRef.current = Object.fromEntries(
+        (s.data.entries ?? [])
+          .filter((entry) => entry.updatedAt)
+          .map((entry) => [entry.id, entry.updatedAt!]),
+      )
       setDrafts(next)
       setBaseline(serializeDrafts(next))
       setStandupMiscNotes(s.data.miscellaneousNotes ?? "")
@@ -767,40 +724,57 @@ function StandupDetailPage() {
   React.useEffect(() => {
     collabStateAppliedRef.current = false
     yjsHydratedFromServerRef.current = false
-    const session = connectStandupCollab(id, (nextPeers) => {
-      collabStateAppliedRef.current = true
-      peersRef.current = nextPeers
-      setPeers(nextPeers)
-      setCollabConnected(true)
-      hydrateYjsFromDraftsRef.current()
-    })
-    const entriesMap = session.doc.getMap<string>("entries")
+    const session = connectStandupCollab(
+      id,
+      (nextPeers) => {
+        collabStateAppliedRef.current = true
+        peersRef.current = nextPeers
+        setPeers(nextPeers)
+        hydrateYjsFromDraftsRef.current()
+      },
+      {
+        onConnectionChange: (connected) => {
+          setCollabConnected(connected)
+        },
+      },
+    )
+    collabDocRef.current = session.doc
+    const entriesMap = session.doc.getMap<unknown>(ENTRIES_MAP_KEY)
+    const metaMap = session.doc.getMap<unknown>(META_MAP_KEY)
     entriesMapRef.current = entriesMap
-    const observer = () => {
-      // Wait until saved stand-up data has replaced the persisted Yjs snapshot.
+    const syncFromYjs = () => {
       if (!yjsHydratedFromServerRef.current) return
-      setDrafts((prev) => {
-        const next = { ...prev }
-        let changed = false
-        for (const [entryId, raw] of entriesMap.entries()) {
-          if (typeof raw !== "string" || !next[entryId]) continue
-          const merged = parseCollabEntry(raw, next[entryId]!)
-          if (
-            serializeCollabEntry(merged) ===
-            serializeCollabEntry(next[entryId]!)
-          ) {
-            continue
-          }
-          next[entryId] = merged
-          changed = true
-        }
-        return changed ? next : prev
-      })
+      const { drafts: next, changed } = mergeYjsEntriesIntoDrafts(
+        entriesMap,
+        draftsRef.current,
+      )
+      if (changed) {
+        draftsRef.current = next
+        setDrafts(next)
+      }
+      entryUpdatedAtRef.current = {
+        ...entryUpdatedAtRef.current,
+        ...collectEntryUpdatedAts(entriesMap),
+      }
+      const liveNotes = readMetaNotes(session.doc)
+      if (
+        typeof liveNotes === "string" &&
+        liveNotes !== standupMiscNotesRef.current
+      ) {
+        standupMiscNotesRef.current = liveNotes
+        setStandupMiscNotes(liveNotes)
+      }
     }
-    entriesMap.observe(observer)
+    const observer = () => {
+      syncFromYjs()
+    }
+    entriesMap.observeDeep(observer)
+    metaMap.observe(observer)
     return () => {
-      entriesMap.unobserve(observer)
+      entriesMap.unobserveDeep(observer)
+      metaMap.unobserve(observer)
       entriesMapRef.current = null
+      collabDocRef.current = null
       collabStateAppliedRef.current = false
       yjsHydratedFromServerRef.current = false
       session.disconnect()
@@ -837,6 +811,8 @@ function StandupDetailPage() {
     }) => {
       if (!standup || readonly) return false
       const currentDrafts = draftsRef.current
+      const sentNotes = standupMiscNotesRef.current
+      const notesDirty = sentNotes !== baselineStandupMiscNotesRef.current
       const scopeEmployeeIds =
         activeGroupId && groupMemberIds && !showAllEmployees
           ? groupMemberIds
@@ -844,10 +820,9 @@ function StandupDetailPage() {
       const entries = buildEntriesPayload(
         standup.entries,
         currentDrafts,
-        scopeEmployeeIds
+        scopeEmployeeIds,
+        entryUpdatedAtRef.current,
       )
-      const notesDirty =
-        standupMiscNotesRef.current !== baselineStandupMiscNotesRef.current
       if (entries.length === 0 && !notesDirty) return true
       if (entries.length > 0 && !options?.assignmentResolutions) {
         const pendingAssignments = getMissingAssignmentsFromStandup(
@@ -879,31 +854,62 @@ function StandupDetailPage() {
           method: "PATCH",
           body: {
             entries,
-            miscellaneousNotes: standupMiscNotesRef.current,
+            ...(notesDirty ? { miscellaneousNotes: sentNotes } : {}),
             assignmentResolutions: options?.assignmentResolutions,
           },
         })
         setStandup(res.data)
-        setStandupMiscNotes(res.data.miscellaneousNotes ?? "")
-        setBaselineStandupMiscNotes(res.data.miscellaneousNotes ?? "")
-        // Only fold saved entries back from the DB. Replacing the full draft map
-        // (and broadcasting it over Yjs) would wipe peers' unsaved work — e.g.
-        // group-scoped saves only persist some employees but the response still
-        // contains every entry as stored in Postgres.
+        // Only adopt server notes if peers did not change them during the save.
+        if (standupMiscNotesRef.current === sentNotes) {
+          const savedNotes = res.data.miscellaneousNotes ?? ""
+          standupMiscNotesRef.current = savedNotes
+          setStandupMiscNotes(savedNotes)
+          setBaselineStandupMiscNotes(savedNotes)
+          if (collabDocRef.current) {
+            writeMetaNotes(collabDocRef.current, savedNotes)
+          }
+        } else {
+          setBaselineStandupMiscNotes(res.data.miscellaneousNotes ?? "")
+        }
+        // Only fold saved entries back from the DB when local/Yjs drafts still
+        // match what we sent — otherwise peers edited during the request and
+        // replaying the response would wipe their work.
         const savedEntryIds = new Set(entries.map((entry) => entry.id))
         const serverDrafts = draftsFromStandup(res.data.entries)
         const nextDrafts = { ...draftsRef.current }
-        const savedDrafts: Record<string, EntryDraft> = {}
+        const map = entriesMapRef.current
+        const nextUpdatedAts = { ...entryUpdatedAtRef.current }
+        for (const entry of res.data.entries ?? []) {
+          if (!savedEntryIds.has(entry.id) || !entry.updatedAt) continue
+          nextUpdatedAts[entry.id] = entry.updatedAt
+        }
+        entryUpdatedAtRef.current = nextUpdatedAts
         for (const entryId of savedEntryIds) {
           const serverDraft = serverDrafts[entryId]
-          if (!serverDraft) continue
+          const sentDraft = currentDrafts[entryId]
+          const liveDraft = draftsRef.current[entryId]
+          if (!serverDraft || !sentDraft) continue
+          const liveChangedDuringSave =
+            liveDraft &&
+            serializeEntryFingerprint(liveDraft) !==
+              serializeEntryFingerprint(sentDraft)
+          if (liveChangedDuringSave) {
+            nextDrafts[entryId] = liveDraft
+            // Still publish DB updatedAt so peers' optimistic locks stay fresh.
+            const at = nextUpdatedAts[entryId]
+            if (map && at) writeEntryUpdatedAt(map, entryId, at)
+            continue
+          }
           nextDrafts[entryId] = serverDraft
-          savedDrafts[entryId] = serverDraft
+          if (map) {
+            writeEntryToYjs(map, entryId, serverDraft)
+            const at = nextUpdatedAts[entryId]
+            if (at) writeEntryUpdatedAt(map, entryId, at)
+          }
         }
         draftsRef.current = nextDrafts
         setDrafts(nextDrafts)
         setBaseline(serializeDrafts(nextDrafts))
-        syncDraftsToYjs(entriesMapRef.current, savedDrafts)
         setMissingAssignments([])
         setResolutionChoices({})
         setMissingAssignmentOpen(false)
@@ -966,12 +972,20 @@ function StandupDetailPage() {
       setDrafts(draftsRef.current)
       const map = entriesMapRef.current
       if (!map) return
-      const serialized = serializeCollabEntry(next)
-      if (map.get(entryId) !== serialized) {
-        map.set(entryId, serialized)
-      }
+      writeEntryToYjs(map, entryId, next)
     },
     []
+  )
+
+  const handleStandupMiscNotesChange = React.useCallback(
+    (next: string) => {
+      standupMiscNotesRef.current = next
+      setStandupMiscNotes(next)
+      if (collabDocRef.current) {
+        writeMetaNotes(collabDocRef.current, next)
+      }
+    },
+    [],
   )
   const handleDraftChangeRef = React.useRef(handleDraftChange)
   handleDraftChangeRef.current = handleDraftChange
@@ -1942,7 +1956,7 @@ function StandupDetailPage() {
               editorKey={`standup-${id}-misc`}
               value={standupMiscNotes}
               disabled={readonly}
-              onChange={setStandupMiscNotes}
+              onChange={handleStandupMiscNotesChange}
               placeholder="General notes, announcements, or blockers for today's stand-up…"
             />
           </CardContent>

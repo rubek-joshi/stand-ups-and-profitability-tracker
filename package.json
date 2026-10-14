@@ -30,11 +30,9 @@
   },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@prisma/engines",
-      "@swc/core",
+      "bcrypt",
       "esbuild",
       "lightningcss",
-      "prisma",
       "unrs-resolver"
     ],
     "ignoredBuiltDependencies": [

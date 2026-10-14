@@ -31,6 +31,7 @@ export class StandupCollabGateway
 {
   private readonly logger = new Logger(StandupCollabGateway.name);
   private readonly docs = new Map<string, Y.Doc>();
+  private readonly persistChains = new Map<string, Promise<void>>();
 
   @WebSocketServer()
   server!: Server;
@@ -74,13 +75,29 @@ export class StandupCollabGateway
     }
   }
 
-  handleDisconnect(client: AuthedSocket): void {
+  async handleDisconnect(client: AuthedSocket): Promise<void> {
     const standupId = client.data.standupId;
-    if (standupId) {
-      client.to(this.room(standupId)).emit("presence:leave", {
-        userId: client.data.userId,
-        userName: client.data.userName,
-      });
+    if (!standupId) return;
+    client.to(this.room(standupId)).emit("presence:leave", {
+      userId: client.data.userId,
+      userName: client.data.userName,
+    });
+    // Evict in-memory doc when the room is empty so the next join reloads DB.
+    try {
+      const sockets = await this.server.in(this.room(standupId)).fetchSockets();
+      if (sockets.length === 0) {
+        const doc = this.docs.get(standupId);
+        if (doc) {
+          await this.persistDoc(standupId, doc);
+          doc.destroy();
+          this.docs.delete(standupId);
+          this.persistChains.delete(standupId);
+        }
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Failed to cleanup standup room ${standupId}: ${String(error)}`,
+      );
     }
   }
 
@@ -88,13 +105,20 @@ export class StandupCollabGateway
   async join(
     @ConnectedSocket() client: AuthedSocket,
     @MessageBody() body: { standupId: string },
-  ): Promise<{ state: string; peers: Array<{ userId: string; userName: string }> }> {
+  ): Promise<{
+    state: string;
+    peers: Array<{ userId: string; userName: string }>;
+  }> {
     const standupId = body.standupId;
     const standup = await this.prismaService.standup.findUnique({
       where: { id: standupId },
     });
     if (!standup) {
       throw new Error("Standup not found");
+    }
+    const previousStandupId = client.data.standupId;
+    if (previousStandupId && previousStandupId !== standupId) {
+      await client.leave(this.room(previousStandupId));
     }
     client.data.standupId = standupId;
     await client.join(this.room(standupId));
@@ -119,6 +143,9 @@ export class StandupCollabGateway
     @ConnectedSocket() client: AuthedSocket,
     @MessageBody() body: { standupId: string; update: string },
   ): Promise<void> {
+    if (!this.clientMayWrite(client, body.standupId)) {
+      return;
+    }
     const doc = this.docs.get(body.standupId);
     if (!doc) {
       return;
@@ -138,11 +165,22 @@ export class StandupCollabGateway
     @MessageBody()
     body: { standupId: string; awareness: Record<string, unknown> },
   ): void {
+    if (!this.clientMayWrite(client, body.standupId)) {
+      return;
+    }
     client.to(this.room(body.standupId)).emit("awareness:update", {
       userId: client.data.userId,
       userName: client.data.userName,
       awareness: body.awareness,
     });
+  }
+
+  private clientMayWrite(client: AuthedSocket, standupId: string): boolean {
+    return Boolean(
+      client.data.userId &&
+        client.data.standupId &&
+        client.data.standupId === standupId,
+    );
   }
 
   private room(standupId: string): string {
@@ -165,11 +203,27 @@ export class StandupCollabGateway
     return doc;
   }
 
-  private async persistDoc(standupId: string, doc: Y.Doc): Promise<void> {
-    const state = Buffer.from(Y.encodeStateAsUpdate(doc));
-    await this.prismaService.standup.update({
-      where: { id: standupId },
-      data: { yjsState: state },
-    });
+  /**
+   * Serialize persists per stand-up so overlapping keystrokes cannot commit
+   * an older full snapshot after a newer one.
+   */
+  private persistDoc(standupId: string, doc: Y.Doc): Promise<void> {
+    const previous = this.persistChains.get(standupId) ?? Promise.resolve();
+    const next = previous
+      .catch(() => undefined)
+      .then(async () => {
+        const state = Buffer.from(Y.encodeStateAsUpdate(doc));
+        await this.prismaService.standup.update({
+          where: { id: standupId },
+          data: { yjsState: state },
+        });
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(
+          `Failed to persist yjsState for ${standupId}: ${String(error)}`,
+        );
+      });
+    this.persistChains.set(standupId, next);
+    return next;
   }
 }
