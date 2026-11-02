@@ -114,11 +114,13 @@ import {
   META_MAP_KEY,
   collectEntryUpdatedAts,
   isLocalYjsOrigin,
+  logStandupMerge,
   mergeYjsEntriesIntoDrafts,
   readMetaNotes,
   seedMetaNotesIfMissing,
   seedMissingEntriesIntoYjs,
   serializeEntryFingerprint,
+  summarizeEntryDraft,
   writeEntryToYjs,
   writeEntryUpdatedAt,
   writeMetaNotes,
@@ -605,32 +607,75 @@ function StandupDetailPage() {
     // then pull Yjs into React.
     seedMissingEntriesIntoYjs(map, draftsToWrite)
     seedMetaNotesIfMissing(doc, standupMiscNotesRef.current)
-    const { drafts: mergedDrafts, changed: yjsChanged } =
-      mergeYjsEntriesIntoDrafts(map, draftsToWrite)
+    const {
+      drafts: mergedDrafts,
+      changed: yjsChanged,
+      changes: yjsChanges,
+    } = mergeYjsEntriesIntoDrafts(map, draftsToWrite)
     let changed = yjsChanged
+    const localOverrideChanges = []
     for (const entryId of locallyDirtyIds) {
       const local = draftsToWrite[entryId]!
+      const beforeOverride = mergedDrafts[entryId]!
       writeEntryToYjs(map, entryId, local)
-      if (mergedDrafts[entryId] !== local) {
+      if (
+        serializeEntryFingerprint(beforeOverride) !==
+        serializeEntryFingerprint(local)
+      ) {
+        localOverrideChanges.push({
+          entryId,
+          before: summarizeEntryDraft(beforeOverride),
+          after: summarizeEntryDraft(local),
+        })
         mergedDrafts[entryId] = local
         changed = true
       }
     }
-    if (changed) {
-      draftsRef.current = mergedDrafts
-      setDrafts(mergedDrafts)
-    }
+    const notesBefore = standupMiscNotesRef.current
+    let notesLog:
+      | {
+          before: string
+          after: string
+          source: "yjs" | "local-dirty-keep"
+        }
+      | undefined
     if (standupMiscNotesRef.current !== baselineStandupMiscNotesRef.current) {
       writeMetaNotes(doc, standupMiscNotesRef.current)
+      notesLog = {
+        before: notesBefore,
+        after: standupMiscNotesRef.current,
+        source: "local-dirty-keep",
+      }
     } else {
       const liveNotes = readMetaNotes(doc)
       if (
         typeof liveNotes === "string" &&
         liveNotes !== standupMiscNotesRef.current
       ) {
+        notesLog = {
+          before: standupMiscNotesRef.current,
+          after: liveNotes,
+          source: "yjs",
+        }
         standupMiscNotesRef.current = liveNotes
         setStandupMiscNotes(liveNotes)
       }
+    }
+    logStandupMerge("hydrate", {
+      standupId: id,
+      peerCount: peersRef.current.length,
+      locallyDirtyIds,
+      changes: [...yjsChanges, ...localOverrideChanges],
+      notes: notesLog,
+      appliedToReact: changed || Boolean(notesLog),
+      extra: {
+        yjsChangeCount: yjsChanges.length,
+        localOverrideCount: localOverrideChanges.length,
+      },
+    })
+    if (changed) {
+      draftsRef.current = mergedDrafts
+      setDrafts(mergedDrafts)
     }
     entryUpdatedAtRef.current = {
       ...entryUpdatedAtRef.current,
@@ -771,12 +816,40 @@ function StandupDetailPage() {
     const entriesMap = session.doc.getMap<unknown>(ENTRIES_MAP_KEY)
     const metaMap = session.doc.getMap<unknown>(META_MAP_KEY)
     entriesMapRef.current = entriesMap
-    const syncFromYjs = () => {
+    const syncFromYjs = (origin: unknown) => {
       if (!yjsHydratedFromServerRef.current) return
-      const { drafts: next, changed } = mergeYjsEntriesIntoDrafts(
+      const { drafts: next, changed, changes } = mergeYjsEntriesIntoDrafts(
         entriesMap,
         draftsRef.current,
       )
+      const liveNotes = readMetaNotes(session.doc)
+      let notesLog:
+        | {
+            before: string
+            after: string
+            source: "yjs" | "local-dirty-keep"
+          }
+        | undefined
+      if (
+        typeof liveNotes === "string" &&
+        liveNotes !== standupMiscNotesRef.current
+      ) {
+        notesLog = {
+          before: standupMiscNotesRef.current,
+          after: liveNotes,
+          source: "yjs",
+        }
+        standupMiscNotesRef.current = liveNotes
+        setStandupMiscNotes(liveNotes)
+      }
+      logStandupMerge("remote-sync", {
+        standupId: id,
+        origin,
+        peerCount: peersRef.current.length,
+        changes,
+        notes: notesLog,
+        appliedToReact: changed || Boolean(notesLog),
+      })
       if (changed) {
         draftsRef.current = next
         setDrafts(next)
@@ -785,20 +858,12 @@ function StandupDetailPage() {
         ...entryUpdatedAtRef.current,
         ...collectEntryUpdatedAts(entriesMap),
       }
-      const liveNotes = readMetaNotes(session.doc)
-      if (
-        typeof liveNotes === "string" &&
-        liveNotes !== standupMiscNotesRef.current
-      ) {
-        standupMiscNotesRef.current = liveNotes
-        setStandupMiscNotes(liveNotes)
-      }
     }
     // Ignore our own Yjs writes — echoing them through setDrafts races keystrokes
     // and makes task/notes fields feel frozen or revert on every character.
     const observer = (_events: unknown, transaction: { origin: unknown }) => {
       if (isLocalYjsOrigin(transaction.origin)) return
-      syncFromYjs()
+      syncFromYjs(transaction.origin)
     }
     entriesMap.observeDeep(observer)
     metaMap.observe(observer)
