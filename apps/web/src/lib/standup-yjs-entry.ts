@@ -8,6 +8,18 @@ export const ENTRIES_MAP_KEY = "entries"
 export const META_MAP_KEY = "meta"
 export const META_NOTES_KEY = "miscellaneousNotes"
 
+/** Yjs transaction origins used for local/client writes — observers must ignore these. */
+export const LOCAL_YJS_ORIGINS = new Set([
+  "local-entry",
+  "local-entry-updated-at",
+  "local-meta",
+  "hydrate-meta",
+])
+
+export function isLocalYjsOrigin(origin: unknown): boolean {
+  return typeof origin === "string" && LOCAL_YJS_ORIGINS.has(origin)
+}
+
 function allocationsJson(draft: EntryDraft): string {
   return JSON.stringify(draft.allocations)
 }
@@ -89,6 +101,7 @@ export function writeEntryToYjs(
 ): void {
   const apply = () => {
     let entry = map.get(entryId)
+    // Migrate legacy whole-JSON strings to nested field maps.
     if (!(entry instanceof Y.Map)) {
       entry = new Y.Map<unknown>()
       map.set(entryId, entry)

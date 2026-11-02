@@ -113,6 +113,7 @@ import {
   ENTRIES_MAP_KEY,
   META_MAP_KEY,
   collectEntryUpdatedAts,
+  isLocalYjsOrigin,
   mergeYjsEntriesIntoDrafts,
   readMetaNotes,
   seedMetaNotesIfMissing,
@@ -765,7 +766,10 @@ function StandupDetailPage() {
         setStandupMiscNotes(liveNotes)
       }
     }
-    const observer = () => {
+    // Ignore our own Yjs writes — echoing them through setDrafts races keystrokes
+    // and makes task/notes fields feel frozen or revert on every character.
+    const observer = (_events: unknown, transaction: { origin: unknown }) => {
+      if (isLocalYjsOrigin(transaction.origin)) return
       syncFromYjs()
     }
     entriesMap.observeDeep(observer)

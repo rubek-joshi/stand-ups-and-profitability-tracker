@@ -47,6 +47,22 @@ export class JobsService {
     }
   }
 
+  /** 1:30 AM Asia/Kathmandu — release employees with no tasks on a project for two stand-ups. */
+  @Cron("30 1 * * *", { timeZone: "Asia/Kathmandu" })
+  async runReleaseIdleProjectAssignments(): Promise<void> {
+    try {
+      const result =
+        await this.standupsService.releaseAssignmentsWithoutRecentTasks();
+      if (result.released > 0) {
+        this.logger.log(
+          `Released ${result.released} idle project assignment(s)`,
+        );
+      }
+    } catch (error) {
+      this.logger.error("Idle project assignment release job failed", error);
+    }
+  }
+
   async autoExtendProjects(): Promise<void> {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);

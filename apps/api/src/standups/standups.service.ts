@@ -686,118 +686,144 @@ export class StandupsService {
       }
     }
 
-    const updatedEntries = await this.prismaService.$transaction(async (tx) => {
-      if (dto.assignmentResolutions?.length) {
-        for (const resolution of dto.assignmentResolutions) {
-          if (resolution.action === "remove_allocation") {
-            continue;
+    const { updatedEntries, unlinkAudits } =
+      await this.prismaService.$transaction(async (tx) => {
+        if (dto.assignmentResolutions?.length) {
+          for (const resolution of dto.assignmentResolutions) {
+            if (resolution.action === "remove_allocation") {
+              continue;
+            }
+            await this.applyAssignmentResolution(tx, standup.date, resolution);
           }
-          await this.applyAssignmentResolution(tx, standup.date, resolution);
         }
-      }
-      for (const item of entriesToSave) {
-        const entry = entryById.get(item.id)!;
-        const attendanceStatus =
-          item.attendanceStatus ?? entry.attendanceStatus;
-        if (
-          attendanceStatus !== AttendanceStatus.absent &&
-          item.allocations?.length
-        ) {
-          await this.validateAllocationProjects(
-            entry.employeeId,
-            item.allocations.map((a) => a.projectId),
-            standup.date,
-            tx,
-          );
+        for (const item of entriesToSave) {
+          const entry = entryById.get(item.id)!;
+          const attendanceStatus =
+            item.attendanceStatus ?? entry.attendanceStatus;
+          if (
+            attendanceStatus !== AttendanceStatus.absent &&
+            item.allocations?.length
+          ) {
+            await this.validateAllocationProjects(
+              entry.employeeId,
+              item.allocations.map((a) => a.projectId),
+              standup.date,
+              tx,
+            );
+          }
         }
-      }
-      const results = [];
-      for (const item of entriesToSave) {
-        const entry = entryById.get(item.id)!;
-        const attendanceStatus =
-          item.attendanceStatus ?? entry.attendanceStatus;
-        const isAbsent = attendanceStatus === AttendanceStatus.absent;
+        const results = [];
+        const unlinkAudits: Array<{
+          action: AuditAction;
+          targetId: string;
+          metadata: Record<string, unknown>;
+        }> = [];
+        for (const item of entriesToSave) {
+          const entry = entryById.get(item.id)!;
+          const attendanceStatus =
+            item.attendanceStatus ?? entry.attendanceStatus;
+          const isAbsent = attendanceStatus === AttendanceStatus.absent;
 
-        if (item.allocations !== undefined || isAbsent) {
-          await tx.projectAllocation.deleteMany({
-            where: { standupEntryId: item.id },
-          });
-          if (!isAbsent && item.allocations?.length) {
-            for (const [index, allocation] of item.allocations.entries()) {
-              const tasks = (allocation.tasks ?? [])
-                .map((task, taskIndex) => ({
-                  text: task.text ?? "",
-                  state: task.state ?? StandupTaskState.open,
-                  blocker: task.blocker != null && task.blocker.trim().length > 0
-                    ? task.blocker.replace(/\s+$/, "")
-                    : null,
-                  sortOrder: task.sortOrder ?? taskIndex,
-                }))
-                .filter(
-                  (task) =>
-                    task.text.trim().length > 0 ||
-                    task.blocker !== null ||
-                    task.state !== StandupTaskState.open,
-                );
-              await tx.projectAllocation.create({
-                data: {
-                  standupEntryId: item.id,
-                  projectId: allocation.projectId,
-                  percentage: allocation.percentage,
-                  isNonBillable: allocation.isNonBillable ?? false,
-                  tasks: {
-                    create: tasks,
+          if (item.allocations !== undefined || isAbsent) {
+            await tx.projectAllocation.deleteMany({
+              where: { standupEntryId: item.id },
+            });
+            if (!isAbsent && item.allocations?.length) {
+              for (const [index, allocation] of item.allocations.entries()) {
+                const tasks = (allocation.tasks ?? [])
+                  .map((task, taskIndex) => ({
+                    text: task.text ?? "",
+                    state: task.state ?? StandupTaskState.open,
+                    blocker:
+                      task.blocker != null && task.blocker.trim().length > 0
+                        ? task.blocker.replace(/\s+$/, "")
+                        : null,
+                    sortOrder: task.sortOrder ?? taskIndex,
+                  }))
+                  .filter(
+                    (task) =>
+                      task.text.trim().length > 0 ||
+                      task.blocker !== null ||
+                      task.state !== StandupTaskState.open,
+                  );
+                await tx.projectAllocation.create({
+                  data: {
+                    standupEntryId: item.id,
+                    projectId: allocation.projectId,
+                    percentage: allocation.percentage,
+                    isNonBillable: allocation.isNonBillable ?? false,
+                    tasks: {
+                      create: tasks,
+                    },
                   },
-                },
-              });
-              void index;
+                });
+                void index;
+              }
             }
           }
-        }
 
-        results.push(
-          await tx.standupEntry.update({
-            where: { id: item.id },
-            data: {
-              attendanceStatus: item.attendanceStatus,
-              miscellaneousNotes: isAbsent
-                ? null
-                : item.miscellaneousNotes !== undefined
-                  ? item.miscellaneousNotes
-                  : undefined,
-            },
-            include: {
-              employee: true,
-              allocations: {
-                include: {
-                  project: true,
-                  tasks: { orderBy: { sortOrder: "asc" } },
+          results.push(
+            await tx.standupEntry.update({
+              where: { id: item.id },
+              data: {
+                attendanceStatus: item.attendanceStatus,
+                miscellaneousNotes: isAbsent
+                  ? null
+                  : item.miscellaneousNotes !== undefined
+                    ? item.miscellaneousNotes
+                    : undefined,
+              },
+              include: {
+                employee: true,
+                allocations: {
+                  include: {
+                    project: true,
+                    tasks: { orderBy: { sortOrder: "asc" } },
+                  },
                 },
               },
-            },
-          }),
-        );
-      }
-      await tx.standup.update({
-        where: { id: standupId },
-        data: {
-          updatedById: actorId,
-          ...(dto.miscellaneousNotes !== undefined
-            ? {
-                miscellaneousNotes:
-                  dto.miscellaneousNotes?.trim() || null,
-              }
-            : {}),
-        },
+            }),
+          );
+
+          if (!isAbsent && item.allocations !== undefined) {
+            const audits = await this.unlinkRemovedProjectAssignments(
+              tx,
+              entry.employeeId,
+              standup.date,
+              item.allocations.map((allocation) => allocation.projectId),
+            );
+            unlinkAudits.push(...audits);
+          }
+        }
+        await tx.standup.update({
+          where: { id: standupId },
+          data: {
+            updatedById: actorId,
+            ...(dto.miscellaneousNotes !== undefined
+              ? {
+                  miscellaneousNotes: dto.miscellaneousNotes?.trim() || null,
+                }
+              : {}),
+          },
+        });
+        return { updatedEntries: results, unlinkAudits };
       });
-      return results;
-    });
 
     await this.rederiveAttendanceForEmployees(
       standupId,
       updatedEntries.map((item) => item.employeeId),
     );
     this.profitabilityService.clearCache();
+
+    for (const audit of unlinkAudits) {
+      await this.auditService.write({
+        actorId,
+        action: audit.action,
+        targetType: "ProjectAssignment",
+        targetId: audit.targetId,
+        metadata: audit.metadata,
+      });
+    }
 
     await this.auditService.write({
       actorId,
@@ -910,6 +936,219 @@ export class StandupsService {
     }
 
     return { standupId: standup.id, markedAbsent: emptyIds.length };
+  }
+
+  /**
+   * End open ProjectAssignments where the employee logged no meaningful tasks
+   * on that project across the two most recent stand-ups.
+   */
+  async releaseAssignmentsWithoutRecentTasks(): Promise<{
+    released: number;
+  }> {
+    const standups = await this.prismaService.standup.findMany({
+      orderBy: { date: "desc" },
+      take: 2,
+      include: {
+        entries: {
+          include: {
+            allocations: {
+              include: {
+                tasks: true,
+              },
+            },
+          },
+        },
+      },
+    });
+    if (standups.length < 2) {
+      return { released: 0 };
+    }
+
+    // findMany date desc → [later, earlier]
+    const later = standups[0]!;
+    const earlier = standups[1]!;
+    const laterDay = toIsoDate(later.date);
+    const earlierDay = toIsoDate(earlier.date);
+
+    const openAssignments =
+      await this.prismaService.projectAssignment.findMany({
+        where: { unassignedAt: null },
+      });
+
+    const candidates = openAssignments.filter(
+      (assignment) =>
+        assignmentCoversDate(
+          assignment.assignedAt,
+          assignment.unassignedAt,
+          earlier.date,
+        ) &&
+        assignmentCoversDate(
+          assignment.assignedAt,
+          assignment.unassignedAt,
+          later.date,
+        ),
+    );
+
+    const entryByEmployee = (
+      standup: (typeof standups)[number],
+      employeeId: string,
+    ) => standup.entries.find((entry) => entry.employeeId === employeeId);
+
+    const loggedTaskOnProject = (
+      standup: (typeof standups)[number],
+      employeeId: string,
+      projectId: string,
+    ): boolean => {
+      const entry = entryByEmployee(standup, employeeId);
+      if (!entry) return false;
+      const allocation = entry.allocations.find(
+        (item) => item.projectId === projectId,
+      );
+      if (!allocation) return false;
+      return allocation.tasks.some((task) => this.isMeaningfulTask(task));
+    };
+
+    const releasedProjectIds = new Set<string>();
+    let released = 0;
+
+    for (const assignment of candidates) {
+      const earlierEntry = entryByEmployee(earlier, assignment.employeeId);
+      const laterEntry = entryByEmployee(later, assignment.employeeId);
+      if (!earlierEntry || !laterEntry) {
+        continue;
+      }
+      if (
+        loggedTaskOnProject(earlier, assignment.employeeId, assignment.projectId) ||
+        loggedTaskOnProject(later, assignment.employeeId, assignment.projectId)
+      ) {
+        continue;
+      }
+      // Inclusive last day = later stand-up; skip if assigned after that day.
+      if (toIsoDate(assignment.assignedAt) > laterDay) {
+        continue;
+      }
+      await this.prismaService.projectAssignment.update({
+        where: { id: assignment.id },
+        data: { unassignedAt: later.date },
+      });
+      await this.auditService.write({
+        actorId: null,
+        action: AuditAction.PROJECT_ASSIGNMENT_ENDED,
+        targetType: "ProjectAssignment",
+        targetId: assignment.id,
+        metadata: {
+          reason: "no_tasks_two_standups",
+          projectId: assignment.projectId,
+          employeeId: assignment.employeeId,
+          assignedAt: toIsoDate(assignment.assignedAt),
+          unassignedAt: laterDay,
+          standupIds: [earlier.id, later.id],
+          dates: [earlierDay, laterDay],
+        },
+      });
+      releasedProjectIds.add(assignment.projectId);
+      released += 1;
+    }
+
+    for (const projectId of releasedProjectIds) {
+      this.profitabilityService.clearCache(projectId);
+    }
+
+    return { released };
+  }
+
+  private isMeaningfulTask(task: {
+    text: string;
+    blocker: string | null;
+    state: StandupTaskState;
+  }): boolean {
+    return (
+      task.text.trim().length > 0 ||
+      (task.blocker != null && task.blocker.trim().length > 0) ||
+      task.state !== StandupTaskState.open
+    );
+  }
+
+  /**
+   * When a rostered project is omitted from a non-absent stand-up save
+   * (UI "Remove project"), end or delete the covering ProjectAssignment so
+   * the employee is no longer linked starting on this stand-up date.
+   */
+  private async unlinkRemovedProjectAssignments(
+    tx: Prisma.TransactionClient,
+    employeeId: string,
+    standupDate: Date,
+    keptProjectIds: string[],
+  ): Promise<
+    Array<{
+      action: AuditAction;
+      targetId: string;
+      metadata: Record<string, unknown>;
+    }>
+  > {
+    const kept = new Set(keptProjectIds);
+    const standupDay = toIsoDate(standupDate);
+    const audits: Array<{
+      action: AuditAction;
+      targetId: string;
+      metadata: Record<string, unknown>;
+    }> = [];
+    const assignments = await tx.projectAssignment.findMany({
+      where: {
+        employeeId,
+        unassignedAt: null,
+      },
+    });
+    for (const assignment of assignments) {
+      if (kept.has(assignment.projectId)) {
+        continue;
+      }
+      if (
+        !assignmentCoversDate(
+          assignment.assignedAt,
+          assignment.unassignedAt,
+          standupDate,
+        )
+      ) {
+        continue;
+      }
+      const assignedDay = toIsoDate(assignment.assignedAt);
+      if (assignedDay === standupDay) {
+        await tx.projectAssignment.delete({ where: { id: assignment.id } });
+        audits.push({
+          action: AuditAction.PROJECT_ASSIGNMENT_DELETED,
+          targetId: assignment.id,
+          metadata: {
+            reason: "standup_remove_project",
+            projectId: assignment.projectId,
+            employeeId,
+            assignedAt: assignedDay,
+            standupDate: standupDay,
+          },
+        });
+        continue;
+      }
+      if (assignedDay < standupDay) {
+        const endDay = dayBefore(standupDate);
+        await tx.projectAssignment.update({
+          where: { id: assignment.id },
+          data: { unassignedAt: endDay },
+        });
+        audits.push({
+          action: AuditAction.PROJECT_ASSIGNMENT_ENDED,
+          targetId: assignment.id,
+          metadata: {
+            reason: "standup_remove_project",
+            projectId: assignment.projectId,
+            employeeId,
+            assignedAt: assignedDay,
+            unassignedAt: toIsoDate(endDay),
+            standupDate: standupDay,
+          },
+        });
+      }
+    }
+    return audits;
   }
 
   private async loadStandupOrThrow(id: string) {
