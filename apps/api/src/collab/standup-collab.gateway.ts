@@ -14,6 +14,8 @@ import { Server, Socket } from "socket.io";
 import * as Y from "yjs";
 import { PrismaService } from "../prisma/prisma.service.js";
 
+const EVICTION_GRACE_MS = 60_000;
+
 type AuthedSocket = Socket & {
   data: {
     userId?: string;
@@ -32,6 +34,7 @@ export class StandupCollabGateway
   private readonly logger = new Logger(StandupCollabGateway.name);
   private readonly docs = new Map<string, Y.Doc>();
   private readonly persistChains = new Map<string, Promise<void>>();
+  private readonly evictionTimers = new Map<string, NodeJS.Timeout>();
 
   @WebSocketServer()
   server!: Server;
@@ -75,25 +78,52 @@ export class StandupCollabGateway
     }
   }
 
-  async handleDisconnect(client: AuthedSocket): Promise<void> {
+  handleDisconnect(client: AuthedSocket): void {
     const standupId = client.data.standupId;
     if (!standupId) return;
     client.to(this.room(standupId)).emit("presence:leave", {
       userId: client.data.userId,
       userName: client.data.userName,
     });
-    // Evict in-memory doc when the room is empty so the next join reloads DB.
+    this.scheduleEviction(standupId);
+  }
+
+  /**
+   * Evict after a grace period, and only if the room is still empty. Evicting
+   * immediately raced reconnects/remounts: a socket could join the doc that
+   * was about to be destroyed, and all of its later updates were dropped.
+   */
+  private scheduleEviction(standupId: string): void {
+    this.cancelEviction(standupId);
+    const timer = setTimeout(() => {
+      this.evictionTimers.delete(standupId);
+      void this.evictIfEmpty(standupId);
+    }, EVICTION_GRACE_MS);
+    this.evictionTimers.set(standupId, timer);
+  }
+
+  private cancelEviction(standupId: string): void {
+    const timer = this.evictionTimers.get(standupId);
+    if (timer) {
+      clearTimeout(timer);
+      this.evictionTimers.delete(standupId);
+    }
+  }
+
+  private async evictIfEmpty(standupId: string): Promise<void> {
     try {
       const sockets = await this.server.in(this.room(standupId)).fetchSockets();
-      if (sockets.length === 0) {
-        const doc = this.docs.get(standupId);
-        if (doc) {
-          await this.persistDoc(standupId, doc);
-          doc.destroy();
-          this.docs.delete(standupId);
-          this.persistChains.delete(standupId);
-        }
-      }
+      if (sockets.length > 0) return;
+      const doc = this.docs.get(standupId);
+      if (!doc) return;
+      await this.persistDoc(standupId, doc);
+      // Someone may have joined while persisting.
+      if (this.evictionTimers.has(standupId)) return;
+      const after = await this.server.in(this.room(standupId)).fetchSockets();
+      if (after.length > 0 || this.docs.get(standupId) !== doc) return;
+      doc.destroy();
+      this.docs.delete(standupId);
+      this.persistChains.delete(standupId);
     } catch (error) {
       this.logger.warn(
         `Failed to cleanup standup room ${standupId}: ${String(error)}`,
@@ -121,6 +151,7 @@ export class StandupCollabGateway
       await client.leave(this.room(previousStandupId));
     }
     client.data.standupId = standupId;
+    this.cancelEviction(standupId);
     await client.join(this.room(standupId));
     const doc = await this.getOrLoadDoc(standupId, standup.yjsState);
     const state = Buffer.from(Y.encodeStateAsUpdate(doc)).toString("base64");
@@ -146,10 +177,17 @@ export class StandupCollabGateway
     if (!this.clientMayWrite(client, body.standupId)) {
       return;
     }
-    const doc = this.docs.get(body.standupId);
+    let doc = this.docs.get(body.standupId);
     if (!doc) {
-      return;
+      // Never drop edits — reload the doc from DB if it was evicted.
+      const standup = await this.prismaService.standup.findUnique({
+        where: { id: body.standupId },
+        select: { yjsState: true },
+      });
+      if (!standup) return;
+      doc = await this.getOrLoadDoc(body.standupId, standup.yjsState);
     }
+    this.cancelEviction(body.standupId);
     const update = Buffer.from(body.update, "base64");
     Y.applyUpdate(doc, update);
     client.to(this.room(body.standupId)).emit("yjs:update", {

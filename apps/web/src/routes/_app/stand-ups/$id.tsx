@@ -568,6 +568,7 @@ function StandupDetailPage() {
   const entriesMapRef = React.useRef<Y.Map<unknown> | null>(null)
   const collabDocRef = React.useRef<Y.Doc | null>(null)
   const entryUpdatedAtRef = React.useRef<Record<string, string>>({})
+  const baselineDraftsRef = React.useRef<Record<string, EntryDraft>>({})
   const draftsRef = React.useRef(drafts)
   draftsRef.current = drafts
   const peersRef = React.useRef(peers)
@@ -587,23 +588,49 @@ function StandupDetailPage() {
     }
     if (yjsHydratedFromServerRef.current) return
     if (Object.keys(draftsToWrite).length === 0) return
+    // Entries edited locally since the last load/save (e.g. the collab session
+    // was recreated mid-edit) must win over the server doc, or rejoining with
+    // a stale doc wipes what the user just typed.
+    const baselineDrafts = baselineDraftsRef.current
+    const locallyDirtyIds = Object.keys(draftsToWrite).filter((entryId) => {
+      const base = baselineDrafts[entryId]
+      return (
+        !base ||
+        serializeEntryFingerprint(draftsToWrite[entryId]!) !==
+          serializeEntryFingerprint(base)
+      )
+    })
     // Never replace existing Yjs content with Postgres — that destroys unsaved
     // collab drafts when the next person opens alone. Only seed missing keys,
     // then pull Yjs into React.
     seedMissingEntriesIntoYjs(map, draftsToWrite)
     seedMetaNotesIfMissing(doc, standupMiscNotesRef.current)
-    const { drafts: mergedDrafts, changed } = mergeYjsEntriesIntoDrafts(
-      map,
-      draftsToWrite,
-    )
+    const { drafts: mergedDrafts, changed: yjsChanged } =
+      mergeYjsEntriesIntoDrafts(map, draftsToWrite)
+    let changed = yjsChanged
+    for (const entryId of locallyDirtyIds) {
+      const local = draftsToWrite[entryId]!
+      writeEntryToYjs(map, entryId, local)
+      if (mergedDrafts[entryId] !== local) {
+        mergedDrafts[entryId] = local
+        changed = true
+      }
+    }
     if (changed) {
       draftsRef.current = mergedDrafts
       setDrafts(mergedDrafts)
     }
-    const liveNotes = readMetaNotes(doc)
-    if (typeof liveNotes === "string" && liveNotes !== standupMiscNotesRef.current) {
-      standupMiscNotesRef.current = liveNotes
-      setStandupMiscNotes(liveNotes)
+    if (standupMiscNotesRef.current !== baselineStandupMiscNotesRef.current) {
+      writeMetaNotes(doc, standupMiscNotesRef.current)
+    } else {
+      const liveNotes = readMetaNotes(doc)
+      if (
+        typeof liveNotes === "string" &&
+        liveNotes !== standupMiscNotesRef.current
+      ) {
+        standupMiscNotesRef.current = liveNotes
+        setStandupMiscNotes(liveNotes)
+      }
     }
     entryUpdatedAtRef.current = {
       ...entryUpdatedAtRef.current,
@@ -650,6 +677,7 @@ function StandupDetailPage() {
       const fromServer = draftsFromStandup(s.data.entries)
       const next = applyAssignedProjectDefaults(fromServer, s.data, p.data)
       draftsRef.current = next
+      baselineDraftsRef.current = next
       draftsReadyRef.current = true
       entryUpdatedAtRef.current = Object.fromEntries(
         (s.data.entries ?? [])
@@ -912,6 +940,7 @@ function StandupDetailPage() {
           }
         }
         draftsRef.current = nextDrafts
+        baselineDraftsRef.current = nextDrafts
         setDrafts(nextDrafts)
         setBaseline(serializeDrafts(nextDrafts))
         setMissingAssignments([])
@@ -975,7 +1004,9 @@ function StandupDetailPage() {
       draftsRef.current = { ...draftsRef.current, [entryId]: next }
       setDrafts(draftsRef.current)
       const map = entriesMapRef.current
-      if (!map) return
+      // Before the first sync, a write would create a competing entry map that
+      // can lose to the server's on merge; hydrate pushes local edits instead.
+      if (!map || !yjsHydratedFromServerRef.current) return
       writeEntryToYjs(map, entryId, next)
     },
     []
@@ -985,7 +1016,7 @@ function StandupDetailPage() {
     (next: string) => {
       standupMiscNotesRef.current = next
       setStandupMiscNotes(next)
-      if (collabDocRef.current) {
+      if (collabDocRef.current && yjsHydratedFromServerRef.current) {
         writeMetaNotes(collabDocRef.current, next)
       }
     },
